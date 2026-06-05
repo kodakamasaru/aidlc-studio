@@ -8,7 +8,7 @@
   - [backtrack](./screenshots/scr-04-review-detail.backtrack.png)
 - 対応 S2 SCR: [SCR-04](../s2/scr-04-review-detail.md) / 設計: [design/review-output.md](../design/review-output.md)
 - 対応 US: [US-13](../s1/us-13-visual-review-step.md)
-- ステータス: レビュー待ち
+- ステータス: 確定
 
 ## 状態網羅
 - **default**: ReviewBlock[] を上から block-stream で描画(summary / ac-map / mermaid / risk … MVP は軽いブロックのみ)。topbar 右に 2 アクション = 差し戻し(↩・危険寄り)/ 承認して次 Phase へ(primary)。

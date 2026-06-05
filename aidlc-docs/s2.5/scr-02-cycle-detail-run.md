@@ -10,7 +10,7 @@
   - [done](./screenshots/scr-02-cycle-detail-run.done.png)
 - 対応 S2 SCR: [SCR-02](../s2/scr-02-cycle-detail-run.md)
 - 対応 US: [US-06](../s1/us-06-cycle-start-phase.md) / [US-07](../s1/us-07-agent-generate-artifact.md) / [US-08](../s1/us-08-retry-run.md)
-- ステータス: レビュー待ち
+- ステータス: 確定
 
 ## 状態網羅(Run state = 画面の主役)
 - **idle**: Run 未起動。topbar に idle バッジ、主アクション = 「Sn Phase 起動」。パイプラインは現在ステップを current(indigo)で表示。

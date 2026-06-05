@@ -9,10 +9,10 @@
   - [create](./screenshots/scr-01-cycle-list-create.create.png)
 - 対応 S2 SCR: [SCR-01](../s2/scr-01-cycle-list-create.md)
 - 対応 US: [US-05](../s1/us-05-cycle-create.md)
-- ステータス: レビュー待ち
+- ステータス: 確定
 
 ## 状態網羅
-- **list**: Cycle 行が並ぶ。各行 = 状態バッジ(running/stalled/done/idle・色 + dot)+ 名前 + meta(対象リポ / 現在ステップ / 更新相対時刻)+ 末尾に `Sn / 7` 進捗と chevron。更新日時降順。
+- **list**: Cycle 行が並ぶ。各行 = 状態バッジ(running/stalled/done/idle・色 + dot)+ 名前 + meta(現在ステップ / 更新相対時刻)+ 末尾に `Sn / 7` 進捗と chevron。更新日時降順。
 - **empty**: Cycle 0 件。中央に glyph + 見出し + 「最初の Cycle を作る」CTA のみ(S2 既定)。
 - **create**: 作成ダイアログ(modal)。**Cycle 名 + 概要/ゴール(任意)のみ**。MVP は対象リポ選択・Task 入力を持たない(下記 D-02)。単一 Task 既定は背景生成(US-05 充足)。
 
@@ -24,7 +24,7 @@
 
 ## a11y(色だけに依存しない)
 - 状態は **色 + dot + テキストラベル**の三重符号(`running` 等の語をバッジ内に必ず出す)。
-- フォーカス順: topbar 新規ボタン → 各行(`role="button"`)→ (modal 内)名前 → リポ → Task → 作成。
+- フォーカス順: topbar 新規ボタン → 各行(`role="button"`)→ (modal 内)Cycle 名 → 概要 → 作成。
 - modal: フォーカストラップ / Esc で閉じる / 背景 `aria-hidden` / `aria-modal="true"`。
 - コントラスト: 本文 text-hi on surface = WCAG AA 以上。バッジ文字は各状態色(soft 背景上)で AA を満たす値を選定。
 

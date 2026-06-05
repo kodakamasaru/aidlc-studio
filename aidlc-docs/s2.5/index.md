@@ -4,7 +4,7 @@
 - 工程: S2.5 (UI Spec / Image)
 - 役割: プロダクトデザイナー(視覚意図担当)
 - バージョン: v0.0.1
-- ステータス: レビュー待ち
+- ステータス: 確定
 - 入力参照: [s2/index.md](../s2/index.md) / [design/review-output.md](../design/review-output.md)
 - 作成日: 2026-06-05
 - 更新日: 2026-06-05
@@ -78,15 +78,15 @@
 - **確定**(AI 記入):
   > primary = indigo+violet、Run 状態 = running:teal / stalled:amber / done:green / failed:red / idle:neutral で確定。Inbox 種別は primary ファミリ内で indigo-400(Q)/ purple-400(レビュー)に分離。
 
-### Q-04 — この視覚意図(tokens + 5 画面 + 状態網羅)で確定してよいか?(**ユーザー確認待ち**)
+### Q-04 — この視覚意図(tokens + 5 画面 + 状態網羅)で確定してよいか?
 - 確認方法: `s2.5/*.html` をブラウザで開く(細部は html、俯瞰は `screenshots/*.png`)。特に見てほしい点:
   1. SCR-02 のパイプライン(現在位置 / done / 手戻りマーカー ↩)と Run 状態(idle/running/stalled/done)の判別性
   2. SCR-03 Inbox の Q 待ち / レビュー待ちが一目で分かるか(色 + アイコン)
   3. SCR-04 block-stream の階層と、承認 / 差し戻し(↩)の重みのバランス
 - **回答**(ユーザー記入):
-  > SCR-01 作成フォームの「初期 Task」欄が意味不明 + 「対象リポ」はリポ=PJ なので選ぶ意味ない。それ以外はいったん OK。
+  > SCR-01 作成フォームの「初期 Task」欄が意味不明 + 「対象リポ」はリポ=PJ なので選ぶ意味ない。それ以外 OK。修正版 create も OK。
 - **確定**(AI 記入):
-  > 視覚方向・トークン・他 4 画面は承認。SCR-01 作成フォームのみ修正(D-06) — 対象リポ選択と初期 Task 入力を削除し「Cycle 名 + 概要(任意)」に単純化。**最終 `確定` は修正版 create の再確認待ち**。
+  > **確定**。視覚方向・トークン・5 画面すべて承認。SCR-01 作成フォームは対象リポ選択と初期 Task 入力を削除し「Cycle 名 + 概要(任意)」に単純化(D-06)、修正版も承認。S2 SCR-01 へ手戻り反映 + BACKLOG.md 台帳化済。
 
 ---
 

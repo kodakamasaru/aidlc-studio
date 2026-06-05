@@ -8,7 +8,7 @@
   - [empty](./screenshots/scr-03-human-inbox.empty.png)
 - 対応 S2 SCR: [SCR-03](../s2/scr-03-human-inbox.md)
 - 対応 US: [US-12](../s1/us-12-answer-question.md) / [US-13](../s1/us-13-visual-review-step.md)
-- ステータス: レビュー待ち
+- ステータス: 確定
 
 ## 状態網羅
 - **list**: Q 待ち / レビュー待ちカードが混在で時系列に並ぶ。各行 = 種別バッジ(色 + アイコン)+ タイトル + meta(Cycle / ステップ / 相対時刻 / 補足)+ 種別に応じた主アクション(回答する / レビュー)+ chevron。sidebar Inbox に未処理件数。

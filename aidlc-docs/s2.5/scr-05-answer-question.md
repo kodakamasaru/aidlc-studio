@@ -7,7 +7,7 @@
   - [default](./screenshots/scr-05-answer-question.default.png)
 - 対応 S2 SCR: [SCR-05](../s2/scr-05-answer-question.md)
 - 対応 US: [US-12](../s1/us-12-answer-question.md)
-- ステータス: レビュー待ち
+- ステータス: 確定
 
 ## 状態網羅
 - **default**: 質問カード(Q バッジ + 番号 + 経過 + 「worktree は回答待ちで一時停止中」)+ 質問本文 + 補足 + 文脈リンク(関連成果物 / 該当ステップ出力)。下に回答テキストエリア(複数行・mono)+ 送信。送信ボタンは回答入力で活性(S2)。
