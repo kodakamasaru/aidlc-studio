@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-04: レビュー詳細(汎用 block-stream)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: default ===================== -->
+    <section data-state="default" data-screen="scr-04-review-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item active"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar">
+            <span class="crumb">Inbox / <b>レビュー詳細</b></span><span class="spacer"></span>
+            <button class="btn btn-danger">↩ 差し戻し</button>
+            <button class="btn btn-primary">✓ 承認して次 Phase へ</button>
+          </div>
+          <div class="content">
+            <div class="rowflex gap-3"><span class="badge b-review">◎ レビュー待ち</span><h1 class="page-title" style="font-size:18px">S3 Unit 分割の確定レビュー</h1></div>
+            <p class="page-sub">v0.0.1 · S3 unit-of-work · ReviewBlock[] を上から描画</p>
+
+            <div class="blocks mt-6">
+              <div class="block">
+                <div class="block-head"><span class="kind">summary</span></div>
+                <div class="block-body"><p style="margin:0" class="muted">Cycle/Run の実行、Human Inbox/Decision、レビュー(ReviewBlock 生成)、orchestration(Agent 起動/stall/retry)の <b style="color:var(--text-hi)">4 Unit</b> に分割。非機能(fresh-context / 外部記憶)は Run 境界の設計論点として S5 へ送る。</p></div>
+              </div>
+
+              <div class="block">
+                <div class="block-head"><span class="kind">ac-map</span> · US ↔ Unit 対応</div>
+                <div class="block-body">
+                  <div class="ac-row"><span class="us">US-06</span><span>Cycle で Phase を起動 → <b style="color:var(--text-hi)">cycle-run</b></span></div>
+                  <div class="ac-row"><span class="us">US-07</span><span>Agent が成果物を生成 → <b style="color:var(--text-hi)">orchestration</b> + review</span></div>
+                  <div class="ac-row"><span class="us">US-08</span><span>stall 時 retry → <b style="color:var(--text-hi)">orchestration</b></span></div>
+                  <div class="ac-row"><span class="us">US-12</span><span>Q に回答して resume → <b style="color:var(--text-hi)">human-inbox</b></span></div>
+                  <div class="ac-row"><span class="us">US-13</span><span>レビューで承認/差し戻し → <b style="color:var(--text-hi)">review</b></span></div>
+                </div>
+              </div>
+
+              <div class="block">
+                <div class="block-head"><span class="kind">mermaid</span> · Unit 依存</div>
+                <div class="block-body"><div class="mermaid-mock">cycle-run ──▶ orchestration ──▶ review<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──▶ human-inbox ◀──┘<br><span class="low">(Mermaid レンダラ。MVP は軽いブロックのみ)</span></div></div>
+              </div>
+
+              <div class="block">
+                <div class="block-head"><span class="kind">risk</span></div>
+                <div class="block-body">
+                  <div class="risk"><span class="badge b-stalled sev">MEDIUM</span><span class="muted">Run の fresh-context 境界が未確定。S5 ドメインモデルで Run の外部記憶(handoff)を集約として定義する必要。</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: backtrack (差し戻しダイアログ) ===================== -->
+    <section data-state="backtrack" data-screen="scr-04-review-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item active"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main" style="position:relative">
+          <div class="topbar"><span class="crumb">Inbox / <b>レビュー詳細</b></span><span class="spacer"></span>
+            <button class="btn btn-danger">↩ 差し戻し</button><button class="btn btn-primary">✓ 承認</button></div>
+          <div class="content">
+            <div class="rowflex gap-3"><span class="badge b-review">◎ レビュー待ち</span><h1 class="page-title" style="font-size:18px">S3 Unit 分割の確定レビュー</h1></div>
+            <p class="page-sub">v0.0.1 · S3 unit-of-work</p>
+          </div>
+          <div class="scrim">
+            <div class="dialog">
+              <h3>差し戻し — 手戻り先を選ぶ</h3>
+              <p class="dialog-sub">任意の過去ステップへ戻せます。理由は Decision / ledger に残ります(監査可能性)。</p>
+              <div class="field"><label class="label">戻り先ステップ</label>
+                <select class="select"><option>S1 — User Story</option><option selected>S2 — 画面モック / フロー</option><option>S2.5 — UI 視覚意図</option></select>
+              </div>
+              <div class="field"><label class="label">差し戻し理由</label>
+                <textarea class="textarea" style="min-height:90px">SCR-02 のパイプラインに「手戻り履歴」を載せる前提が S2 に無く、Unit 境界が表現できない。S2 画面に手戻り履歴の情報構造を足してから S3 を再生成したい。</textarea>
+              </div>
+              <div class="dialog-actions"><button class="btn btn-ghost">キャンセル</button><button class="btn btn-danger">S2 から再開する</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

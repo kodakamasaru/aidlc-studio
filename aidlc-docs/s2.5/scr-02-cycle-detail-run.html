@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-02: Cycle 詳細・実行</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: idle ===================== -->
+    <section data-state="idle" data-screen="scr-02-cycle-detail-run">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item active"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb">Cycles / <b>v0.0.1</b></span><span class="spacer"></span><span class="badge b-idle"><span class="dot d-idle"></span>idle</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.1 — Human Inbox 縦ループ</h1><p class="page-sub">aidlc-studio · 次に S3 を起動できます</p></div>
+              <button class="btn btn-primary">▶ S3 Phase 起動</button></div>
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">S1</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2.5</div></div><div class="connector"></div>
+                <div class="step current"><div class="node">3</div><div class="lbl">S3</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">S4</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">S5</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">S6</div></div><div class="connector"></div>
+                <div class="step"><div class="node">7</div><div class="lbl">S7</div></div>
+              </div>
+            </div>
+            <div class="card card-pad mt-6">
+              <div class="rowflex between mb-4"><b>現在 Run</b><span class="badge b-idle"><span class="dot d-idle"></span>未起動</span></div>
+              <p class="muted">S2.5 まで完了しています。<b style="color:var(--text-hi)">S3 Phase 起動</b> で AI が headless でアーキ分割を生成します。判断が必要になれば Inbox にカードが届きます。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: running ===================== -->
+    <section data-state="running" data-screen="scr-02-cycle-detail-run">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item active"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb">Cycles / <b>v0.0.1</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>running</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.1 — Human Inbox 縦ループ</h1><p class="page-sub">aidlc-studio · S3 を生成中…</p></div>
+              <button class="btn" aria-disabled="true"><span class="spinner"></span> 生成中</button></div>
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">S1</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2.5</div></div><div class="connector done"></div>
+                <div class="step current"><div class="node"><span class="spinner" style="width:13px;height:13px;border-width:2px"></span></div><div class="lbl">S3</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">S4</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">S5</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">S6</div></div><div class="connector"></div>
+                <div class="step"><div class="node">7</div><div class="lbl">S7</div></div>
+              </div>
+            </div>
+            <div class="card card-pad mt-6">
+              <div class="rowflex between mb-4"><b>Run ログ</b><span class="badge b-running"><span class="dot d-running pulse"></span>running · worktree #1</span></div>
+              <div class="log">
+                <div><span class="ts">[12:04:33]</span> phase S3 (unit-of-work) started · agent sdk headless</div>
+                <div><span class="ts">[12:04:35]</span> read aidlc-docs/s1, s2, s2.5 <span class="ok">✓</span></div>
+                <div><span class="ts">[12:04:51]</span> draft units: cycle-run / human-inbox / review / orchestration</div>
+                <div><span class="ts">[12:05:09]</span> defining port interfaces …</div>
+                <div><span class="cur">[12:05:12] ▌ analyzing fresh-context boundary for Run</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: stalled ===================== -->
+    <section data-state="stalled" data-screen="scr-02-cycle-detail-run">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item active"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb">Cycles / <b>v0.0.1</b></span><span class="spacer"></span><span class="badge b-stalled"><span class="dot d-stalled"></span>stalled</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.1 — Human Inbox 縦ループ</h1><p class="page-sub">aidlc-studio · Run が停止しました</p></div>
+              <button class="btn btn-primary">↻ retry</button></div>
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">S1</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2.5</div></div><div class="connector"></div>
+                <div class="step current"><div class="node" style="background:var(--stalled-soft);border-color:var(--stalled);color:var(--stalled);box-shadow:0 0 0 4px var(--stalled-soft)">!</div><div class="lbl">S3</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">S4</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">S5</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">S6</div></div><div class="connector"></div>
+                <div class="step"><div class="node">7</div><div class="lbl">S7</div></div>
+              </div>
+            </div>
+            <div class="card card-pad mt-6" style="border-color:rgba(245,158,11,0.35)">
+              <div class="rowflex between mb-4"><b>停止理由</b><span class="badge b-stalled"><span class="dot d-stalled"></span>stalled · 3 分 無出力</span></div>
+              <p class="muted">エージェントが 3 分以上 無出力のため stall 検知しました。直前の出力: <span class="mono" style="color:var(--text-hi)">"defining port interfaces…"</span>。<b style="color:var(--text-hi)">retry</b> で同じ worktree から再開します。</p>
+              <div class="rowflex gap-3 mt-4"><button class="btn btn-primary">↻ retry</button><button class="btn btn-ghost">ログ全文を見る</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: done ===================== -->
+    <section data-state="done" data-screen="scr-02-cycle-detail-run">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item active"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item"><span class="ico">✦</span> Inbox <span class="count">4</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb">Cycles / <b>v0.0.1</b></span><span class="spacer"></span><span class="badge b-done"><span class="dot d-done"></span>S3 done</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.1 — Human Inbox 縦ループ</h1><p class="page-sub">aidlc-studio · S3 完了 — レビュー待ちが Inbox に届きました</p></div>
+              <button class="btn btn-primary">Inbox でレビュー →</button></div>
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">S1</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S2.5</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">S3</div><div class="bt-marker" title="S2 から手戻り済">↩</div></div><div class="connector"></div>
+                <div class="step current"><div class="node">4</div><div class="lbl">S4</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">S5</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">S6</div></div><div class="connector"></div>
+                <div class="step"><div class="node">7</div><div class="lbl">S7</div></div>
+              </div>
+              <p class="low mt-4" style="font-size:12px">↩ = 手戻り履歴(S3 は一度 S2 へ戻って再開した)</p>
+            </div>
+            <div class="card card-pad mt-6" style="border-color:rgba(34,197,94,0.30)">
+              <div class="rowflex between mb-4"><b>S3 出力</b><span class="badge b-done"><span class="dot d-done"></span>done</span></div>
+              <p class="muted">4 Unit に分割しました(cycle-run / human-inbox / review / orchestration)。レビュー待ちカードを Inbox に生成済み。承認すると S4 へ進みます。</p>
+              <div class="rowflex gap-3 mt-4"><button class="btn btn-primary">レビュー詳細を開く</button><button class="btn btn-ghost">▶ S4 を先に起動</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

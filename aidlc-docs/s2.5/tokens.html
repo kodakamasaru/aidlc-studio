@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tokens — S2.5 視覚カタログ</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="catalog">
+      <h1>aidlc-studio — 視覚トークン</h1>
+      <p class="muted">Minimal product UI (Linear/Vercel 風) / Dark 優先 / primary = indigo・violet。これは視覚意図のカタログ。実装は S6/S7 がゼロベースで RN/React idiom で再現する。</p>
+
+      <h2>Surfaces</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--bg)"></div><div class="meta"><div class="nm">bg</div><div class="val">#09090b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface)"></div><div class="meta"><div class="nm">surface</div><div class="val">#131316</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface-2)"></div><div class="meta"><div class="nm">surface-2</div><div class="val">#1a1a20</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface-3)"></div><div class="meta"><div class="nm">surface-3</div><div class="val">#212129</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--line)"></div><div class="meta"><div class="nm">line</div><div class="val">#26262d</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--line-strong)"></div><div class="meta"><div class="nm">line-strong</div><div class="val">#34343d</div></div></div>
+      </div>
+
+      <h2>Text</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--text-hi)"></div><div class="meta"><div class="nm">text-hi</div><div class="val">#ededf0</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--text-mid)"></div><div class="meta"><div class="nm">text-mid</div><div class="val">#9a9aa4</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--text-low)"></div><div class="meta"><div class="nm">text-low</div><div class="val">#6a6a74</div></div></div>
+      </div>
+
+      <h2>Primary (indigo / violet)</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--primary)"></div><div class="meta"><div class="nm">primary</div><div class="val">#6366f1</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--primary-hover)"></div><div class="meta"><div class="nm">primary-hover</div><div class="val">#7c7ff5</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--violet)"></div><div class="meta"><div class="nm">violet</div><div class="val">#a78bfa</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--primary-soft)"></div><div class="meta"><div class="nm">primary-soft</div><div class="val">15% α</div></div></div>
+      </div>
+
+      <h2>State colors (Run / process)</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--running)"></div><div class="meta"><div class="nm">running (teal)</div><div class="val">#2dd4bf</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--stalled)"></div><div class="meta"><div class="nm">stalled (amber)</div><div class="val">#f59e0b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--done)"></div><div class="meta"><div class="nm">done (green)</div><div class="val">#22c55e</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--error)"></div><div class="meta"><div class="nm">error (red)</div><div class="val">#ef4444</div></div></div>
+      </div>
+
+      <h2>Inbox card kinds</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--q-wait)"></div><div class="meta"><div class="nm">Q 待ち (indigo-400)</div><div class="val">#818cf8</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--review-wait)"></div><div class="meta"><div class="nm">レビュー待ち (purple-400)</div><div class="val">#c084fc</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--idle)"></div><div class="meta"><div class="nm">idle</div><div class="val">#6a6a74</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--info)"></div><div class="meta"><div class="nm">info</div><div class="val">#38bdf8</div></div></div>
+      </div>
+
+      <h2>Badges (実体)</h2>
+      <div class="rowflex gap-3" style="flex-wrap:wrap">
+        <span class="badge b-running"><span class="dot d-running"></span>running</span>
+        <span class="badge b-stalled"><span class="dot d-stalled"></span>stalled</span>
+        <span class="badge b-done"><span class="dot d-done"></span>done</span>
+        <span class="badge b-error"><span class="dot d-error"></span>failed</span>
+        <span class="badge b-idle"><span class="dot d-idle"></span>idle</span>
+        <span class="badge b-q">? Q 待ち</span>
+        <span class="badge b-review">◎ レビュー待ち</span>
+      </div>
+
+      <h2>Typography — Inter / JetBrains Mono</h2>
+      <div class="type-sample"><div class="tag">display 28/700</div><div style="font-size:28px;font-weight:700;letter-spacing:-0.02em">サイクルを回す</div></div>
+      <div class="type-sample"><div class="tag">h1 20/600</div><div style="font-size:20px;font-weight:600;letter-spacing:-0.01em">Cycle 詳細・実行</div></div>
+      <div class="type-sample"><div class="tag">h2 16/600</div><div style="font-size:16px;font-weight:600">Human Inbox</div></div>
+      <div class="type-sample"><div class="tag">body 14/400</div><div style="font-size:14px">人間は IDE を触らず Inbox を捌くだけ。</div></div>
+      <div class="type-sample"><div class="tag">caption 12.5</div><div style="font-size:12.5px;color:var(--text-mid)">更新 2026-06-05 / 対象リポ aidlc-studio</div></div>
+      <div class="type-sample"><div class="tag">mono 12.5</div><div class="mono" style="font-size:12.5px;color:var(--text-mid)">[12:04:33] phase S2.5 started</div></div>
+
+      <h2>Spacing (4px base)</h2>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-1 / 4</div><div class="sp-bar" style="width:4px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-2 / 8</div><div class="sp-bar" style="width:8px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-3 / 12</div><div class="sp-bar" style="width:12px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-4 / 16</div><div class="sp-bar" style="width:16px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-6 / 24</div><div class="sp-bar" style="width:24px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-8 / 32</div><div class="sp-bar" style="width:32px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-12 / 48</div><div class="sp-bar" style="width:48px"></div></div>
+
+      <h2>Radius / Shadow</h2>
+      <div class="radius-sample">
+        <div class="radius-box" style="border-radius:var(--r-sm)">sm 6</div>
+        <div class="radius-box" style="border-radius:var(--r-md)">md 8</div>
+        <div class="radius-box" style="border-radius:var(--r-lg)">lg 12</div>
+        <div class="radius-box" style="border-radius:var(--r-full);width:64px">full</div>
+        <div class="radius-box" style="border-radius:var(--r-lg);box-shadow:var(--shadow-pop);border-color:var(--line)">pop</div>
+      </div>
+
+      <h2>Motion (意図 — 文字で / 値は参考)</h2>
+      <ul class="muted" style="line-height:1.9;font-size:13px">
+        <li>hover / focus: <b>150ms ease-out</b>(背景・境界・shadow)</li>
+        <li>パネル / モーダル出現: <b>200ms cubic-bezier(0.16,1,0.3,1)</b> で fade + 4px slide-up</li>
+        <li>running 状態: dot の <b>pulse 1.6s ease-out infinite</b> / spinner <b>0.8s linear</b></li>
+        <li>loading skeleton: shimmer <b>1.4s ease-in-out infinite</b></li>
+        <li>ステップ完了でパイプライン node が done 色へ <b>250ms ease-out</b> で遷移</li>
+      </ul>
+    </div>
+  </body>
+</html>

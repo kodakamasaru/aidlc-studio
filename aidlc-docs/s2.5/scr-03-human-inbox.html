@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-03: Human Inbox</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: list ===================== -->
+    <section data-state="list" data-screen="scr-03-human-inbox">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item active"><span class="ico">✦</span> Inbox <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><b>Inbox</b></span><span class="spacer"></span><span class="muted" style="font-size:12.5px">3 件 待ち</span></div>
+          <div class="content">
+            <h1 class="page-title">Human Inbox</h1>
+            <p class="page-sub">AI → 人間 の依頼が全部カードになる。Q 待ちは回答へ、レビュー待ちは詳細へ。</p>
+            <div class="card mt-6 list">
+              <div class="row">
+                <span class="badge b-q">? Q 待ち</span>
+                <div class="grow"><div class="name">S3 の Run 境界で fresh-context をどう切る?</div><div class="meta">v0.0.1 · S3 unit-of-work · 3 分前</div></div>
+                <button class="btn btn-sm">回答する</button>
+                <span class="chev">›</span>
+              </div>
+              <div class="row">
+                <span class="badge b-review">◎ レビュー待ち</span>
+                <div class="grow"><div class="name">S2.5 視覚意図の確定レビュー</div><div class="meta">v0.0.1 · S2.5 ui-spec · 12 分前 · 5 画面 + tokens</div></div>
+                <button class="btn btn-sm">レビュー</button>
+                <span class="chev">›</span>
+              </div>
+              <div class="row">
+                <span class="badge b-review">◎ レビュー待ち</span>
+                <div class="grow"><div class="name">S3 Unit 分割の承認 / 差し戻し</div><div class="meta">v0.0.2 · S3 unit-of-work · 1 時間前 · 4 Unit</div></div>
+                <button class="btn btn-sm">レビュー</button>
+                <span class="chev">›</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: empty ===================== -->
+    <section data-state="empty" data-screen="scr-03-human-inbox">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">Workspace</div>
+          <div class="nav-item"><span class="ico">◆</span> Cycles</div>
+          <div class="nav-item active"><span class="ico">✦</span> Inbox</div>
+          <div class="nav-item"><span class="ico">▤</span> Artifacts</div>
+          <div class="nav-item"><span class="ico">▦</span> Wiki</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><b>Inbox</b></span><span class="spacer"></span><span class="muted" style="font-size:12.5px">0 件</span></div>
+          <div class="content">
+            <div class="empty">
+              <div class="glyph">✦</div>
+              <h3>いま捌くものはありません</h3>
+              <p>AI が判断を求めると、Q 回答 / レビュー待ち / 実機確認 がここにカードで届きます。Cycle を進めて Phase を起動しましょう。</p>
+              <button class="btn">◆ Cycles を見る</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

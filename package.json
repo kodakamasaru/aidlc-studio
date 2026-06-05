@@ -1,0 +1,12 @@
+{
+  "name": "aidlc-studio",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "s2.5:capture": "bun run scripts/s2.5-capture.ts"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}
