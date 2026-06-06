@@ -3,7 +3,7 @@
 ## メタ
 - 工程: S6 (Pure Code)
 - 役割: ドメインエンジニア
-- ステータス: レビュー待ち(完了条件 4/4 充足。残りは下記 D-01〜D-07 のユーザー判断)
+- ステータス: 確定(完了条件 4/4 充足 + D-01〜D-08 ユーザー承認済み。2026-06-06)
 - 入力参照: [s5/](./s5/)
 - コード出力先: `src/domain/`
 - 言語/テストランナー: **TypeScript** / **`bun test`**(組み込み・Jest 互換・追加依存ゼロ。repo は既に Bun を採用 = bun.lock / `type: module`)
@@ -56,42 +56,42 @@
 
 ### D-01 — テストランナーは `bun test`(組み込み)を採用
 - **理由**: repo は既に Bun(bun.lock / bun 1.3.14 / `package.json type:module` / `s2.5:capture` も `bun run`)。`bun test` は Jest 互換 API(`import { test, expect } from "bun:test"`)で**追加依存ゼロ**・TS をそのまま実行。Vitest/Jest を足すと依存と設定が増える。`[[search-first]]` に従い既存ツールを使う。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-02 — 失敗しうる操作は例外でなく `Result<T, DomainError>`(ok/err)を返す
 - **理由**: S5 の各操作は不変条件違反を「エラー列(EmptyTitle / DuplicateVersion / IllegalTransition …)」で定義済み。純粋関数で `throw` を制御フローに使わず、**ドメインエラーを判別可能ユニオンの値**として返すと、① 型でハンドリング漏れを検出 ② テストが try/catch 不要 ③ 副作用なし(純粋)。エラーは集約ごとの union(例 `CycleError = 'EmptyTitle' | 'DuplicateVersion' | …`)。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-03 — 集約は readonly データ型 + 名前空間化した純粋関数(クラス可変を使わない)
 - **理由**: ユーザーの CRITICAL 規約「常に新オブジェクトを返し、既存を破壊しない」。集約を `readonly` フィールドの型で表し、コマンドは `Cycle.startPhase(cycle, cmd): Result<Cycle, …>` のように**新インスタンスを返す純粋関数**で表現。クラスの in-place 変更や DI 装飾(`@Injectable` 等)を一切持たない。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-04 — id 生成・時刻・乱数はドメイン内で発生させず引数で注入する
 - **理由**: 純粋性要件「I/O(時刻取得・乱数・ID 採番)を関数内に直書きしない → 引数で渡す」。`createCycle({ id, version, title, createdAt })` のように **id(branded string)と `Instant`(ISO-8601)を外から渡す**。`Date.now()` / `crypto.randomUUID()` はドメインに登場させない(採番・時刻取得は S7 のアダプタ責務)。これで全テストがモック不要の決定論になる。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-05 — id は branded string 型 / `Verdict`・`ReviewBlock`・`Step` は共有 types 層に正本を置く
 - **理由**: S5 で「ReviewBlock の正本は共有 types 層」「Verdict は Question/Facts 共有」と確定。id は `type CycleId = string & { readonly __brand: 'CycleId' }` の branded type にして異種 id の取り違えを型で防ぐ。共有語彙は `src/domain/shared/` に置き各集約が import(クリーンアーキの内向き依存)。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-06 — 横断ユースケース(answerQuestion の Question close + Fact append + Unit-02 命令)は「純粋ドメインサービスが結果データを返す」形にし、port 呼び出し/トランザクションは S7 に残す
 - **理由**: S5 index/question D-02 で「answerQuestion は use-case interactor で 2 集約更新 + Unit-02 命令を束ねる」と確定。ただし port(永続化・Agent SDK)を**呼ぶ**のは技術層(S7)。S6 では純粋な `applyAnswer(question, answer, ctx): Result<{ question, fact, command }, …>` を提供し(新 Question・追記する Fact・Unit-02 へ渡す命令の**データ**を返すだけ)、実際の保存・SDK 呼び出しは S7 のインタラクタが行う。これで「調停ロジックは S6 で純粋にテスト」「I/O は S7」を両立。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-07 — S5「Result(レビュー成果)」の型名を `Review` にする(コード上のみ)
 - **理由**: S5 のユビキタス語「Result」は本コードの `Result<T,E>`(ok/err モナド, D-02)と名前衝突する。ドメイン型名を `Review`、ディレクトリを `src/domain/review/` にした(集約ルート = `Review`、構築関数 = `buildReview`)。ユビキタス言語上は「Result(レビュー成果 dossier)」のまま、コード識別子だけ衝突回避。ReviewBlock 名は S5 通り。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ### D-08 — 集約をまたぐ判定値は引数で受ける(approvePhase の `allTaskReviewsApproved` / createCycle の `DuplicateVersion`)
 - **理由**: Cycle 集約は Question を直接見ない(INV-5/9 / クリーンアーキの内向き依存)。「全 Task レビュー承認済みか」は Question 集約からアプリ層が集計し、`approvePhase` に boolean で渡す。同様に Version の Project 内一意(`DuplicateVersion`)は単一 Cycle では検証できずリポジトリの一意制約(S7)が担保する。これらは S6 では「外から与えられる事実」として扱い、集約の純粋性を保つ。
-- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **判断**(ユーザー記入): 承認
 - **上書き内容**(上書き時のみ):
 
 ---
