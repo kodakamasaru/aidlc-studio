@@ -1,0 +1,228 @@
+.cycle-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+.cycle-detail .page-head {
+  margin-bottom: 0;
+}
+.cycle-detail__action-error {
+  margin-top: calc(-1 * var(--sp-2));
+}
+
+.crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+a.crumb:hover {
+  color: var(--color-text-mid);
+}
+
+/* ── Pipeline ────────────────────────────────────────────── */
+.pipeline {
+  padding: var(--sp-6) var(--sp-5);
+}
+
+.pipeline__track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+
+.pipeline__node-wrap {
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 84px;
+}
+.pipeline__node-wrap:first-child {
+  flex: 0 0 auto;
+}
+
+.pipeline__connector {
+  height: 2px;
+  background: var(--color-line-strong);
+  flex: 1 1 auto;
+  margin-top: 18px;
+  align-self: flex-start;
+  transition: background-color 250ms var(--ease-out);
+}
+.pipeline__connector--done {
+  background: var(--color-done);
+}
+
+.pipeline__node-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+}
+
+.pipeline__node {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-line-strong);
+  background: var(--color-surface-2);
+  color: var(--color-text-low);
+  font-weight: 700;
+  font-size: var(--text-body);
+  transition:
+    background-color 250ms var(--ease-out),
+    border-color 250ms var(--ease-out),
+    color 250ms var(--ease-out);
+}
+
+.pipeline__node--done {
+  background: var(--color-done-soft);
+  border-color: var(--color-done);
+  color: var(--color-done);
+}
+.pipeline__node--current,
+.pipeline__node--running {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-soft);
+}
+.pipeline__node--stalled {
+  background: var(--color-stalled-soft);
+  border-color: var(--color-stalled);
+  color: var(--color-stalled);
+  box-shadow: 0 0 0 4px var(--color-stalled-soft);
+}
+/* Human-waiting: amber ring + person glyph, with a slow breathing pulse so it
+ * reads as "blocked on you" rather than the teal AI-running spinner. */
+.pipeline__node--human {
+  background: var(--color-stalled-soft);
+  border-color: var(--color-stalled);
+  color: var(--color-stalled);
+  box-shadow: 0 0 0 4px var(--color-stalled-soft);
+  animation: human-pulse 1.8s var(--ease-out) infinite;
+}
+@keyframes human-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px var(--color-stalled-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 7px var(--color-stalled-soft);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipeline__node--human {
+    animation: none;
+  }
+}
+
+.pipeline__backtrack-mark {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-stalled-soft);
+  border: 1px solid var(--color-stalled);
+  color: var(--color-stalled);
+}
+
+.pipeline__step-label {
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  font-weight: 600;
+}
+
+.pipeline__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+}
+.pipeline__legend svg {
+  color: var(--color-stalled);
+}
+
+/* ── Run card ────────────────────────────────────────────── */
+.run-card {
+  padding: var(--sp-6);
+  animation: fade-slide-up var(--duration-panel) var(--ease-out-expo);
+}
+.run-card--stalled {
+  border-color: var(--color-stalled-border);
+}
+/* Human-waiting run card: amber accent + a left rail so it's clearly NOT the
+ * neutral AI-running log surface. */
+.run-card--human {
+  border-color: var(--color-stalled-border);
+  box-shadow: inset 3px 0 0 var(--color-stalled);
+}
+
+.run-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+.run-card__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+}
+.run-card__body {
+  color: var(--color-text-mid);
+  line-height: var(--leading-body);
+}
+.run-card__body strong {
+  color: var(--color-text-hi);
+  font-weight: 600;
+}
+.run-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-5);
+}
+
+/* ── Run log ─────────────────────────────────────────────── */
+.run-log {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  font-size: var(--text-caption);
+  line-height: var(--leading-log);
+  max-height: 280px;
+  overflow-y: auto;
+  color: var(--color-text-mid);
+}
+.run-log__line {
+  white-space: pre-wrap;
+  animation: fade-in 120ms var(--ease-out);
+}
+.run-log__ts {
+  color: var(--color-text-low);
+}
+.run-log__line--tail {
+  color: var(--color-text-hi);
+}
+.run-log__caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: var(--color-text-hi);
+  margin-right: var(--sp-2);
+  vertical-align: text-bottom;
+  animation: pulse-dot 1s steps(2, start) infinite;
+}

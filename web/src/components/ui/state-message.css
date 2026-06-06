@@ -1,0 +1,55 @@
+.state-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-6);
+  text-align: center;
+}
+
+.state-msg__text {
+  color: var(--color-text-mid);
+}
+.state-msg__text.state-msg--error {
+  color: var(--color-failed);
+}
+
+/* Designed empty state (SCR-01 / SCR-03): glyph tile + heading + body + CTA */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sp-4);
+  padding: clamp(var(--sp-8), 14vh, 140px) var(--sp-6) var(--sp-8);
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.empty-state__glyph {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-text-low);
+  margin-bottom: var(--sp-1);
+}
+
+.empty-state__title {
+  font-size: var(--text-h1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-hi);
+}
+
+.empty-state__body {
+  color: var(--color-text-mid);
+  line-height: var(--leading-body);
+}
+
+.empty-state__action {
+  margin-top: var(--sp-2);
+}

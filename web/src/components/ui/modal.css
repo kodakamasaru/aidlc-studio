@@ -1,0 +1,86 @@
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6);
+  background: rgba(0, 0, 0, 0.55);
+  animation: fade-in var(--duration-panel) var(--ease-out);
+}
+
+.modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  /* Stay reachable at 400% zoom / short viewports: cap height and scroll the
+   * dialog body so the action buttons remain visible. */
+  max-height: calc(100vh - 2 * var(--sp-6));
+  overflow-y: auto;
+  padding: var(--sp-7);
+  box-shadow: var(--shadow-popover);
+  animation: fade-slide-up var(--duration-panel) var(--ease-out-expo);
+}
+
+.modal-dialog:focus {
+  outline: none;
+}
+
+/* Visible close affordance — ≥24×24 hit target, top-right of the dialog. */
+.modal-close {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-mid);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.modal-close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-hi);
+}
+
+.modal-title {
+  font-size: var(--text-h1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal-desc {
+  color: var(--color-text-mid);
+  margin-top: var(--sp-2);
+  line-height: var(--leading-body);
+}
+
+.modal-body {
+  margin-top: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

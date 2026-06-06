@@ -1,0 +1,85 @@
+.inbox-count {
+  font-size: var(--text-body);
+  color: var(--color-text-mid);
+  font-weight: 500;
+}
+.inbox-count--muted {
+  color: var(--color-text-low);
+}
+
+.inbox-list {
+  overflow: hidden;
+  padding: var(--sp-1) 0;
+}
+
+.inbox-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  border-bottom: 1px solid var(--color-line);
+  padding: var(--sp-4) var(--sp-5);
+  transition: background-color var(--duration-fast) var(--ease-out);
+  animation: fade-slide-up var(--duration-panel) var(--ease-out-expo);
+}
+.inbox-card:last-child {
+  border-bottom: none;
+}
+.inbox-card:hover {
+  background: var(--color-surface-2);
+}
+
+.inbox-card__link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+}
+.inbox-card__link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.inbox-card__kind-icon {
+  font-weight: 700;
+  margin-right: var(--sp-1);
+}
+
+.inbox-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.inbox-card__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-card__meta {
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+}
+
+.inbox-card__action {
+  flex: 0 0 auto;
+}
+
+.inbox-card__chevron {
+  display: inline-flex;
+  color: var(--color-text-low);
+  flex: 0 0 auto;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.inbox-card:hover .inbox-card__chevron {
+  color: var(--color-text-mid);
+  transform: translateX(2px);
+}

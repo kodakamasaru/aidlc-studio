@@ -1,0 +1,105 @@
+/* ── SCR-01 list ─────────────────────────────────────────── */
+.cycle-list {
+  overflow: hidden;
+  padding: var(--sp-1) 0;
+}
+
+.cycle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-line);
+  padding: var(--sp-4) var(--sp-5);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.cycle-row:last-child {
+  border-bottom: none;
+}
+.cycle-row:hover {
+  background: var(--color-surface-2);
+}
+.cycle-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.cycle-row .badge {
+  flex: 0 0 auto;
+}
+
+.cycle-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cycle-row__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cycle-row__meta {
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+}
+.cycle-row__sep {
+  margin: 0 var(--sp-2);
+  color: var(--color-text-low);
+}
+
+.cycle-row__progress {
+  flex: 0 0 auto;
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  letter-spacing: 0.02em;
+}
+
+.cycle-row__chevron {
+  display: inline-flex;
+  color: var(--color-text-low);
+  flex: 0 0 auto;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.cycle-row:hover .cycle-row__chevron {
+  color: var(--color-text-mid);
+  transform: translateX(2px);
+}
+
+/* ── First-run repo setup ────────────────────────────────── */
+.repo-setup {
+  max-width: 560px;
+  margin: clamp(var(--sp-8), 10vh, 120px) auto 0;
+  padding: var(--sp-7);
+}
+.repo-setup__title {
+  font-size: var(--text-h1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.repo-setup__body {
+  color: var(--color-text-mid);
+  margin-top: var(--sp-2);
+  line-height: var(--leading-body);
+}
+.repo-setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  margin-top: var(--sp-6);
+}
+.repo-setup__actions {
+  display: flex;
+  justify-content: flex-end;
+}

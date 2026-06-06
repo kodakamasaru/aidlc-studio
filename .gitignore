@@ -2,3 +2,13 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Local studio runtime DB (bun:sqlite) + git worktrees for parallel cycles.
+aidlc-studio.db
+aidlc-studio.db-shm
+aidlc-studio.db-wal
+.aidlc-worktrees/
+
+# Playwright E2E run artifacts (HTML report + per-test traces/screenshots).
+test-results/
+tests/e2e/.report/

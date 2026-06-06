@@ -1,0 +1,90 @@
+# 引き継ぎ台帳 — v0.0.1(スキーマ: kit/rules/ledger.md)
+# S7 で確定した D-NN と次サイクルへ渡す項目を state 付きで台帳化する。
+# 次サイクル(v0.0.x)S1 は into: が当該サイクルを指す carried を全消し込みするまで確定不可。
+
+# ── S7 で確定し、このサイクル内で消化済(done)──
+- id: D-01
+  origin: v0.0.1/s7-integration.md
+  decision: "OrchestratorPort を 2 アダプタ(scripted 決定論 + live ローカル Claude CLI)で実装"
+  state: done
+  closed_in: "src/infra/orchestrator/{scripted,live}.ts / s7-integration.md"
+
+- id: D-02
+  origin: v0.0.1/s7-integration.md
+  decision: "永続化 = bun:sqlite(ファイル実体 / 1tx 対応)"
+  state: done
+  closed_in: "src/infra/db/* / tests/integration/store.test.ts(27 real-DB tests)"
+
+- id: D-03
+  origin: v0.0.1/s7-integration.md
+  decision: "HTTP = Hono"
+  state: done
+  closed_in: "src/infra/http/* / tests/integration/api.test.ts"
+
+- id: D-04
+  origin: v0.0.1/s7-integration.md
+  decision: "orchestrator emit を DomainEvent に正規化し EventApplier で 1tx 永続化"
+  state: done
+  closed_in: "src/app/services/event-applier.ts / tests/integration/loop.test.ts"
+
+- id: D-05
+  origin: v0.0.1/s7-integration.md
+  decision: "ID = crypto.randomUUID / Clock = SystemClock(ISO-8601 Instant)/ テストは決定論 fake 注入"
+  state: done
+  closed_in: "src/infra/sys/*"
+
+- id: D-06
+  origin: v0.0.1/s7-integration.md
+  decision: "live adapter = ローカル Claude Code CLI を headless(-p / stream-json)起動"
+  state: done
+  closed_in: "src/infra/orchestrator/live.ts / tests/e2e-live/live-run.test.ts(実AI pass)"
+
+- id: D-07
+  origin: v0.0.1/s7-integration.md
+  decision: "Repo owner スコープ = projectId(v0 単一ユーザ)/ ProposalRepo.save は projectId を受ける"
+  state: done
+  closed_in: "src/app/ports/repos.ts / src/infra/db/*"
+
+- id: D-08
+  origin: v0.0.1/s7-integration.md
+  decision: "7 reviewer pipeline は backend-complete / frontend+E2E-complete の 2 ゲートで一括起動(各 sub-phase は tsc+test hard gate)"
+  state: done
+  closed_in: "s7-integration.md S7 完了レポート(2 ゲートとも CRITICAL=0 / HIGH 解消済)"
+
+# ── 次サイクル(v0.0.x)へ持ち越し(carried)──
+- id: S7-C1
+  origin: v0.0.1/s7-integration.md
+  decision: "live adapter の対話型 Q→回答→resume ループ(headless claude のセッション resume / 実 AI が Q を出して停止し人間回答で再開)。v0 は run→emit→done の実 AI 検証まで。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C4
+  origin: v0.0.1/s7-integration.md
+  decision: "backtrack 後の戻り先 Phase への run 自動生成 = S6 に relaunchPhase 相当が必要 / S7 では pipeline rewind+Fact まで。差し戻し後の戻り先 Phase は domain 上 running(run なし)で、既存 startPhase は pending 前提のため再起動できない。UI は SCR-02 で「要再実行 / running(run なし)」を disabled-with-explanation で表示。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C2
+  origin: v0.0.1/s7-integration.md
+  decision: "orchestration→web の push 経路(SSE/WebSocket)。v0 はポーリング/リクエスト駆動。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C3
+  origin: v0.0.1/s7-integration.md
+  decision: "frontend MEDIUM 整理: 画面ガード共通化(PageGuard 抽出)/ 一覧 comparator 共通化(LOW)。機能影響なしのため繰越。"
+  state: carried
+  into: v0.0.x
+
+# ── 意図的に落とす(dropped / BACKLOG 転記済)──
+- id: S7-D1
+  origin: v0.0.1/s7-integration.md
+  decision: "API 認証 / マルチユーザ / 本番 CSP nonce 化。v0 はローカル単一ユーザ常駐(127.0.0.1 バインド + secureHeaders 既定)で十分。"
+  state: dropped
+  reason: "BACKLOG B(公開・共有 v1.0.0 公開時)/ 公開軸。multi-tenant by UserId は S5/S6 ドメインに不在。"
+
+- id: S7-D2
+  origin: v0.0.1/s7-integration.md
+  decision: "通知(NotifyPort 実体 / push)= US-31。v0 は no-op port のみ。"
+  state: dropped
+  reason: "BACKLOG A(機能拡張 v0.0.x)。US-31 は v0 6US 外。"
