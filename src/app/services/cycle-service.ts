@@ -3,12 +3,14 @@
 // DB commit (S7 D-04): persist the new cycle state first, then launch/retry the
 // headless run against the now-running phase.
 import type { Ports } from "../ports/composition";
-import { fail, type ServiceError } from "./errors";
+import { fail, messageOf, type ServiceError } from "./errors";
 import { compensateRun } from "./compensate";
 import { locatePhaseOfRun } from "./cycle-helpers";
+import { nextVersion } from "./cycle-version";
 import {
   createCycle as domainCreateCycle,
   startPhase as domainStartPhase,
+  relaunchPhase as domainRelaunchPhase,
   retryRun as domainRetryRun,
   version as parseVersion,
   type Cycle,
@@ -22,7 +24,12 @@ import { isErr } from "../../domain/shared/result";
 
 export interface CreateCycleInput {
   readonly title: string;
-  readonly version: string;
+  /**
+   * Optional: when a non-empty string, it is validated + used (DuplicateVersion
+   * if it collides). When omitted, the service auto-assigns nextVersion() — the
+   * project's semver-max with patch +1 (or v0.0.1 for the first cycle).
+   */
+  readonly version?: string;
   readonly taskIds?: readonly string[];
 }
 
@@ -32,6 +39,7 @@ export const cycleErrorStatus = (error: CycleError): ServiceError => {
     case "CyclePaused":
     case "PrevPhaseNotDone":
     case "PhaseAlreadyRunning":
+    case "PhaseNotRewound":
     case "RunNotFailedOrStalled":
     case "MaxAttemptExceeded":
       return fail(409, error);
@@ -80,14 +88,34 @@ export class CycleService {
     const projectId = ProjectId(projectIdRaw);
     const project = this.loadProject(projectId);
 
-    const ver = parseVersion(input.version);
-    if (isErr(ver)) throw fail(400, ver.error);
+    // Resolve the version: an explicit (non-blank) one is validated + checked for
+    // collision; an omitted one is auto-assigned as the project's semver-max + a
+    // patch bump (or v0.0.1 for the first cycle). The derived value is unique by
+    // construction (max+1); the UNIQUE index in the insert path is the backstop.
+    const explicit =
+      typeof input.version === "string" && input.version.trim().length > 0
+        ? input.version.trim()
+        : undefined;
 
-    const existing = this.ports.repos.cycles.findByProjectVersion(
-      projectId,
-      input.version,
-    );
-    if (existing) throw fail(409, "DuplicateVersion");
+    let versionStr: string;
+    if (explicit !== undefined) {
+      const parsed = parseVersion(explicit);
+      if (isErr(parsed)) throw fail(400, parsed.error);
+      const existing = this.ports.repos.cycles.findByProjectVersion(
+        projectId,
+        explicit,
+      );
+      if (existing) throw fail(409, "DuplicateVersion");
+      versionStr = explicit;
+    } else {
+      const existingVersions = this.ports.repos.cycles
+        .listByProject(projectId)
+        .map((c) => c.version as string);
+      versionStr = nextVersion(existingVersions);
+    }
+
+    const ver = parseVersion(versionStr);
+    if (isErr(ver)) throw fail(400, ver.error);
 
     const pipeline = project.pipelineDef.map((sd) => ({
       phaseId: this.ports.ids.phaseId(),
@@ -153,15 +181,64 @@ export class CycleService {
       startedAt: this.ports.clock.now(),
     });
     if (isErr(started)) throw cycleErrorStatus(started.error);
-    const next = started.value;
 
+    return this.persistThenLaunch(
+      started.value,
+      project,
+      cycleId,
+      step,
+      runId,
+      "AI 実行の起動に失敗しました",
+    );
+  }
+
+  /**
+   * Re-execute a phase a backtrack rewound to "running" (US-13). startPhase only
+   * accepts a PENDING phase, so the rewound phase needs its own command: append a
+   * fresh attempt and launch, reusing the same post-commit launch+compensate path.
+   */
+  async relaunchPhase(cycleIdRaw: string, stepRaw: string): Promise<Cycle> {
+    const cycleId = CycleId(cycleIdRaw);
+    const cycle = this.loadCycle(cycleId);
+    const project = this.loadProject(cycle.projectId);
+    const step = Step(stepRaw);
+    const runId = this.ports.ids.runId();
+
+    const relaunched = domainRelaunchPhase(cycle, {
+      step,
+      runId,
+      startedAt: this.ports.clock.now(),
+    });
+    if (isErr(relaunched)) throw cycleErrorStatus(relaunched.error);
+
+    return this.persistThenLaunch(
+      relaunched.value,
+      project,
+      cycleId,
+      step,
+      runId,
+      "AI 実行の再起動に失敗しました",
+    );
+  }
+
+  /**
+   * Persist the advanced cycle, then launch the orchestrator post-commit (S7
+   * D-04). Shared by startPhase/relaunchPhase. If launch throws, the run is
+   * already persisted "running" with no live process — compensate it to "failed".
+   */
+  private async persistThenLaunch(
+    next: Cycle,
+    project: Project,
+    cycleId: CycleId,
+    step: Step,
+    runId: RunId,
+    failMsg: string,
+  ): Promise<Cycle> {
     this.ports.uow.run(() => this.ports.repos.cycles.save(next));
 
     const phase = next.phases.find((p) => sameStep(p.step, step));
     if (!phase) throw fail(400, "StepNotInPipeline");
 
-    // Orchestrator runs post-commit: if launch throws, the run is already
-    // persisted "running" with no live process — compensate it to "failed".
     try {
       await this.ports.orchestrator.launch({
         runId,
@@ -171,8 +248,14 @@ export class CycleService {
         step,
         repoPath: project.repoPath,
       });
-    } catch {
-      compensateRun(this.ports, cycleId, runId, "failed");
+    } catch (err) {
+      compensateRun(
+        this.ports,
+        cycleId,
+        runId,
+        "failed",
+        `${failMsg}: ${messageOf(err)}`,
+      );
       throw fail(502, "OrchestratorLaunchFailed");
     }
 
@@ -210,8 +293,14 @@ export class CycleService {
         step: phase.step,
         repoPath: project.repoPath,
       });
-    } catch {
-      compensateRun(this.ports, cycleId, newRunId, "failed");
+    } catch (err) {
+      compensateRun(
+        this.ports,
+        cycleId,
+        newRunId,
+        "failed",
+        `AI 実行のリトライに失敗しました: ${messageOf(err)}`,
+      );
       throw fail(502, "OrchestratorRetryFailed");
     }
 

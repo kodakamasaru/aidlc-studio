@@ -65,8 +65,11 @@ export function CycleDetailPage() {
     if (!isLive) return;
     const tick = () => {
       if (document.hidden) return;
-      reloadCycle();
-      reloadInbox();
+      // Soft refresh: refetch in the background, keeping the current data on
+      // screen. Without this the 2.5s tick flips status to "loading" and the
+      // screen blinks to its blank/loading state every interval.
+      reloadCycle({ background: true });
+      reloadInbox({ background: true });
     };
     const id = window.setInterval(tick, POLL_INTERVAL_MS);
     const onVisible = () => {
@@ -110,6 +113,10 @@ export function CycleDetailPage() {
 
   const onStart = (step: string) => mutate(() => api.startPhase(cycleId, step));
   const onRetry = (runId: string) => mutate(() => api.retryRun(cycleId, runId));
+  // Re-run a backtrack-rewound phase: domain relaunchPhase appends a fresh run on
+  // the "running" (run-less) phase and launches it. Closes the backtrack loop.
+  const onRelaunch = (step: string) =>
+    mutate(() => api.relaunchPhase(cycleId, step));
 
   useSetTopbar(
     {
@@ -124,6 +131,7 @@ export function CycleDetailPage() {
       ),
       right: cycle ? (
         <TopbarActions
+          cycleId={cycleId}
           step={phase?.step}
           runState={runState}
           runId={activeRun?.id}
@@ -147,6 +155,7 @@ export function CycleDetailPage() {
           humanWaitId={humanWait?.question.id}
           onStart={onStart}
           onRetry={onRetry}
+          onRelaunch={onRelaunch}
         />
       ) : undefined,
     },
@@ -202,6 +211,7 @@ export function CycleDetailPage() {
           busy={busy}
           onRetry={onRetry}
           onStartNext={onStart}
+          onRelaunch={onRelaunch}
         />
       ) : null}
     </div>
@@ -209,6 +219,7 @@ export function CycleDetailPage() {
 }
 
 interface TopbarActionsProps {
+  readonly cycleId: string;
   readonly step: string | undefined;
   readonly runState: "running" | "stalled" | "done" | "failed" | undefined;
   readonly runId: string | undefined;
@@ -219,9 +230,11 @@ interface TopbarActionsProps {
   readonly humanWaitId: string | undefined;
   readonly onStart: (step: string) => void;
   readonly onRetry: (runId: string) => void;
+  readonly onRelaunch: (step: string) => void;
 }
 
 function TopbarActions({
+  cycleId,
   step,
   runState,
   runId,
@@ -231,32 +244,32 @@ function TopbarActions({
   humanWaitId,
   onStart,
   onRetry,
+  onRelaunch,
 }: TopbarActionsProps) {
   let action: ReactNode = null;
 
   if (humanWaitId) {
-    // The run is running but waiting on the human — point straight at the card.
+    // The run is running but waiting on the human — point straight at the card
+    // under this cycle (a cycle-child review/answer screen, not the Inbox).
     action = (
       <Link
-        to={`/questions/${encodeURIComponent(humanWaitId)}`}
+        to={`/cycles/${encodeURIComponent(cycleId)}/q/${encodeURIComponent(humanWaitId)}`}
         className="btn btn--primary"
       >
-        <PersonIcon size={14} /> Inbox で対応する →
+        <PersonIcon size={14} /> 対応する →
       </Link>
     );
-  } else if (rewound) {
-    // Backtracked phase: domain state is "running" but there is no live run and
-    // no domain path to launch one on an already-"running" phase (auto-relaunch
-    // deferred to v0.0.x). Surface the affordance disabled-with-explanation so it
-    // never looks broken nor mis-fires PhaseAlreadyRunning.
+  } else if (rewound && step) {
+    // Backtracked phase: domain state is "running" with no live run. Relaunch
+    // appends a fresh run on it and launches — closing the backtrack loop.
     action = (
       <button
         type="button"
         className="btn btn--primary"
-        disabled
-        title="差し戻し後の自動再実行は v0.0.x で対応(現状は手動 relaunch 待ち)"
+        onClick={() => onRelaunch(step)}
+        disabled={busy}
       >
-        <PlayIcon size={14} /> 再実行待ち
+        <PlayIcon size={14} /> {step} を再実行
       </button>
     );
   } else if (runState === "running") {

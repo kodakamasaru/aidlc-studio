@@ -25,3 +25,11 @@ export const fail = (status: HttpStatus, code: string): ServiceError =>
 
 export const isServiceError = (e: unknown): e is ServiceError =>
   e instanceof ServiceError;
+
+/**
+ * Concise human-readable text from an unknown thrown value — used to enrich a
+ * run's `failureReason` so the UI shows the REAL cause of a launch/retry/dispatch
+ * failure instead of a generic "Run が失敗しました。".
+ */
+export const messageOf = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);

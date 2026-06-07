@@ -26,10 +26,12 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Past steps to offer as backtrack targets (everything before the review
-  // step). The cycle is ONLY needed to populate those options, so the fetch is
-  // deferred until the backtrack modal is actually opened — no waterfall on the
-  // common approve path. `null` factory until then keeps useAsync inert.
+  // Backtrack targets = every step up to AND INCLUDING the step under review;
+  // later steps are dropped. Including the review step lets the human redo THIS
+  // phase (domain backtrackTo sets the target phase back to "running"), not only
+  // earlier ones. The cycle is ONLY needed to populate these options, so the
+  // fetch is deferred until the backtrack modal is actually opened — no waterfall
+  // on the common approve path. `null` factory until then keeps useAsync inert.
   const cycleQ = useAsync(
     () => (backtracking ? api.getCycle(question.cycleId) : Promise.resolve(undefined)),
     [backtracking, question.cycleId],
@@ -40,13 +42,17 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
   const stepOptions = useMemo<StepOption[]>(() => {
     const phases = cycleQ.data?.phases ?? [];
     const reviewStep = review?.step;
-    const before: StepOption[] = [];
+    const upto: StepOption[] = [];
     for (const p of phases) {
-      if (reviewStep && p.step === reviewStep) break;
-      before.push({ step: p.step, label: p.step });
+      const isCurrent = reviewStep != null && p.step === reviewStep;
+      upto.push({
+        step: p.step,
+        label: isCurrent ? `${p.step}(このフェーズをやり直す)` : p.step,
+      });
+      if (isCurrent) break;
     }
-    return before.length > 0
-      ? before
+    return upto.length > 0
+      ? upto
       : phases.map((p) => ({ step: p.step, label: p.step }));
   }, [cycleQ.data, review?.step]);
 
@@ -60,12 +66,12 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
     try {
       await api.answerQuestion(question.id, { verdict: "approve" });
       refreshInbox();
-      navigate("/inbox");
+      navigate(`/cycles/${question.cycleId}`);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
     }
-  }, [question.id, refreshInbox, navigate]);
+  }, [question.id, question.cycleId, refreshInbox, navigate]);
 
   const reject = useCallback(
     async (backtrackTo: string, reason: string) => {
@@ -78,18 +84,18 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
           reason,
         });
         refreshInbox();
-        navigate("/inbox");
+        navigate(`/cycles/${question.cycleId}`);
       } catch (err) {
         setError(errorMessage(err));
         setBusy(false);
       }
     },
-    [question.id, refreshInbox, navigate],
+    [question.id, question.cycleId, refreshInbox, navigate],
   );
 
   useSetTopbar(
     {
-      left: reviewCrumb("レビュー詳細"),
+      left: reviewCrumb("レビュー詳細", question.cycleId),
       right: (
         <>
           <button

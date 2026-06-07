@@ -70,6 +70,7 @@ export class EventApplier {
           runId: ctx.runId,
           to: event.to,
           at: clock.now(),
+          ...(event.reason !== undefined ? { reason: event.reason } : {}),
         });
         if (isOk(advanced)) repos.cycles.save(advanced.value);
         else logError("RunStateChanged: advanceRun failed", advanced.error);

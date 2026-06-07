@@ -14,6 +14,7 @@ export function App() {
         <Route index element={<CycleListPage />} />
         <Route path="cycles/:cycleId" element={<CycleDetailPage />} />
         <Route path="inbox" element={<InboxPage />} />
+        <Route path="cycles/:cycleId/q/:questionId" element={<QuestionPage />} />
         <Route path="questions/:questionId" element={<QuestionPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

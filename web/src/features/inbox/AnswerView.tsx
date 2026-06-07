@@ -1,6 +1,6 @@
 // SCR-05 — Q answer (question kind). Shows the prompt + a paused-worktree note,
 // then a mono textarea; submit posts answer {verdict:"answer", body} and returns
-// to the inbox. Submit stays disabled until the answer is non-empty.
+// to the cycle screen. Submit stays disabled until the answer is non-empty.
 import { useId, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Question } from "../../lib/api";
@@ -37,7 +37,7 @@ export function AnswerView({ question }: AnswerViewProps) {
         body: body.trim(),
       });
       refreshInbox();
-      navigate("/inbox");
+      navigate(`/cycles/${question.cycleId}`);
     } catch (err) {
       setError(errorMessage(err));
       setSubmitting(false);
@@ -53,7 +53,7 @@ export function AnswerView({ question }: AnswerViewProps) {
 
   useSetTopbar(
     {
-      left: reviewCrumb("Q 回答"),
+      left: reviewCrumb("Q 回答", question.cycleId),
       right: (
         <StateBadge variant="q" noDot icon={<span aria-hidden="true">?</span>}>
           Q 待ち

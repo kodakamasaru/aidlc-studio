@@ -20,13 +20,16 @@ a.crumb:hover {
 
 /* ── Pipeline ────────────────────────────────────────────── */
 .pipeline {
-  padding: var(--sp-6) var(--sp-5);
+  padding: var(--sp-4) var(--sp-4);
 }
 
 .pipeline__track {
   list-style: none;
   margin: 0;
-  padding: 0;
+  /* Room for the active node's pulsing ring (≤7px) on every side so the track's
+   * overflow-x clip never cuts the ripple — especially the first/last node and
+   * the top edge. */
+  padding: 10px;
   display: flex;
   align-items: flex-start;
   overflow-x: auto;
@@ -40,6 +43,11 @@ a.crumb:hover {
 }
 .pipeline__node-wrap:first-child {
   flex: 0 0 auto;
+  /* The first wrap holds only the node (no leading connector). Without resetting
+   * the shared 84px min-width, the node sits at the wrap's left and ~46px of
+   * empty space trails it — so the first connector starts far from S1 and its
+   * spacing doesn't match the other nodes. */
+  min-width: 0;
 }
 
 .pipeline__connector {
@@ -47,6 +55,12 @@ a.crumb:hover {
   background: var(--color-line-strong);
   flex: 1 1 auto;
   margin-top: 18px;
+  /* The line meets the node edges and renders ABOVE the active node's ripple
+   * (box-shadow), so the ripple never breaks or offsets it. Spacing is then
+   * identical for every node — active or not — and the full ripple stays
+   * visible (the 2px line just crosses it). */
+  position: relative;
+  z-index: 2;
   align-self: flex-start;
   transition: background-color 250ms var(--ease-out);
 }
@@ -60,6 +74,8 @@ a.crumb:hover {
   align-items: center;
   gap: var(--sp-2);
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1; /* nodes (and their rings) paint above the connector line */
 }
 
 .pipeline__node {

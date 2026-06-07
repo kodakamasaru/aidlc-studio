@@ -37,6 +37,8 @@ export interface CycleRepo {
   save(cycle: Cycle): void;
   findById(id: CycleId): Cycle | undefined;
   listByProject(projectId: ProjectId): readonly Cycle[];
+  /** All cycles across every project — used by startup reconcile to find orphaned runs. */
+  listAll(): readonly Cycle[];
   /** version is unique within a project; used to enforce DuplicateVersion. */
   findByProjectVersion(projectId: ProjectId, version: string): Cycle | undefined;
 }

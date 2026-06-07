@@ -4,10 +4,14 @@
 // from the default `test` script; run it via `bun run test:live`.
 //
 // Flow: createProject → createCycle → startPhase(S1) launches the live adapter,
-// which spawns `claude -p` in the repo, parses its stream-json, emits
-// ResultEmitted+done through the EventApplier sink, which persists a Review and
-// raises a visual_review Question. We poll the cycle until the run is terminal,
-// then assert real model text was persisted and surfaced as a reviewable card.
+// which spawns `claude -p` in the repo (NON-BLOCKING: startPhase resolves as soon
+// as the child is spawned). The background task parses its stream-json and emits
+// ONLY ResultEmitted through the EventApplier sink, which persists a Review and
+// raises a visual_review Question — the run STAYS `running` (レビュー待ち), NOT done.
+// We poll until that visual_review Question appears, assert it carries real
+// (non-scripted) model text, then APPROVE it → orchestrator.resume emits
+// RunStateChanged done → we poll until the run reaches `done`. This is the live
+// equivalent of the scripted review→approve→done gate.
 import { test, expect, describe } from "bun:test";
 import { openDb } from "../../src/infra/db/open";
 import { buildStore } from "../../src/infra/db/store";
@@ -55,7 +59,7 @@ const suite = claudeBin ? describe : describe.skip;
 
 suite("LiveClaudeOrchestrator — real local Claude run", () => {
   test(
-    "real claude run → done → Review + visual_review Question persisted",
+    "real claude run → review (still running) → approve → done",
     async () => {
       // Real ports bundle over a real in-memory bun:sqlite engine.
       const db = openDb(":memory:");
@@ -95,13 +99,53 @@ suite("LiveClaudeOrchestrator — real local Claude run", () => {
         version: "v0.0.1",
       });
 
-      // startPhase awaits the live launch, which runs claude to completion and
-      // emits ResultEmitted+done before resolving — so the run is already
-      // terminal once this returns. We still poll defensively.
+      // startPhase now returns as soon as the live child is spawned (non-blocking)
+      // — claude runs in the background, so the run is NOT yet terminal here.
       await cycles.startPhase(cycle.id as string, firstStep);
 
-      // Poll the persisted cycle until the latest run reaches a terminal state.
+      // Poll the project inbox until the background run emits ResultEmitted and the
+      // sink raises a visual_review Question. The run should still be `running`.
       const deadline = Date.now() + POLL_TIMEOUT_MS;
+      let visualReview = inbox
+        .listInbox(project.id as string)
+        .find((q) => q.payload.kind === "visual_review");
+      while (visualReview === undefined && Date.now() < deadline) {
+        await sleep(POLL_INTERVAL_MS);
+        visualReview = inbox
+          .listInbox(project.id as string)
+          .find((q) => q.payload.kind === "visual_review");
+      }
+
+      // A real review card was produced (NOT failed/timeout).
+      expect(visualReview).toBeDefined();
+
+      // The run is still `running` — the review→approve→done gate has NOT been
+      // bypassed (the old bug emitted `done` immediately on completion).
+      const beforeApprove = latestRun(cycles.getCycle(cycle.id as string));
+      expect(beforeApprove).toBeDefined();
+      expect(beforeApprove!.state).toBe("running");
+
+      // The visual_review card carries real, non-empty, non-scripted model text.
+      const payload = visualReview!.payload;
+      expect(payload.kind).toBe("visual_review");
+      const blocks =
+        payload.kind === "visual_review" ? payload.review.blocks : [];
+      const summary = blocks.find((b) => b.type === "summary");
+      expect(summary).toBeDefined();
+      const body = summary && summary.type === "summary" ? summary.body : "";
+      expect(typeof body).toBe("string");
+      expect(body.trim().length).toBeGreaterThan(10); // real sentence, not empty.
+      expect(body).not.toBe(SCRIPTED_CONSTANT); // proves it is real model text.
+      // Surface the persisted real sentence for the test report.
+      console.error(`[live-run] persisted model sentence: ${body}`);
+
+      // APPROVE the review → approveTaskReview → orchestrator.resume emits
+      // RunStateChanged done. This is the live post-review finalize.
+      await inbox.answerQuestion(visualReview!.id as string, {
+        verdict: "approve",
+      });
+
+      // Poll until the run reaches `done` after approval.
       let run = latestRun(cycles.getCycle(cycle.id as string));
       while (
         run !== undefined &&
@@ -112,30 +156,12 @@ suite("LiveClaudeOrchestrator — real local Claude run", () => {
         await sleep(POLL_INTERVAL_MS);
         run = latestRun(cycles.getCycle(cycle.id as string));
       }
-
       expect(run).toBeDefined();
-      // Real claude must have succeeded (NOT failed/stalled/timeout).
       expect(run!.state).toBe("done");
 
-      // A Review was persisted from the real ResultEmitted with non-empty,
-      // non-scripted real model text.
+      // The persisted Review row also carries the same real model text.
       const reviews = store.repos.reviews.findByRun(RunId(run!.id));
       expect(reviews.length).toBeGreaterThan(0);
-      const summary = reviews
-        .flatMap((r) => r.blocks)
-        .find((b) => b.type === "summary");
-      expect(summary).toBeDefined();
-      const body = summary && summary.type === "summary" ? summary.body : "";
-      expect(typeof body).toBe("string");
-      expect(body.trim().length).toBeGreaterThan(10); // real sentence, not empty.
-      expect(body).not.toBe(SCRIPTED_CONSTANT); // proves it is real model text.
-      // Surface the persisted real sentence for the test report.
-      console.error(`[live-run] persisted model sentence: ${body}`);
-
-      // The sink raised a visual_review Question from the real ResultEmitted.
-      const open = inbox.listInbox(project.id as string);
-      const visualReview = open.find((q) => q.payload.kind === "visual_review");
-      expect(visualReview).toBeDefined();
     },
     POLL_TIMEOUT_MS + 30_000,
   );

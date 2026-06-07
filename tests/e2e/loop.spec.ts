@@ -29,9 +29,10 @@ test("human runs one phase end-to-end through the Inbox loop", async ({
     .first()
     .click();
 
-  const nameField = page.getByLabel("Cycle 名");
-  await expect(nameField).toBeVisible();
-  await nameField.fill("v0.0.1 — Human Inbox 縦ループ");
+  // The human types ONLY the goal; the version is auto-assigned (→ v0.0.1).
+  const goalField = page.getByLabel("Cycle 名(ゴール)");
+  await expect(goalField).toBeVisible();
+  await goalField.fill("Human Inbox 縦ループ");
   // Modal open, fields filled, before submit.
   await shot(page, "scr-01.create.png");
 
@@ -41,11 +42,12 @@ test("human runs one phase end-to-end through the Inbox loop", async ({
   await expect(page.getByRole("region", { name: "Phase パイプライン" })).toBeVisible();
   const cycleUrl = page.url();
 
-  // Back to the list to capture the populated SCR-01 list state.
+  // Back to the list to capture the populated SCR-01 list state. The row now
+  // shows the goal as title plus the auto-assigned version (v0.0.1) separately.
   await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: /v0\.0\.1 — Human Inbox 縦ループ/ }),
-  ).toBeVisible();
+  const cycleRow = page.getByRole("button", { name: /Human Inbox 縦ループ/ });
+  await expect(cycleRow).toBeVisible();
+  await expect(cycleRow).toContainText("v0.0.1");
   await shot(page, "scr-01.list.png");
 
   // ── 3. Open the cycle (SCR-02 idle), assert S1..S7 pipeline ───
@@ -103,13 +105,22 @@ test("human runs one phase end-to-end through the Inbox loop", async ({
     .fill("スコープを確認しました。進めてください。");
   await page.getByRole("button", { name: /回答を送信して resume/ }).click();
 
-  // Returns to the inbox; a visual_review card now appears.
+  // The review/answer screens live UNDER the cycle now: after answering, the app
+  // returns to the CYCLE screen (not the Inbox). Confirm we're back on the cycle.
+  await expect(page).toHaveURL(new RegExp(`${escapeRe(cycleUrl)}$`));
+  await expect(page.getByRole("region", { name: "Phase パイプライン" })).toBeVisible();
+
+  // The Inbox still lists open cards globally; go there to pick up the next one —
+  // a visual_review card now appears.
+  await page.locator("a.nav-item", { hasText: "Inbox" }).click();
   await expect(page.getByRole("heading", { name: "Human Inbox" })).toBeVisible();
   const reviewCard = page.getByRole("listitem").filter({ hasText: "レビュー待ち" });
   await expect(reviewCard).toBeVisible();
 
   // ── 7. Open the review (SCR-04 default), open backtrack form ──
+  // Opening the card lands on the cycle-child review route /cycles/:id/q/:qid.
   await reviewCard.getByRole("link", { name: /レビュー/ }).click();
+  await expect(page).toHaveURL(/\/cycles\/[^/]+\/q\/[^/]+$/);
   await expect(page.getByRole("heading", { name: /成果の確定レビュー/ })).toBeVisible();
   // Block-stream renders summary / ac-map / mermaid / screenshot.
   await expect(page.getByText("Summary", { exact: true })).toBeVisible();
@@ -125,18 +136,18 @@ test("human runs one phase end-to-end through the Inbox loop", async ({
   await page.getByRole("button", { name: "キャンセル" }).click();
   await expect(page.getByRole("heading", { name: /手戻り先を選ぶ/ })).toBeHidden();
 
-  // ── 8. Approve → run reaches done (SCR-02 done) ───────────────
+  // ── 8. Approve → phase completes → the loop ADVANCES to S2 ─────
+  // Approving now returns straight to the CYCLE screen (the loop's home), NOT the
+  // Inbox. S1 is done and S2 is the startable next phase.
+  // Regression guard: approving used to mark only the run done, leaving the
+  // phase in "review" → S2 was blocked (PrevPhaseNotDone) and the loop froze
+  // on S1 with no on-screen explanation.
   await page.getByRole("button", { name: /承認して次 Phase へ/ }).click();
-  // Approving clears the last open card → the Inbox returns to its empty state.
+  await expect(page).toHaveURL(new RegExp(`${escapeRe(cycleUrl)}$`));
+  await expect(page.getByText("次に S2 を起動できます")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "いま捌くものはありません" }),
+    page.getByRole("button", { name: /S2 Phase 起動/ }).first(),
   ).toBeVisible();
-
-  // Return to the cycle; the run output card shows the done state.
-  await page.goto(cycleUrl);
-  const outputCard = page.getByRole("region", { name: /S1 出力/ });
-  await expect(outputCard).toBeVisible();
-  await expect(outputCard.getByText("done", { exact: true })).toBeVisible();
   await shot(page, "scr-02.done.png");
 });
 

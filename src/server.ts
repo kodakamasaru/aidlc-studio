@@ -19,6 +19,7 @@ import { UuidIdGen } from "./infra/sys/id-gen";
 import { createApp } from "./infra/http/app";
 import { logError } from "./infra/log";
 import { EventApplier } from "./app/services/event-applier";
+import { reconcileRunningRuns } from "./app/services/reconcile";
 import { ScriptedOrchestrator } from "./infra/orchestrator/scripted";
 import { LiveClaudeOrchestrator } from "./infra/orchestrator/live";
 import type { Ports } from "./app/ports/composition";
@@ -85,6 +86,12 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
     notify: noopNotify,
   };
 
+  // Startup recovery: any run still "running" at boot is orphaned (this fresh
+  // process holds no live child/stall-timer behind it — see reconcile.ts), so
+  // drive it to "stalled" before serving. Without this, a crash or `bun --watch`
+  // restart mid-run leaves the run stuck "running" forever with no retry path.
+  reconcileRunningRuns(ports);
+
   const app = createApp(ports);
   mountStaticSpa(app);
   return { app, db, ports };
@@ -107,8 +114,12 @@ function mountStaticSpa(app: Hono): void {
   app.get("/favicon.ico", serveStatic({ path: "./web/dist/favicon.ico" }));
 
   // SPA fallback: any non-/api GET that didn't match an asset → index.html.
+  // index.html must NOT be cached by the browser (its hashed asset references
+  // change on every build); otherwise a rebuilt frontend looks "stale" until a
+  // hard refresh. The hashed /assets/* stay cacheable.
   app.get("*", (c, next) => {
     if (c.req.path.startsWith("/api")) return next();
+    c.header("Cache-Control", "no-cache, must-revalidate");
     return serveStatic({ path: "./web/dist/index.html" })(c, next);
   });
 }
@@ -128,9 +139,22 @@ function buildOrchestrator(
       raw !== undefined && raw.length > 0 && MODEL_NAME_RE.test(raw)
         ? raw
         : undefined;
+    // AIDLC_STALL_TIMEOUT_MS bounds how long a live run may run with no result
+    // before it's treated as STALLED (retriable). Defaults to the adapter's
+    // built-in 120s; set a small value to demo/test the stall surface quickly.
+    const tRaw = process.env.AIDLC_STALL_TIMEOUT_MS?.trim();
+    const tParsed = tRaw ? Number.parseInt(tRaw, 10) : NaN;
+    const timeoutMs = Number.isInteger(tParsed) && tParsed > 0 ? tParsed : undefined;
+    // AIDLC_MAX_TURNS caps claude's agentic turns (`--max-turns`). UNSET = no cap
+    // (the agent can finish a phase); set a positive int only to bound it.
+    const mtRaw = process.env.AIDLC_MAX_TURNS?.trim();
+    const mtParsed = mtRaw ? Number.parseInt(mtRaw, 10) : NaN;
+    const maxTurns = Number.isInteger(mtParsed) && mtParsed > 0 ? mtParsed : undefined;
     return new LiveClaudeOrchestrator({
       sink,
       ...(model !== undefined ? { model } : {}),
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      ...(maxTurns !== undefined ? { maxTurns } : {}),
     });
   }
   // AIDLC_SCENARIO lets E2E pick the deterministic script: "happy" (default)

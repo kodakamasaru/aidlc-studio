@@ -16,6 +16,8 @@ interface RunPanelProps {
   readonly busy: boolean;
   readonly onRetry: (runId: string) => void;
   readonly onStartNext: (step: string) => void;
+  /** Re-run a backtrack-rewound phase (appends a fresh run + launches). */
+  readonly onRelaunch: (step: string) => void;
   /** Phase is "running" via a backtrack rewind but has no live run (US-13). */
   readonly rewound?: boolean;
   /** Set when the running run is blocked on the human (#1/#5). */
@@ -58,15 +60,15 @@ function HumanWaitPanel({
       </header>
       <p className="run-card__body">
         <span aria-hidden="true">🧑 </span>
-        <strong>AI はあなたの{verb}を待っています。</strong> Inbox で{verb}
+        <strong>AI はあなたの{verb}を待っています。</strong> {verb}
         すると Run が再開します。
       </p>
       <div className="run-card__actions">
         <Link
           className="btn btn--primary"
-          to={`/questions/${encodeURIComponent(humanWait.question.id)}`}
+          to={`/cycles/${encodeURIComponent(humanWait.question.cycleId)}/q/${encodeURIComponent(humanWait.question.id)}`}
         >
-          <PersonIcon size={14} /> Inbox で{verb}する
+          <PersonIcon size={14} /> {verb}する
         </Link>
         <Link className="btn btn--ghost" to="/inbox">
           Inbox を開く
@@ -102,12 +104,11 @@ function IdlePanel({ phase, busy, onStartNext }: RunPanelProps) {
   );
 }
 
-function RewoundPanel({ phase }: RunPanelProps) {
+function RewoundPanel({ phase, busy, onRelaunch }: RunPanelProps) {
   // US-13 backtrack: the pipeline rewound this phase to "running" and recorded a
-  // Fact, but did NOT create a new run (no domain path launches a run on an
-  // already-"running" phase). Auto-relaunch is deferred to v0.0.x (ledger S7-C4);
-  // until then the re-execute affordance is shown disabled-with-explanation so
-  // the state reads as "要再実行" rather than a broken run-less running phase.
+  // Fact, but did NOT create a new run (backtrackTo leaves only terminal runs in
+  // history). Relaunch appends a fresh run on this phase and launches it — so the
+  // re-execute button drives the rewound phase back into a live run.
   return (
     <section
       className="run-card surface-card"
@@ -119,18 +120,18 @@ function RewoundPanel({ phase }: RunPanelProps) {
       </header>
       <p className="run-card__body">
         差し戻しでこの Phase まで巻き戻りました(理由は Decision / ledger
-        に記録済み)。再生成の <strong>run 自動起動は v0.0.x で対応</strong>
-        します。現状は手動 relaunch 待ちです。
+        に記録済み)。<strong>{phase.step} を再実行</strong>{" "}
+        すると新しい run を起動して再生成します。
       </p>
       <div className="run-card__actions">
         <button
           type="button"
           className="btn btn--primary"
-          disabled
-          title="差し戻し後の自動再実行は v0.0.x で対応(現状は手動 relaunch 待ち)"
+          onClick={() => onRelaunch(phase.step)}
+          disabled={busy}
         >
           <PlayIcon size={14} />
-          再実行待ち
+          {phase.step} を再実行
         </button>
       </div>
     </section>
@@ -178,9 +179,11 @@ function StalledPanel({ run, busy, onRetry }: RunPanelProps & { run: Run }) {
         </StateBadge>
       </header>
       <p className="run-card__body">
-        {failed
-          ? "Run が失敗しました。"
-          : "エージェントが一定時間 無出力のため stall 検知しました。"}{" "}
+        {run.failureReason
+          ? run.failureReason
+          : failed
+            ? "Run が失敗しました。"
+            : "エージェントが一定時間 無出力のため stall 検知しました。"}{" "}
         <strong>retry</strong> で同じ worktree から再開します。
       </p>
       <div className="run-card__actions">

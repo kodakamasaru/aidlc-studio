@@ -21,6 +21,8 @@ export type RunStateChanged = {
   readonly type: "RunStateChanged";
   readonly runId: RunId;
   readonly to: RunState;
+  /** Human-readable cause for failed/stalled transitions. Empty for done. */
+  readonly reason?: string;
 };
 
 /** AI が人間判断を要求した(S3 名: HumanTaskEmitted)→ Question を 1 枚 open。 */

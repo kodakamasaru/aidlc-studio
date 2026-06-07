@@ -44,6 +44,12 @@ export interface LiveClaudeOptions {
   readonly claudeBin?: string;
   readonly model?: string;
   readonly timeoutMs?: number;
+  /**
+   * Cap on claude agentic turns (`--max-turns`). Omitted by default = NO cap, so
+   * the agent can actually complete a phase (a low cap aborts the moment it tries
+   * a tool → `error_max_turns`). The wall-clock `timeoutMs` is the real backstop.
+   */
+  readonly maxTurns?: number;
   readonly buildPrompt?: (cmd: RunLaunch) => string;
 }
 
@@ -54,20 +60,37 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private readonly claudeBin: string;
   private readonly model: string | undefined;
   private readonly timeoutMs: number;
+  private readonly maxTurns: number | undefined;
   private readonly buildPrompt: (cmd: RunLaunch) => string;
   // Live child processes keyed by runId, so cancel() can kill an in-flight run.
   private readonly children = new Map<string, SpawnedChild>();
+  // Each run's full context, kept so the post-review approval finalize (resume)
+  // can emit a context-tagged `RunStateChanged done` — the sink needs cycleId to
+  // locate + advance the Cycle. Populated at startAttempt; never evicted in v0
+  // (one run per launch; bounded by process lifetime).
+  private readonly contexts = new Map<string, RunContext>();
 
   constructor(opts: LiveClaudeOptions) {
     this.sink = opts.sink;
     this.claudeBin = opts.claudeBin ?? DEFAULT_CLAUDE_BIN;
     this.model = opts.model;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.maxTurns = opts.maxTurns;
     this.buildPrompt = opts.buildPrompt ?? defaultBuildPrompt;
   }
 
+  // The OrchestratorPort contract says launch "Resolves once the run is started"
+  // — NOT once it finishes. Headless `claude -p` can run for minutes, so awaiting
+  // its completion here would block POST /phases/:step/start for the whole run and
+  // freeze the web Start button. So launch SPAWNS the child (tracking it in the
+  // map) and returns immediately; the rest — await exit, drain, parse, emit — runs
+  // detached in awaitAndEmit(). spawn() throws synchronously only if the spawn
+  // itself is impossible (bad cwd / missing bin); that propagates out of launch so
+  // the caller's compensation can react. Once the child is spawned, every later
+  // failure becomes a terminal `RunStateChanged failed` emission inside the
+  // detached task — never an unhandled rejection out of launch.
   async launch(cmd: RunLaunch): Promise<void> {
-    await this.runAttempt(
+    this.startAttempt(
       buildRunContext(cmd, cmd.runId),
       this.buildPrompt(cmd),
       cmd.repoPath,
@@ -85,7 +108,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       repoPath: cmd.repoPath,
       ...(cmd.worktreeRef !== undefined ? { worktreeRef: cmd.worktreeRef } : {}),
     };
-    await this.runAttempt(
+    this.startAttempt(
       buildRunContext(cmd, cmd.newRunId),
       this.buildPrompt(launchLike),
       cmd.repoPath,
@@ -93,26 +116,38 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   }
 
   /**
-   * v0.0.x: interactive Q→answer→resume against the real model is NOT yet
-   * supported — headless `claude -p` runs to completion and never pauses for
-   * human input mid-run, so there is no live session to inject an answer into.
-   * The real-AI gated test therefore does NOT depend on real Q→resume. The
-   * proper enhancement is `--resume <session-id>` with the human answer streamed
-   * as the next turn (v0.0.x).
+   * In live v0 the ONLY resume is the post-review approval finalize. A live run
+   * does NOT emit `done` on completion — it emits only `ResultEmitted`, so the
+   * run stays `running` and surfaces as a `visual_review` card ("レビュー待ち").
+   * When the human approves that review, the inbox service dispatches resume —
+   * which here simply emits the terminal `RunStateChanged done`. No `claude`
+   * re-spawn is needed: headless `claude -p` already ran to completion at launch.
    *
-   * Rather than silently no-op'ing (which would leave the run hanging with no
-   * terminal affordance), we THROW. ResumeRun carries only a runId — not the
-   * cycle/phase/step context an emission needs — so the adapter can't emit a
-   * context-tagged terminal event itself. Throwing routes through the inbox
-   * service's post-commit compensation, which drives the acted-on run to a
-   * retriable terminal state and surfaces a 502, so the UI/inbox can offer a
-   * retry instead of the run hanging forever.
+   * RunStateChanged carries only a runId, so resume can emit `done` without the
+   * cycle/phase/step context a Question/Review needs. If the run already failed,
+   * advanceRun(done) is an illegal transition — that's fine; the sink logs it and
+   * the run stays terminal-failed.
+   *
+   * Mid-run interactive Q→answer→resume against the real model is still a v0.0.x
+   * enhancement (S7-C1): headless `claude -p` has no mid-run pause, so there is no
+   * live session to inject an answer into. The v0 review-approval finalize below
+   * is the only resume the live adapter supports.
    */
-  async resume(_cmd: ResumeRun): Promise<void> {
-    const reason =
-      "resume-not-supported-in-v0: headless claude -p cannot pause/resume";
-    logError("LiveClaudeOrchestrator.resume", reason);
-    return Promise.reject(new Error(reason));
+  async resume(cmd: ResumeRun): Promise<void> {
+    const ctx = this.contexts.get(cmd.runId);
+    if (!ctx) {
+      // Context lost (server restart / not launched by this instance).
+      // Throw so the caller's compensation can surface the error to the user
+      // instead of silently failing and leaving the run stuck in "running".
+      throw new Error(
+        `LiveClaudeOrchestrator.resume: context not found for run ${cmd.runId}`,
+      );
+    }
+    await this.emit(ctx, {
+      type: "RunStateChanged",
+      runId: cmd.runId,
+      to: "done",
+    });
   }
 
   async cancel(cmd: { readonly runId: RunId }): Promise<void> {
@@ -134,74 +169,27 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
 
   // ── internals ──────────────────────────────────────────────────
   /**
-   * Spawn the local claude headless for one attempt, await completion, and emit.
-   * On success: ResultEmitted(summary) THEN RunStateChanged(done). On any
-   * failure (spawn error, non-zero exit, timeout, parse miss): RunStateChanged
-   * (failed). Never throws out of here unless the spawn itself is impossible —
-   * the run state conveys failure to the app layer.
+   * Spawn the local claude headless for one attempt and return IMMEDIATELY,
+   * leaving the await/parse/emit to a detached background task (awaitAndEmit).
+   * This is what makes launch/retry non-blocking: the HTTP start request resolves
+   * as soon as the child is spawned + tracked, not when claude finishes.
+   *
+   * THROWS only if the spawn itself is impossible (bad cwd / missing bin) — that
+   * propagates out of launch/retry so the caller's compensation can react. Once
+   * the child is spawned + tracked, this returns void and every later failure is
+   * converted to a terminal `failed` emission inside awaitAndEmit.
    */
-  private async runAttempt(
+  private startAttempt(
     ctx: RunContext,
     prompt: string,
     repoPath: string,
-  ): Promise<void> {
-    // The ENTIRE attempt — spawn, parse, AND the ResultEmitted/done emits — is
-    // wrapped so ANY failure (spawn error, non-zero exit, timeout, parse miss,
-    // is_error result, or a throw from the sink mid-emit) falls through to emit
-    // exactly one terminal `failed`. A run is never left with no terminal state.
-    try {
-      const text = await this.runClaude(ctx.runId, prompt, repoPath);
-      await this.emit(ctx, {
-        type: "ResultEmitted",
-        runId: ctx.runId,
-        blocks: [
-          {
-            type: "summary",
-            title: `S${ctx.step as string} (live Claude)`,
-            body: text,
-          },
-        ],
-      });
-      await this.emit(ctx, {
-        type: "RunStateChanged",
-        runId: ctx.runId,
-        to: "done",
-      });
-    } catch (err) {
-      logError("LiveClaudeOrchestrator: run failed", err);
-      // The terminal `failed` emit is itself best-effort: if the sink throws
-      // here (the only emit on the failure path), it must NOT escape — otherwise
-      // the run is left with no terminal state at all. Swallow after logging so
-      // the attempt is guaranteed to resolve, never reject, on the failure path.
-      try {
-        await this.emit(ctx, {
-          type: "RunStateChanged",
-          runId: ctx.runId,
-          to: "failed",
-        });
-      } catch (sinkErr) {
-        logError("LiveClaudeOrchestrator: terminal failed-emit threw", sinkErr);
-      }
-    }
-  }
-
-  /**
-   * Run `claude -p <prompt> --output-format stream-json --verbose --max-turns 1`
-   * in cwd=repoPath, stream-parse JSONL stdout, and return the assistant's final
-   * text. Throws on non-zero exit, timeout, or when no result text is found.
-   */
-  private async runClaude(
-    runId: RunId,
-    prompt: string,
-    repoPath: string,
-  ): Promise<string> {
+  ): void {
     // Defense in depth: refuse to spawn against a non-absolute / missing cwd.
     // Bun.spawn with a bad cwd can throw or behave oddly per-platform; failing
-    // fast here yields a clean, well-described error → terminal `failed`.
+    // fast here (synchronously, BEFORE the run is tracked) surfaces as a launch
+    // throw → caller compensation, not a half-tracked run.
     if (!isAbsolute(repoPath) || !existsSync(repoPath)) {
-      throw new Error(
-        `repoPath must be an existing absolute path: ${repoPath}`,
-      );
+      throw new Error(`repoPath must be an existing absolute path: ${repoPath}`);
     }
 
     const args = [
@@ -210,18 +198,43 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       "--output-format",
       "stream-json",
       "--verbose",
-      "--max-turns",
-      "1",
+      // No --max-turns by default: a low cap aborts the agent the instant it uses
+      // a tool (error_max_turns). Only pass it when explicitly configured.
+      ...(this.maxTurns !== undefined
+        ? ["--max-turns", String(this.maxTurns)]
+        : []),
       ...(this.model !== undefined ? ["--model", this.model] : []),
     ];
 
+    // Bun.spawn throws synchronously if the binary is missing/unspawnable → that
+    // escapes launch as the "spawn is impossible" case the contract calls out.
     const child = Bun.spawn([this.claudeBin, ...args], {
       cwd: repoPath,
       stdout: "pipe",
       stderr: "pipe",
     });
-    this.children.set(runId, child);
+    this.children.set(ctx.runId, child);
+    this.contexts.set(ctx.runId, ctx);
 
+    // Detached: do NOT await. awaitAndEmit owns the rest of the lifecycle and is
+    // total — it catches everything and always emits a terminal/result event — so
+    // there is never an unhandled rejection. void marks the intentional detach.
+    void this.awaitAndEmit(ctx, child);
+  }
+
+  /**
+   * Background task: await the spawned child, drain+parse its stream-json, and
+   * emit. On success: emit ONLY `ResultEmitted` — the run stays `running` and the
+   * sink raises a `visual_review` Question ("レビュー待ち"); the run is finalized to
+   * `done` later by resume() when the human approves the review. On TIMEOUT (the
+   * run is stuck) → emit terminal `RunStateChanged stalled` (the retriable stall
+   * surface); on any other failure (non-zero exit, parse miss, is_error, sink
+   * throw) → terminal `failed`. Never rejects — all errors are caught + converted.
+   */
+  private async awaitAndEmit(
+    ctx: RunContext,
+    child: SpawnedChild,
+  ): Promise<void> {
     let timedOut = false;
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
@@ -242,26 +255,77 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       // Drain stdout, stderr, and the exit concurrently. Draining stdout fully
       // before reading stderr can deadlock when the child blocks writing to a
       // full stderr pipe while we're still reading stdout.
+      // SpawnedChild widens stdout/stderr to a union (the general Bun.spawn
+      // overload), but this adapter always spawns with `"pipe"`, so both are
+      // ReadableStreams — narrow them for Response.
+      const out = child.stdout as ReadableStream<Uint8Array>;
+      const err = child.stderr as ReadableStream<Uint8Array>;
       const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
+        new Response(out).text(),
+        new Response(err).text(),
         child.exited,
       ]);
       if (timedOut) {
         throw new Error(`claude timed out after ${this.timeoutMs}ms`);
       }
       if (exitCode !== 0) {
-        throw new Error(`claude exited ${exitCode}: ${stderr.slice(0, 500)}`);
+        // claude usually writes its real error to STDOUT (stream-json), not
+        // stderr — a bare `claude exited 1:` with empty stderr is useless to the
+        // human. Prefer stderr, but fall back to a readable detail mined from
+        // stdout so the failureReason carries the actual cause.
+        const detail = claudeFailureDetail(stderr, stdout);
+        throw new Error(
+          detail
+            ? `claude exited ${exitCode}: ${detail}`
+            : `claude exited ${exitCode}(診断出力なし — claude CLI のログを確認してください)`,
+        );
       }
       const text = extractResultText(stdout);
       if (text === undefined || text.trim().length === 0) {
         throw new Error("claude produced no assistant result text");
       }
-      return text;
+      // SUCCESS: emit ONLY the review. Do NOT emit `done` — the run stays
+      // `running` until the human approves the review (resume → done). This keeps
+      // the live flow consistent with the scripted model's review→approve gate.
+      await this.emit(ctx, {
+        type: "ResultEmitted",
+        runId: ctx.runId,
+        blocks: [
+          {
+            type: "summary",
+            title: `S${ctx.step as string} (live Claude)`,
+            body: text,
+          },
+        ],
+      });
+    } catch (err) {
+      logError("LiveClaudeOrchestrator: run ended abnormally", err);
+      // A TIMEOUT means the run is STUCK (the AI stopped making progress) → emit
+      // `stalled`, the recoverable state the human retries from. A genuine error
+      // (non-zero exit, parse miss, spawn failure, is_error) → `failed`. Both are
+      // retriable, but the distinction makes stall detection real in live mode
+      // (the stall surface + retry only triggers on a `stalled` run).
+      // This terminal emit is best-effort: if the sink throws it must NOT escape
+      // (detached task → an escape would be an unhandled rejection and leave the
+      // run with no terminal state). Swallow after logging.
+      const terminal: "stalled" | "failed" = timedOut ? "stalled" : "failed";
+      // Derive a concise, human-readable reason from the actual error so the
+      // user knows WHAT went wrong (not just "failed").
+      const reason = err instanceof Error ? err.message : String(err);
+      try {
+        await this.emit(ctx, {
+          type: "RunStateChanged",
+          runId: ctx.runId,
+          to: terminal,
+          reason,
+        });
+      } catch (sinkErr) {
+        logError("LiveClaudeOrchestrator: terminal-emit threw", sinkErr);
+      }
     } finally {
       clearTimeout(timer);
       if (hardKillTimer !== undefined) clearTimeout(hardKillTimer);
-      this.children.delete(runId);
+      this.children.delete(ctx.runId);
     }
   }
 
@@ -276,6 +340,74 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private async emit(ctx: RunContext, event: DomainEvent): Promise<void> {
     await this.sink({ ctx, event });
   }
+}
+
+const MAX_DETAIL_LEN = 500;
+
+/** Readable text for claude's known terminal `result` error subtypes. */
+const RESULT_SUBTYPE_MSG: Record<string, string> = {
+  error_max_turns: "max turns に達しました(エージェントが完了前に停止)",
+  error_during_execution: "実行中にエラーが発生しました",
+};
+
+/**
+ * Human-readable summary of a claude stream-json `{"type":"result"}` event, or
+ * undefined if it isn't an error result. Prefers the `result` text; otherwise
+ * maps the known error subtype to a sentence (NOT raw JSON — error_max_turns &
+ * friends carry no `result` string, only a subtype).
+ */
+function resultEventMessage(e: Record<string, unknown>): string | undefined {
+  if (e["type"] !== "result") return undefined;
+  const result = e["result"];
+  if (typeof result === "string" && result.trim().length > 0) return result;
+  const subtype = e["subtype"];
+  if (typeof subtype !== "string" || subtype === "success") return undefined;
+  const base = RESULT_SUBTYPE_MSG[subtype] ?? `claude error: ${subtype}`;
+  const turns = e["num_turns"];
+  return typeof turns === "number" ? `${base}(${turns} turns)` : base;
+}
+
+/**
+ * Best-effort human-readable detail for a non-zero `claude` exit, used to enrich
+ * the run's failureReason. Prefers stderr; when it's empty (claude writes most
+ * errors to stdout as stream-json), mines stdout for an error message — a
+ * `{"type":"result"}` event (its `result` text or mapped error subtype), a
+ * top-level `error`, or the last non-JSON text line. Raw JSON is NEVER returned
+ * verbatim. Returns "" when nothing usable exists.
+ */
+export function claudeFailureDetail(stderr: string, stdout: string): string {
+  const errText = stderr.trim();
+  if (errText.length > 0) return errText.slice(0, MAX_DETAIL_LEN);
+
+  let fromJson: string | undefined;
+  let lastText: string | undefined; // last NON-JSON line — never a raw JSON dump.
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    let evt: unknown;
+    try {
+      evt = JSON.parse(trimmed);
+    } catch {
+      lastText = trimmed; // plain text (e.g. a stack trace) — usable as detail.
+      continue;
+    }
+    if (typeof evt !== "object" || evt === null) continue;
+    const e = evt as Record<string, unknown>;
+    const resultMsg = resultEventMessage(e);
+    if (resultMsg !== undefined) {
+      fromJson = resultMsg;
+    } else if (typeof e["error"] === "string") {
+      fromJson = e["error"] as string;
+    } else if (
+      typeof e["error"] === "object" &&
+      e["error"] !== null &&
+      typeof (e["error"] as Record<string, unknown>)["message"] === "string"
+    ) {
+      fromJson = (e["error"] as Record<string, unknown>)["message"] as string;
+    }
+  }
+  const detail = (fromJson ?? lastText ?? "").trim();
+  return detail.slice(0, MAX_DETAIL_LEN);
 }
 
 /**

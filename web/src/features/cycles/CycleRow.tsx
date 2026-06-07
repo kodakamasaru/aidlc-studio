@@ -45,7 +45,10 @@ export function CycleRow({ cycle }: CycleRowProps) {
       </span>
 
       <span className="cycle-row__main">
-        <span className="cycle-row__title">{cycle.title}</span>
+        <span className="cycle-row__title">
+          <span className="cycle-row__version mono">{cycle.version}</span>
+          {cycle.title}
+        </span>
         <span className="cycle-row__meta">
           {meta}
           <span className="cycle-row__sep">·</span>

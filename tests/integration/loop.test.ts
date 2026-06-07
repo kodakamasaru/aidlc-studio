@@ -142,6 +142,19 @@ describe("full loop — happy path", () => {
     // Inbox is now empty (both questions answered).
     const inbox3 = await get(h.app, `/api/projects/${projectId}/inbox`);
     expect(inbox3.json.data).toHaveLength(0);
+
+    // The S1 phase is "done" (the approved review completed it) — so the NEXT
+    // phase is startable. Regression guard: approving used to mark only the run
+    // done, leaving the phase stuck in "review", which blocked startPhase(S2)
+    // with PrevPhaseNotDone and froze the loop on S1.
+    const phasesAfter = (await get(h.app, `/api/cycles/${cycle.id}`)).json.data
+      .phases;
+    expect(phasesAfter.find((p: any) => p.step === "S1").state).toBe("done");
+    const startS2 = await post(
+      h.app,
+      `/api/cycles/${cycle.id}/phases/S2/start`,
+    );
+    expect(startS2.status).toBe(200);
   });
 
   test("answer is atomic — fact and answered question both persist together", async () => {

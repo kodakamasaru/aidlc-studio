@@ -15,7 +15,7 @@ interface InboxCardProps {
 
 export function InboxCard({ question }: InboxCardProps) {
   const meta = kindMeta(question.kind);
-  const href = `/questions/${question.id}`;
+  const href = `/cycles/${question.cycleId}/q/${question.id}`;
 
   return (
     <article className="inbox-card" role="listitem">

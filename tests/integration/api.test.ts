@@ -12,18 +12,25 @@ import type { TestApp, FailingTestApp } from "../support/harness";
 import { raiseQuestion } from "../../src/domain/question/question";
 import type { QuestionPayload } from "../../src/domain/question/question";
 import { buildReview } from "../../src/domain/review/review";
-import { advanceRun } from "../../src/domain/cycle/cycle";
+import {
+  advanceRun,
+  createCycle as domainCreateCycle,
+  startPhase as domainStartPhase,
+  version,
+} from "../../src/domain/cycle/cycle";
 import {
   ProjectId,
   QuestionId,
   RunId,
   CycleId,
+  PhaseId,
   TaskId,
 } from "../../src/domain/shared/ids";
 import { Step } from "../../src/domain/shared/vocab";
 import { instant } from "../../src/domain/shared/primitives";
 import { unwrap } from "../../src/domain/shared/result";
 import { cycleErrorStatus } from "../../src/app/services/cycle-service";
+import { nextVersion } from "../../src/app/services/cycle-version";
 
 const T0 = unwrap(instant("2026-01-01T00:00:00.000Z"));
 
@@ -237,6 +244,46 @@ describe("cycles create/list/get", () => {
     expect(json.error).toBe("InvalidVersion");
   });
 
+  test("create with NO version on a fresh project → 201 auto-assigns v0.0.1", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const { status, json } = await post(
+      h.app,
+      `/api/projects/${projectId}/cycles`,
+      { title: "Human Inbox 縦ループ" },
+    );
+    expect(status).toBe(201);
+    expect(json.data.version).toBe("v0.0.1");
+    expect(json.data.title).toBe("Human Inbox 縦ループ");
+  });
+
+  test("second create with NO version → auto bumps the patch to v0.0.2", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const first = await post(h.app, `/api/projects/${projectId}/cycles`, {
+      title: "first goal",
+    });
+    expect(first.json.data.version).toBe("v0.0.1");
+    const second = await post(h.app, `/api/projects/${projectId}/cycles`, {
+      title: "second goal",
+    });
+    expect(second.status).toBe(201);
+    expect(second.json.data.version).toBe("v0.0.2");
+  });
+
+  test("blank version string is treated as omitted → auto-assigns", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const { status, json } = await post(
+      h.app,
+      `/api/projects/${projectId}/cycles`,
+      { title: "goal", version: "   " },
+    );
+    // asOptionalString rejects a present-but-blank field before the service.
+    expect(status).toBe(400);
+    expect(json.error).toBe("InvalidField:version");
+  });
+
   test("project not found → 404", async () => {
     const h = buildTestApp();
     const { status, json } = await post(h.app, `/api/projects/ghost/cycles`, {
@@ -286,6 +333,26 @@ describe("cycles create/list/get", () => {
     const after = (await get(h.app, `/api/projects/${projectId}/cycles`)).json
       .data.length as number;
     expect(after).toBe(before);
+  });
+});
+
+// ── nextVersion (pure auto-assign helper) ────────────────────────
+describe("nextVersion", () => {
+  test("empty → v0.0.1", () => {
+    expect(nextVersion([])).toBe("v0.0.1");
+  });
+
+  test('["v0.0.1"] → v0.0.2', () => {
+    expect(nextVersion(["v0.0.1"])).toBe("v0.0.2");
+  });
+
+  test('["v0.1.0","v0.0.9"] → v0.1.1 (semver-max, not lexical-max)', () => {
+    expect(nextVersion(["v0.1.0", "v0.0.9"])).toBe("v0.1.1");
+  });
+
+  test("ignores non-vX.Y.Z entries; all-invalid → v0.0.1", () => {
+    expect(nextVersion(["nope", "1.0", "v2"])).toBe("v0.0.1");
+    expect(nextVersion(["v1.2.3", "garbage"])).toBe("v1.2.4");
   });
 });
 
@@ -353,6 +420,65 @@ describe("startPhase", () => {
     );
     expect(status).toBe(409);
     expect(json.error).toBe("PrevPhaseNotDone");
+  });
+});
+
+describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
+  test("success → fresh run launched on the rewound phase", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const { cycle, runId } = await cycleWithRunningRun(h, projectId);
+    const firstStep = cycle.phases[0]!.step as string;
+    const review = buildReview({
+      runId: RunId(runId),
+      cycleId: CycleId(cycle.id),
+      step: Step(firstStep),
+      taskId: TaskId("task-1"),
+      blocks: [{ type: "summary", title: "x", body: "y" }],
+      producedAt: T0,
+    });
+    const qid = seedQuestion(
+      h,
+      cycle,
+      runId,
+      { kind: "visual_review", review },
+      "task-1",
+    );
+    // Reject → backtrack to the SAME phase: it becomes rewound (running, run done).
+    await post(h.app, `/api/questions/${qid}/answer`, {
+      verdict: "reject",
+      backtrackTo: firstStep,
+      reason: "redo it",
+    });
+
+    const { status, json } = await post(
+      h.app,
+      `/api/cycles/${cycle.id}/phases/${firstStep}/relaunch`,
+    );
+    expect(status).toBe(200);
+    const phase = json.data.phases.find((p: any) => p.step === firstStep);
+    expect(phase.state).toBe("running");
+    expect(phase.runs).toHaveLength(2); // old (done) + the fresh run
+    const newRun = phase.runs[phase.runs.length - 1];
+    expect(newRun.state).toBe("running");
+
+    const launches = h.orchestrator.ofMethod("launch");
+    const last = launches[launches.length - 1]!.args;
+    expect(last.runId).toBe(newRun.id);
+    expect(last.step as string).toBe(firstStep);
+  });
+
+  test("relaunch on a pending (non-rewound) phase → 409 PhaseNotRewound", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const cycle = await createCycle(h, projectId);
+    const firstStep = cycle.phases[0]!.step as string;
+    const { status, json } = await post(
+      h.app,
+      `/api/cycles/${cycle.id}/phases/${firstStep}/relaunch`,
+    );
+    expect(status).toBe(409);
+    expect(json.error).toBe("PhaseNotRewound");
   });
 });
 
@@ -459,6 +585,11 @@ describe("orchestrator failure compensation", () => {
     const run = got.json.data.phases.find((p: any) => p.step === firstStep)
       .runs[0];
     expect(run.state).toBe("failed");
+    // ...AND it carries the REAL cause so the UI shows more than a generic
+    // "Run が失敗しました。" — the orchestrator's thrown message is surfaced.
+    expect(run.failureReason).toBe(
+      "AI 実行の起動に失敗しました: launch failed (test)",
+    );
   });
 
   test("retryRun whose retry throws → 502 AND new attempt compensated to failed", async () => {
@@ -487,6 +618,13 @@ describe("orchestrator failure compensation", () => {
     const runs = got.json.data.phases.flatMap((p: any) => p.runs);
     expect(runs.some((r: any) => r.state === "running")).toBe(false);
     expect(runs.filter((r: any) => r.state === "failed").length).toBe(2);
+    // The retry-attempt run carries the retry-specific real cause.
+    const retryRun = runs.find(
+      (r: any) => (r.id as string) !== failedRun.id && r.state === "failed",
+    );
+    expect(retryRun.failureReason).toBe(
+      "AI 実行のリトライに失敗しました: retry failed (test)",
+    );
   });
 });
 
@@ -565,7 +703,7 @@ describe("answerQuestion", () => {
     expect(resumes[0]!.args.body).toBe("sqlite");
   });
 
-  test("visual_review approve → approveTaskReview → resume(runId)", async () => {
+  test("visual_review approve → run done + phase done (domain functions, not orchestrator.resume)", async () => {
     const h = buildTestApp();
     const projectId = await createProject(h);
     const { cycle, runId } = await cycleWithRunningRun(h, projectId);
@@ -593,9 +731,97 @@ describe("answerQuestion", () => {
     expect(status).toBe(200);
     expect(json.data.question.state).toBe("answered");
 
-    const resumes = h.orchestrator.ofMethod("resume");
-    expect(resumes).toHaveLength(1);
-    expect(resumes[0]!.args.runId as string).toBe(runId);
+    // approveTaskReview now uses domain functions directly (advanceRun +
+    // approvePhase) instead of orchestrator.resume — so the run should be
+    // "done" and the phase should be "done" (not "review") immediately after
+    // the answer is processed. No orchestrator.resume call expected.
+    const updated = h.ports.repos.cycles.findById(CycleId(cycle.id));
+    const phase = updated!.phases.find((p) =>
+      p.runs.some((r) => (r.id as string) === runId),
+    );
+    expect(phase).toBeDefined();
+    const run = phase!.runs.find((r) => (r.id as string) === runId);
+    expect(run!.state).toBe("done");
+    expect(phase!.state).toBe("done");
+  });
+
+  test("approving the LAST phase completes the cycle (active → done)", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    // A single-phase cycle built directly, so approving that phase = ALL phases
+    // done → completeCycle should fire and flip the cycle active → done.
+    const built = unwrap(
+      domainCreateCycle({
+        id: CycleId("cyc-final"),
+        projectId: ProjectId(projectId),
+        version: unwrap(version("v9.9.9")),
+        title: "final-phase cycle",
+        taskIds: [],
+        createdAt: T0,
+        pipeline: [{ phaseId: PhaseId("cyc-final-p1"), step: Step("S1") }],
+      }),
+    );
+    const runId = "run-final";
+    const started = unwrap(
+      domainStartPhase(built, {
+        step: Step("S1"),
+        runId: RunId(runId),
+        startedAt: T0,
+      }),
+    );
+    h.ports.repos.cycles.save(started);
+
+    const review = buildReview({
+      runId: RunId(runId),
+      cycleId: CycleId("cyc-final"),
+      step: Step("S1"),
+      taskId: TaskId("task-1"),
+      blocks: [{ type: "summary", title: "x", body: "y" }],
+      producedAt: T0,
+    });
+    const qid = seedQuestion(
+      h,
+      { id: "cyc-final" },
+      runId,
+      { kind: "visual_review", review },
+      "task-1",
+    );
+
+    const { status } = await post(h.app, `/api/questions/${qid}/answer`, {
+      verdict: "approve",
+    });
+    expect(status).toBe(200);
+
+    const done = h.ports.repos.cycles.findById(CycleId("cyc-final"))!;
+    expect(done.state).toBe("done");
+    expect(done.phases[0]!.state).toBe("done");
+  });
+
+  test("approving a NON-final phase leaves the cycle active", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    // Default pipeline has 8 phases; approving the first leaves 7 pending.
+    const { cycle, runId } = await cycleWithRunningRun(h, projectId);
+    const review = buildReview({
+      runId: RunId(runId),
+      cycleId: CycleId(cycle.id),
+      step: Step("S1"),
+      taskId: TaskId("task-1"),
+      blocks: [{ type: "summary", title: "x", body: "y" }],
+      producedAt: T0,
+    });
+    const qid = seedQuestion(
+      h,
+      cycle,
+      runId,
+      { kind: "visual_review", review },
+      "task-1",
+    );
+
+    await post(h.app, `/api/questions/${qid}/answer`, { verdict: "approve" });
+
+    const after = h.ports.repos.cycles.findById(CycleId(cycle.id))!;
+    expect(after.state).toBe("active");
   });
 
   test("visual_review reject w/ backtrackTo+reason → cycle backtracked + persisted", async () => {
@@ -632,6 +858,11 @@ describe("answerQuestion", () => {
       (p) => (p.step as string) === firstStep,
     )!;
     expect(targetPhase.state).toBe("running");
+    // The reviewed run must be retired to "done" — NOT left "running". Backtracking
+    // to the reviewed phase itself would otherwise leave a phantom running run, and
+    // the cycle-detail UI would spin "生成中" forever (rewound needs run=done|none).
+    const reviewedRun = targetPhase.runs.find((r) => r.id === runId)!;
+    expect(reviewedRun.state).toBe("done");
     expect(h.ports.repos.facts.listByCycle(CycleId(cycle.id))).toHaveLength(1);
   });
 

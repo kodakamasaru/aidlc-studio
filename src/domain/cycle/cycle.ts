@@ -35,6 +35,8 @@ export type Run = {
   readonly state: RunState;
   readonly startedAt: Instant;
   readonly endedAt?: Instant;
+  /** Human-readable reason when the run reached failed/stalled. Empty for done. */
+  readonly failureReason?: string;
 };
 
 export type Phase = {
@@ -63,6 +65,7 @@ export type CycleError =
   | "PrevPhaseNotDone"
   | "PhaseAlreadyRunning"
   | "StepNotInPipeline"
+  | "PhaseNotRewound"
   | "PhaseNotFound"
   | "RunNotFound"
   | "IllegalTransition"
@@ -183,10 +186,54 @@ export const startPhase = (
   return ok({ ...started, state: "active" });
 };
 
+export type RelaunchPhaseCmd = {
+  readonly step: Step;
+  readonly runId: RunId;
+  readonly startedAt: Instant;
+};
+
+/**
+ * relaunchPhase: re-execute a phase that a backtrack rewound to "running" but
+ * left WITHOUT a live run (only terminal runs in history — see backtrackTo). It
+ * appends a fresh run (attempt = last + 1) so the rewound phase actually re-runs.
+ * Distinct from startPhase (begins a PENDING phase at attempt 1) and retryRun
+ * (needs a failed/stalled run). INV-2: at most one running run per phase, so a
+ * phase that still has a live run is rejected (PhaseAlreadyRunning); a phase that
+ * is not a rewound "running" phase is rejected (PhaseNotRewound).
+ */
+export const relaunchPhase = (
+  cycle: Cycle,
+  cmd: RelaunchPhaseCmd,
+): Result<Cycle, CycleError> => {
+  if (cycle.state === "paused") return err("CyclePaused");
+  const target = findPhaseByStep(cycle, cmd.step);
+  if (!target) return err("StepNotInPipeline");
+  if (target.state !== "running") return err("PhaseNotRewound");
+  if (target.runs.some((r) => r.state === "running")) {
+    return err("PhaseAlreadyRunning");
+  }
+
+  const nextAttempt = (latestRun(target)?.attempt ?? 0) + 1;
+  const run: Run = {
+    id: cmd.runId,
+    attempt: nextAttempt,
+    state: "running",
+    startedAt: cmd.startedAt,
+  };
+  const relaunched = replacePhase(cycle, target.id, (p) => ({
+    ...p,
+    state: "running",
+    runs: [...p.runs, run],
+  }));
+  return ok({ ...relaunched, state: "active" });
+};
+
 export type AdvanceRunCmd = {
   readonly runId: RunId;
   readonly to: Exclude<RunState, "running">;
   readonly at: Instant;
+  /** Why the run transitioned — surfaced in the UI so the human can act on the real cause. */
+  readonly reason?: string;
 };
 
 /**
@@ -204,12 +251,20 @@ export const advanceRun = (
   }
 
   const endedAt = RUN_TERMINAL.has(cmd.to) ? { endedAt: cmd.at } : {};
+  // Only attach failureReason for failed/stalled AND only when a reason was
+  // actually supplied — under exactOptionalPropertyTypes an explicit `undefined`
+  // is not assignable to the optional `failureReason?: string`.
+  const failureReason =
+    (cmd.to === "failed" || cmd.to === "stalled") && cmd.reason !== undefined
+      ? { failureReason: cmd.reason }
+      : {};
   return ok(
     replacePhase(cycle, loc.phase.id, (p) => {
       const withRun = replaceRun(p, cmd.runId, (r) => ({
         ...r,
         state: cmd.to,
         ...endedAt,
+        ...failureReason,
       }));
       return cmd.to === "done" ? { ...withRun, state: "review" } : withRun;
     }),

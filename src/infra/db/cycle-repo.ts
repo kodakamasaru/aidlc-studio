@@ -36,6 +36,13 @@ export class SqliteCycleRepo implements CycleRepo {
     return parseRows<Cycle>(rows);
   }
 
+  listAll(): readonly Cycle[] {
+    const rows = this.db
+      .query("SELECT data FROM cycles ORDER BY projectId, version")
+      .all() as Row[];
+    return parseRows<Cycle>(rows);
+  }
+
   findByProjectVersion(
     projectId: ProjectId,
     version: string,

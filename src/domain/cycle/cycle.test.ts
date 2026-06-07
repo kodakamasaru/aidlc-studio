@@ -8,6 +8,7 @@ import {
   version,
   createCycle,
   startPhase,
+  relaunchPhase,
   advanceRun,
   resumeRun,
   retryRun,
@@ -262,6 +263,56 @@ describe("backtrackTo (INV-7: rewind + preserve history)", () => {
       ok: false,
       error: "StepNotInPipeline",
     });
+  });
+});
+
+describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
+  /** S5 done → backtrack to S5: S5 is "running" with only a terminal run. */
+  const rewoundAtS5 = (): Cycle => {
+    let c = fresh();
+    c = unwrap(startPhase(c, { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) }));
+    c = unwrap(advanceRun(c, { runId: RunId("r1"), to: "done", at: at(2) }));
+    return unwrap(backtrackTo(c, { step: Step("S5"), reason: "redo S5" }));
+  };
+
+  test("appends a fresh attempt run and keeps history on the rewound phase", () => {
+    const out = unwrap(
+      relaunchPhase(rewoundAtS5(), {
+        step: Step("S5"),
+        runId: RunId("r1b"),
+        startedAt: at(3),
+      }),
+    );
+    const s5 = out.phases[0]!;
+    expect(s5.state).toBe("running");
+    expect(s5.runs).toHaveLength(2); // history preserved + the new run
+    const fresh2 = latestRun(s5)!;
+    expect(fresh2.id).toBe(RunId("r1b"));
+    expect(fresh2.attempt).toBe(2);
+    expect(fresh2.state).toBe("running");
+    expect(out.state).toBe("active");
+  });
+
+  test("rejects a phase that still has a live run (PhaseAlreadyRunning)", () => {
+    // S5 freshly started: phase running WITH a running run — not a rewind.
+    const c = unwrap(
+      startPhase(fresh(), { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) }),
+    );
+    expect(
+      relaunchPhase(c, { step: Step("S5"), runId: RunId("r1b"), startedAt: at(2) }),
+    ).toEqual({ ok: false, error: "PhaseAlreadyRunning" });
+  });
+
+  test("rejects a non-rewound (pending) phase (PhaseNotRewound)", () => {
+    expect(
+      relaunchPhase(fresh(), { step: Step("S5"), runId: RunId("r"), startedAt: at(1) }),
+    ).toEqual({ ok: false, error: "PhaseNotRewound" });
+  });
+
+  test("unknown step is StepNotInPipeline", () => {
+    expect(
+      relaunchPhase(rewoundAtS5(), { step: Step("SX"), runId: RunId("r"), startedAt: at(3) }),
+    ).toEqual({ ok: false, error: "StepNotInPipeline" });
   });
 });
 

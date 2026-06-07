@@ -12,11 +12,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type AsyncStatus = "loading" | "success" | "error";
 
+export interface ReloadOptions {
+  /**
+   * Background (soft) refresh: refetch WITHOUT flipping status to "loading". The
+   * current `data` and `status:"success"` stay on screen and the new data swaps
+   * in silently when it resolves. Use this for polling ticks so the screen never
+   * flashes its loading/blank state on every interval. The INITIAL load (and any
+   * reload() without this flag) still shows the loading state.
+   */
+  readonly background?: boolean;
+}
+
 export interface AsyncResult<T> {
   readonly status: AsyncStatus;
   readonly data: T | undefined;
   readonly error: unknown;
-  readonly reload: () => void;
+  /** Reload, optionally as a background/soft refresh (no loading flash). */
+  readonly reload: (options?: ReloadOptions) => void;
 }
 
 export function useAsync<T>(
@@ -34,18 +46,35 @@ export function useAsync<T>(
   const factoryRef = useRef(factory);
   factoryRef.current = factory;
 
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  // Whether the NEXT effect run (triggered by the pending nonce bump) should be a
+  // soft/background refresh. Held in a ref so the effect can read it without
+  // becoming a dep. A dep-change re-run (not a reload) reads `false` → normal
+  // load. Reset in the effect so it never leaks into a later run.
+  const backgroundRef = useRef(false);
+
+  const reload = useCallback((options?: ReloadOptions) => {
+    if (options?.background === true) backgroundRef.current = true;
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     const reqId = ++reqRef.current;
-    setStatus("loading");
-    setError(undefined);
+    const isBackground = backgroundRef.current;
+    backgroundRef.current = false;
+    // Background refresh: keep current data + status:"success" on screen (no
+    // loading flash). Only a foreground load (initial mount, dep change, or a
+    // non-background reload) shows the loading state.
+    if (!isBackground) {
+      setStatus("loading");
+      setError(undefined);
+    }
     factoryRef
       .current()
       .then((value) => {
         if (reqRef.current !== reqId) return;
         setData(value);
         setStatus("success");
+        setError(undefined);
       })
       .catch((err: unknown) => {
         if (reqRef.current !== reqId) return;

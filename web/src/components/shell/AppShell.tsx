@@ -96,8 +96,10 @@ export function AppShell() {
 
       <div className="main-col">
         <header className="topbar">
-          <div className="topbar__left">{topbar?.left}</div>
-          <div className="topbar__right">{topbar?.right}</div>
+          <div className="topbar__inner">
+            <div className="topbar__left">{topbar?.left}</div>
+            <div className="topbar__right">{topbar?.right}</div>
+          </div>
         </header>
         <main id="main" className="content" tabIndex={-1} ref={mainRef}>
           <Outlet />

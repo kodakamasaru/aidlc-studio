@@ -5,3 +5,9 @@
 export function logError(context: string, err: unknown): void {
   console.error(`[aidlc-studio] ${context}:`, err);
 }
+
+/** Operational info (e.g. startup recovery counts). Not debug console.log. */
+export function logInfo(context: string, detail?: unknown): void {
+  if (detail === undefined) console.info(`[aidlc-studio] ${context}`);
+  else console.info(`[aidlc-studio] ${context}:`, detail);
+}

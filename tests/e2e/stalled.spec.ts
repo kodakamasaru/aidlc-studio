@@ -22,7 +22,7 @@ test("stalled run surfaces a retry affordance and retry starts a fresh attempt",
     .getByRole("button", { name: /最初の Cycle を作る|新規 Cycle/ })
     .first()
     .click();
-  await page.getByLabel("Cycle 名").fill("v0.0.1 — stall surface");
+  await page.getByLabel("Cycle 名(ゴール)").fill("stall surface");
   await page.getByRole("button", { name: "作成して開く" }).click();
 
   // On SCR-02; start the first phase → it stalls.

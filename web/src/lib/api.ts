@@ -15,6 +15,8 @@ export interface Run {
   readonly state: RunState;
   readonly startedAt: string;
   readonly endedAt?: string;
+  /** Human-readable reason when the run reached failed/stalled. */
+  readonly failureReason?: string;
 }
 
 export interface Phase {
@@ -142,7 +144,8 @@ export interface AnswerBody {
 
 export interface CreateCycleBody {
   readonly title: string;
-  readonly version: string;
+  /** Optional: omit to let the server auto-assign the next version (patch +1). */
+  readonly version?: string;
   readonly taskIds?: readonly string[];
 }
 
@@ -223,6 +226,13 @@ export const api = {
   retryRun: (cycleId: string, runId: string): Promise<Cycle> =>
     request(
       `/cycles/${encodeURIComponent(cycleId)}/runs/${encodeURIComponent(runId)}/retry`,
+      { method: "POST" },
+    ),
+  // Re-run a phase a backtrack rewound to "running" (US-13). Distinct from
+  // startPhase, which only begins a PENDING phase.
+  relaunchPhase: (cycleId: string, step: string): Promise<Cycle> =>
+    request(
+      `/cycles/${encodeURIComponent(cycleId)}/phases/${encodeURIComponent(step)}/relaunch`,
       { method: "POST" },
     ),
 

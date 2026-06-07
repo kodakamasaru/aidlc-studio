@@ -12,3 +12,6 @@ aidlc-studio.db-wal
 # Playwright E2E run artifacts (HTML report + per-test traces/screenshots).
 test-results/
 tests/e2e/.report/
+
+# Ad-hoc live-test scratch (screenshots / one-off scripts during live E2E dev).
+.pw-tmp/
