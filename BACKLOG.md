@@ -44,16 +44,52 @@ S1〜S7 で「v0.0.1 では作らない / v0.0.x で / v1.0.0 で」と判断し
 ## D. 時期未定
 - (未定)
 
-## F. 方法論 v2 — ステップ再定義(S2.5 廃止 / S1-S8)
-ユーザー合意(2026-06-06)。現行 S1-S7+S2.5 を S1-S8 に再定義。S2.5 の半端さを解消し UI デザインを正式ステップ化、UoW と context-map を統合。**v0.0.1 締め後に独立実施**(影響: kit/skills 9本 + operating-model + `src/domain/shared/vocab.ts` DEFAULT_STEPS=S6 戻り + studio pipeline/UI)。既存 v0.0.1 aidlc-docs は歴史として温存し、新ステップは次版から前向き適用。出典: ユーザー提案 2026-06-06 #3
+## H. ChatGPT v0.4 由来の拡張(v0.0.x シリーズ)
+出典: ユーザー要件定義「AI Development Runtime 要件定義 v0.4」(2026-06-09)とのギャップ分析。既存設計に含まれない新規概念を台帳化。
+
+### Phase 構成拡張(方法論 v2 §F と同時実施)
+- [ ] Validation 独立 Phase: Scenario Validation(実DB/スクリーンショット/動画) + Human Acceptance Test を S7/S8 から独立させる。ChatGPT doc の「Validation」Phase に相当
+- [ ] Improvement 独立 Phase: Retrospective(振り返りレポート) + Workflow Improvement(改善提案)を Cycle 最後に独立 Phase として実装。dogfooding §9 を Phase に昇格。ChatGPT doc の「Improvement」Phase に相当
+
+### オーケストレーション抽象度向上(v0.0.3-4 想定)
+- [ ] Skill ↔ Step 動的化: Step は Skill を知らない、Skill も Step を知らない。Orchestrator が Step の要件に合う Skill を動的選択する(現行の skillRef 静的マッピングからの移行)
+- [ ] Workflow 版管理: StepDef 配列の変更履歴を記録(いつ Step を足した/消した/編集したか)。JSON 永続化のみの現状から、版付き snapshot を保持
+
+### 要求管理レイヤー(v0.0.x)
+- [ ] Request/Epic 層: Task の上位概念。「通知機能改善」レベルの事業要求を建模。Backlog 画面で Epic → Task の階層表示。ChatGPT doc の「Request」に相当
+
+### 横断ルール機構(v0.0.x)
+- [ ] Policy 横断適用: Workflow 全体に横断適用されるルール機構。まず Security Policy から導入。将来的に DDD/Compliance/Performance 等。ChatGPT doc の「Policy」に相当
+- [ ] Extension プラグイン: Workflow 変更なしで適用可能な追加ルール群(Security/Financial/SaaS/Healthcare)。Policy とセットで設計。ChatGPT doc の「Extension」に相当
+
+### 履歴・分析(v0.0.x)
+- [ ] Rollback 履歴 entity: 手戻りを first-class entity に(発生Step/戻り先/理由/判断者を保持)。現行 backtrack コマンドの記録強化
+- [ ] AI 開発部レポート: AI が品質/リスク/手戻り分析/Workflow改善提案を自動生成。Dashboard 4象限(§A)の高度化
+
+## F. 方法論 v2 — ステップ再定義(S2.5 廃止 / 5Phase × 12Step)
+ユーザー合意(2026-06-06, 2026-06-09 更新)。現行 S1-S7+S2.5 を 5Phase 構成(Discovery/Design/Build/Validation/Improvement)に再定義。**v0.0.1 締め後に独立実施**(影響: kit/skills + operating-model + `src/domain/shared/vocab.ts` + studio pipeline/UI)。既存 v0.0.1 aidlc-docs は歴史として温存し、新ステップは次版から前向き適用。出典: ユーザー提案 2026-06-06 #3 / ChatGPT v0.4 ギャップ分析 2026-06-09
+
+### Discovery
 - [ ] S1 要件ヒアリング(brief + 現 S1 を統合・対話寄り)
 - [ ] S2 画面要素(ワイヤーフレームレベル)= 現 S2 screen-mock
+
+### Design
 - [ ] S3 本格 UI デザイン = 現 S2.5 を正式ステップに昇格(**S2.5 廃止**)
 - [ ] S4 技術仕様確定(必要なとき / 任意)= 新規
+
+### Build
 - [ ] S5 並行作業単位(UoW)と順序確定 = 現 S3 unit-of-work + 現 S4 context-map を統合
 - [ ] S6 ドメインモデル視覚化で対応内容/方針を確認 = 現 S5 domain-model
 - [ ] S7 ドメインコード実装 = 現 S6 pure-code
 - [ ] S8 実 PJ コード組み込み = 現 S7 integration
+
+### Validation (★新規独立 Phase)
+- [ ] S9 Scenario Validation — 実DB利用/スクリーンショット/動画。モック禁止。出典: ChatGPT v0.4 §H
+- [ ] S10 Human Acceptance Test — 人間による最終確認。出典: ChatGPT v0.4 §H
+
+### Improvement (★新規独立 Phase)
+- [ ] S11 Retrospective — 振り返りレポート生成。出典: ChatGPT v0.4 §H
+- [ ] S12 Workflow Improvement — 開発プロセス改善提案。dogfooding §9 の Phase 昇格。出典: ChatGPT v0.4 §H
 
 ## G. git 運用 / サイクル識別(v0.0.x)
 v0.0.1 はサイクルをバージョン文字列(vX.Y.Z)で識別している。本来サイクルの同一性は不変 ID が担い、バージョンはブランチがマージされて初めて確定する成果物である。git 運用そのものもプロジェクトごとに設定可能にする。出典: ユーザー feedback 2026-06-07
