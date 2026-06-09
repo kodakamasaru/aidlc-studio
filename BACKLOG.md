@@ -47,9 +47,8 @@ S1〜S7 で「v0.0.1 では作らない / v0.0.x で / v1.0.0 で」と判断し
 ## H. ChatGPT v0.4 由来の拡張(v0.0.x シリーズ)
 出典: ユーザー要件定義「AI Development Runtime 要件定義 v0.4」(2026-06-09)とのギャップ分析。既存設計に含まれない新規概念を台帳化。
 
-### Phase 構成拡張(方法論 v2 §F と同時実施)
-- [ ] Validation 独立 Phase: Scenario Validation(実DB/スクリーンショット/動画) + Human Acceptance Test を S7/S8 から独立させる。ChatGPT doc の「Validation」Phase に相当
-- [ ] Improvement 独立 Phase: Retrospective(振り返りレポート) + Workflow Improvement(改善提案)を Cycle 最後に独立 Phase として実装。dogfooding §9 を Phase に昇格。ChatGPT doc の「Improvement」Phase に相当
+### Phase 構成拡張(→ §F に統合済)
+- Validation / Improvement 独立 PhaseGroup は §F の5PhaseGroup 構成に含む
 
 ### オーケストレーション抽象度向上(v0.0.3-4 想定)
 - [ ] Skill ↔ Step 動的化: Step は Skill を知らない、Skill も Step を知らない。Orchestrator が Step の要件に合う Skill を動的選択する(現行の skillRef 静的マッピングからの移行)
@@ -66,8 +65,16 @@ S1〜S7 で「v0.0.1 では作らない / v0.0.x で / v1.0.0 で」と判断し
 - [ ] Rollback 履歴 entity: 手戻りを first-class entity に(発生Step/戻り先/理由/判断者を保持)。現行 backtrack コマンドの記録強化
 - [ ] AI 開発部レポート: AI が品質/リスク/手戻り分析/Workflow改善提案を自動生成。Dashboard 4象限(§A)の高度化
 
-## F. 方法論 v2 — ステップ再定義(S2.5 廃止 / 5Phase × 12Step)
-ユーザー合意(2026-06-06, 2026-06-09 更新)。現行 S1-S7+S2.5 を 5Phase 構成(Discovery/Design/Build/Validation/Improvement)に再定義。**v0.0.1 締め後に独立実施**(影響: kit/skills + operating-model + `src/domain/shared/vocab.ts` + studio pipeline/UI)。既存 v0.0.1 aidlc-docs は歴史として温存し、新ステップは次版から前向き適用。出典: ユーザー提案 2026-06-06 #3 / ChatGPT v0.4 ギャップ分析 2026-06-09
+## F. 方法論 v2 — 4層化 + 5PhaseGroup × 12Step 再定義
+ユーザー合意(2026-06-06, 2026-06-09 更新)。現行3層(Cycle > Phase > Run)を**4層(Cycle > PhaseGroup > Step > Run)**に再構成。現行 Phase を Step にリネームし、新たに PhaseGroup(大区分: Discovery/Design/Build/Validation/Improvement)を導入。S2.5 廃止。**v0.0.1 締め後に独立実施**(影響: kit/skills + operating-model + domain/cycle.ts + domain/project.ts + vocab.ts + studio pipeline/UI)。既存 v0.0.1 aidlc-docs は歴史として温存。出典: ユーザー提案 2026-06-06 #3 / ChatGPT v0.4 ギャップ分析 2026-06-09
+
+### 階層構造変更(★中核)
+- [ ] 4層化: Cycle > PhaseGroup > Step > Run。現行 Phase(実行単位=S1-S7)を Step にリネーム、PhaseGroup(大区分)を新設
+- [ ] `PhaseGroup` 型定義: { id, label, order, steps: StepDef[] } を domain/project.ts に追加
+- [ ] `pipelineDef` 構造変更: StepDef[] → PhaseGroupDef[] に変更(Project.ts)
+- [ ] `Cycle` 集約再構成: phases: Phase[] → phaseGroups: PhaseGroup[] に変更(cycle.ts)
+- [ ] `vocab.ts` 更新: PhaseGroup branded type 追加、DEFAULT_STEPS → DEFAULT_PIPELINE_GROUPS に変更
+- [ ] UI ルーティング更新: /phase/:id → /step/:id に変更(group 単位でアコーディオン表示)
 
 ### Discovery
 - [ ] S1 要件ヒアリング(brief + 現 S1 を統合・対話寄り)
