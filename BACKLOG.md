@@ -3,6 +3,20 @@
 S1〜S7 で「v0.0.1 では作らない / v0.0.x で / v1.0.0 で」と判断した項目をここに台帳化する(出典必須 / 完了で `[ ]`→`☑`、削除しない)。
 
 ## A. 機能拡張軸(v0.0.x シリーズ)
+
+### v0.0.2 で実施(出典: aidlc-docs/scope-v0.0.2.md)
+- [ ] StepDef 拡張(4契約+execMode) — A. BACKLOG §A「Vision管理/Step定義カスタム」の基盤
+- [ ] BriefIn/BriefOut 型 + engine 組立 — 品質ハーネス基盤
+- [ ] Run.role + evaluator 起動(launchEval) — 品質ハーネス基盤
+- [ ] Deterministic gate(eval前存在検査) — 品質ハーネス基盤
+- [ ] Completeness gate + descope Question — 品質ハーネス基盤
+- [ ] Prompt 構成(遅延ロード 2層) — 品質ハーネス基盤
+- [ ] 成果物 Profile レジストリ — 品質ハーネス基盤
+- [ ] Bugfix dossier プロファイル — 品質ハーネス基盤
+- [ ] Step 定義カスタム UI — BACKLOG §A「Vision管理/Step定義カスタム」
+- [ ] リッチ可視化(review block 描画) — BACKLOG §A「リッチ可視化」
+
+### v0.0.x 以降(時期未定)
 - [ ] 複数リポ / PJ 切替(repo-switch)。MVP は単一 PJ 固定。出典: US-25 / S2 SCR-01(作成フォームから対象リポ選択を削除)
 - [ ] Backlog / Task 管理 UI(Task 追加・並べ替え・Cycle への割当)。MVP は Cycle 作成時に単一 Task 既定を背景生成のみ。出典: US-01/03/23/24 / S2 index / S2 SCR-01(作成フォームから初期 Task 入力を削除)
 - [ ] Dashboard 4 象限。出典: US-10 / S1 Q-01 / S2 R-01
@@ -10,9 +24,9 @@ S1〜S7 で「v0.0.1 では作らない / v0.0.x で / v1.0.0 で」と判断し
 - [ ] Decision 履歴ビュー。出典: US-17
 - [ ] Wiki(ユビキタス言語 / D 決定 / 引き継ぎ台帳)自動管理・閲覧。出典: US-20/32/33
 - [ ] 会話履歴ビュー。出典: US-28
-- [ ] Vision 管理 / Step 定義カスタム。出典: US-26/27
+- [ ] Vision 管理 / Step 定義カスタム。出典: US-26/27 → **v0.0.2 で Step 定義カスタムのみ実施**
 - [ ] 並行サイクル(worktree 複数)。出典: US-09 / CLAUDE.md v0 スコープ外
-- [ ] リッチ可視化(レビュー重ブロック: 動画 dossier / screenshot / test-report リッチ描画)。出典: S2 SCR-04 / design/review-output.md
+- [ ] リッチ可視化(レビュー重ブロック: 動画 dossier / screenshot / test-report リッチ描画)。出典: S2 SCR-04 / design/review-output.md → **v0.0.2 で実施**
 - [ ] Light テーマ(tokens を light/dark 2 系統化)。出典: S2.5 Q-02
 - [ ] Inbox 種別タブ分割。出典: S2.5 SCR-03 R-01
 - [ ] 実 AI 対話型ループ(headless `claude` の Q→回答→resume / `--resume`・session 注入)。MVP は run→emit→done の実 AI 検証まで(`claude -p` は実行完遂型)。出典: S7 ledger S7-C1 / s7-integration.md
