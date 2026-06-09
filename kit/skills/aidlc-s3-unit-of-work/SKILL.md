@@ -1,6 +1,6 @@
 ---
 name: aidlc-s3-unit-of-work
-description: AI-DLC S3。確定 US 群を並行開発できる Unit に分割し、各 Unit の責務・所属 US・I/F 定義案を作る。成果物は aidlc-docs/s3/ 配下に index + 1 Unit 1 ファイルで展開する。ユーザーが「Unit 分けたい」「並行で開発したい」「責務分割したい」と言ったとき、または s2/ が確定して s3/ がまだ無いときに呼ぶ。
+description: AI-DLC S3。確定 US 群を並行開発できる Unit に分割し、各 Unit の責務・所属 US・I/F 定義案を作る。成果物は aidlc-docs/{version}/s3/ 配下に index + 1 Unit 1 ファイルで展開する。ユーザーが「Unit 分けたい」「並行で開発したい」「責務分割したい」と言ったとき、または s2/ が確定して s3/ がまだ無いときに呼ぶ。
 ---
 
 # AI-DLC S3: Unit of Work の設計
@@ -16,23 +16,24 @@ AI 提案は叩き台。Unit の粒度、責務、依存方向を 1 つ 1 つ吟
 ## いまどこにいるか
 
 - フェーズ: **Inception** の S3
-- 前: `aidlc-docs/s1/`(確定 US 群)+ `aidlc-docs/s2/`(画面/フロー)
+- 前: `aidlc-docs/{version}/s1/`(確定 US 群)+ `aidlc-docs/{version}/s2/`(画面/フロー)
 - 後: S4(ContextMap)の入力になる
+- バージョン: `aidlc-docs/{version}/` が現在のサイクル。`{version}` は作業中バージョン(v0.0.2 等)に置換する。`aidlc-docs/brief.md` のみ全版共通(ルート)。
 
 ## 入出力と完了条件
 
 | 項目 | 内容 |
 |------|------|
-| 入力 | `aidlc-docs/s1/` + `aidlc-docs/s2/` + アーキテクチャ前提情報 |
-| 出力 | `aidlc-docs/s3/` 配下に `index.md` + `unit-NN-{slug}.md` 群 |
+| 入力 | `aidlc-docs/{version}/s1/` + `aidlc-docs/{version}/s2/` + アーキテクチャ前提情報 |
+| 出力 | `aidlc-docs/{version}/s3/` 配下に `index.md` + `unit-NN-{slug}.md` 群 |
 | 完了条件 | (1) 全 US がいずれかの Unit に割り当て / (2) 各 Unit に責務・所属 US・I/F 定義案がある / (3) Unit 間の依存方向が一方向 or 明示された境界 / (4) エンジニア(=ユーザー本人)が「これで並行開発できる」と納得 |
 
 ## 進め方
 
 0. **最初に必ず**:
    - `s1/index.md` と `s2/index.md`、および主要な単位ファイルを読む。
-   - `aidlc-docs/s3/` が既にあれば `index.md` の引き継ぎセクションと各 `unit-NN-*.md` を確認。
-   - 無ければ `aidlc-docs/s3/` を作り、下のテンプレで `index.md` を新規作成。
+   - `aidlc-docs/{version}/s3/` が既にあれば `index.md` の引き継ぎセクションと各 `unit-NN-*.md` を確認。
+   - 無ければ `aidlc-docs/{version}/s3/` を作り、下のテンプレで `index.md` を新規作成。
    - **以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
    - **質問の所属**: アーキ全体・I/F 方針・Unit 横断は `index.md`、個別 Unit の議論は該当 `unit-NN-*.md`。
 
@@ -53,7 +54,7 @@ AI 提案は叩き台。Unit の粒度、責務、依存方向を 1 つ 1 つ吟
 
 ## 成果物 md テンプレート
 
-### `aidlc-docs/s3/index.md`
+### `aidlc-docs/{version}/s3/index.md`
 
 ```markdown
 # S3 — Unit of Work(全体)
@@ -117,7 +118,7 @@ AI 提案は叩き台。Unit の粒度、責務、依存方向を 1 つ 1 つ吟
 - 棄却した案とその理由:
 ```
 
-### `aidlc-docs/s3/unit-NN-{slug}.md`
+### `aidlc-docs/{version}/s3/unit-NN-{slug}.md`
 
 ```markdown
 # Unit-NN: {Unit 名}

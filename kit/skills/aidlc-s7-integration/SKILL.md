@@ -16,15 +16,16 @@ PDF 強調: 「S3 の I/F 契約との整合性を必ず確認する」。S3 で
 ## いまどこにいるか
 
 - フェーズ: **Construction** の S7(最終工程)
-- 前: `aidlc-docs/{vX}/s6-pure-code.md` + `src/domain/` 実装 + `aidlc-docs/{vX}/s2.5/`(視覚意図契約)
-- 必ず参照: `aidlc-docs/{vX}/s3/` の I/F 定義 + `aidlc-docs/{vX}/s2.5/screenshots/` + `aidlc-docs/{vX}/s2.5/scr-NN-*.md`
+- 前: `aidlc-docs/{version}/s6-pure-code.md` + `src/domain/` 実装 + `aidlc-docs/{version}/s2.5/`(視覚意図契約)
+- 必ず参照: `aidlc-docs/{version}/s3/` の I/F 定義 + `aidlc-docs/{version}/s2.5/screenshots/` + `aidlc-docs/{version}/s2.5/scr-NN-*.md`
 - 関連: `[[aidlc-s2.5-image-only-contract]]` / `[[feedback-no-scope-cut-by-construction]]`
 - 後: 1 サイクル完了 → 次サイクル開始(あれば S1 へ戻り、引き継ぎコンテキストを書く)
+- バージョン: `aidlc-docs/{version}/` が現在のサイクル。`{version}` は作業中バージョン(v0.0.2 等)に置換する。`aidlc-docs/brief.md` のみ全版共通(ルート)。
 
 ## S2.5 への接し方(極めて重要)
 
-- **`aidlc-docs/{vX}/s2.5/*.html` / `tokens.html` は Read 禁止**(HTML/CSS / Tailwind / DOM 階層のリーク防止)
-- 参照していいのは `aidlc-docs/{vX}/s2.5/screenshots/*.png` と `aidlc-docs/{vX}/s2.5/scr-NN-*.md` のみ
+- **`aidlc-docs/{version}/s2.5/*.html` / `tokens.html` は Read 禁止**(HTML/CSS / Tailwind / DOM 階層のリーク防止)
+- 参照していいのは `aidlc-docs/{version}/s2.5/screenshots/*.png` と `aidlc-docs/{version}/s2.5/scr-NN-*.md` のみ
 - UI 実装(Expo / React Native の画面コード)は **screenshots と md を見て、ゼロベースで RN ネイティブ idiom で書く**。HTML から机上で移植しない
 - 視覚アウトカム(色 / タイポ / 余白 / 状態 / 階層 / 密度 / ヒエラルキー)は契約として全て再現する。「実装しやすさ」「実機確認以外だから」を理由に省略しない
 - トークン値(色 hex / spacing px / type rem)は意図の言語化として記録されている。RN 側 `StyleSheet` / theme に literal コピーする義務はないが、視覚アウトカムが同じになる形で取り込む
@@ -35,15 +36,15 @@ PDF 強調: 「S3 の I/F 契約との整合性を必ず確認する」。S3 で
 
 | 項目 | 内容 |
 |------|------|
-| 入力 | `aidlc-docs/s6-pure-code.md` + `aidlc-docs/s3/` + 実 PJ アーキ |
-| 出力 | (1) 統合コード: `src/` 配下(アダプタ・コントローラ・DI 配線) / (2) 進行ログ: `aidlc-docs/s7-integration.md` |
+| 入力 | `aidlc-docs/{version}/s6-pure-code.md` + `aidlc-docs/{version}/s3/` + 実 PJ アーキ |
+| 出力 | (1) 統合コード: `src/` 配下(アダプタ・コントローラ・DI 配線) / (2) 進行ログ: `aidlc-docs/{version}/s7-integration.md` |
 | 完了条件 | (1) ドメイン層が S6 から無変更で動く / (2) S3 の I/F 契約と一致(突合表が埋まる) / (3) E2E or 統合テストが通る / (4) US が画面 → API → ドメイン → 永続化まで貫通する |
 
 ## 進め方
 
 0. **最初に必ず**:
-   - `s6-pure-code.md` と `s3/` を読む。`src/domain/` の公開関数も把握。
-   - `aidlc-docs/s7-integration.md` が既にあれば「前サイクルからの引き継ぎ」を最優先で反映。
+   - `aidlc-docs/{version}/s6-pure-code.md` と `aidlc-docs/{version}/s3/` を読む。`src/domain/` の公開関数も把握。
+   - `aidlc-docs/{version}/s7-integration.md` が既にあれば「前サイクルからの引き継ぎ」を最優先で反映。
    - 無ければ下のテンプレで進行ログを新規作成。**以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
 
 1. **I/F 契約整合チェックを最初にやる**(PDF 強調)。S3 で定義した I/F とドメイン層の公開関数を 1 件ずつ突き合わせる:
@@ -70,7 +71,7 @@ PDF 強調: 「S3 の I/F 契約との整合性を必ず確認する」。S3 で
 - 工程: S7 (Integration)
 - 役割: アプリケーションエンジニア(統合)
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s6-pure-code.md](./s6-pure-code.md), [s3/](./s3/)
+- 入力参照: [s6-pure-code.md](./s6-pure-code.md), [s3/](./s3/) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
 - コード出力先: `src/`(domain 配下は触らない)
 - 作成日: YYYY-MM-DD
 - 更新日: YYYY-MM-DD
@@ -169,4 +170,4 @@ PDF P.10「コンテキスト管理の原則」:
 
 S7 を `確定` する前に、**必ず**「次サイクルへの引き継ぎ」セクションを埋める。次サイクルで AI が初回プロンプトでこれを読まないと、同じ考慮漏れが繰り返される。
 
-加えて、このサイクルで確定した `### D-NN` と「次サイクルに渡す」項目を **`aidlc-docs/{vX}/ledger.yml` に `state: carried|done|dropped` で台帳化**する(散文の引き継ぎだけに頼らない)。`carried` には `into:`(渡し先バージョン)を必ず付ける。台帳化せずに S7 を `確定` にすることは禁止。スキーマは ledger ルール(`kit/rules/ledger.md`)参照。
+加えて、このサイクルで確定した `### D-NN` と「次サイクルに渡す」項目を **`aidlc-docs/{version}/ledger.yml` に `state: carried|done|dropped` で台帳化**する(散文の引き継ぎだけに頼らない)。`carried` には `into:`(渡し先バージョン)を必ず付ける。台帳化せずに S7 を `確定` にすることは禁止。スキーマは ledger ルール(`kit/rules/ledger.md`)参照。

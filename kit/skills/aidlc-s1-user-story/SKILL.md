@@ -1,6 +1,6 @@
 ---
 name: aidlc-s1-user-story
-description: AI-DLC S1。brief.md を入力に、ユーザーストーリーを粒度定義(1US=1つの独立してテスト可能な縦スライス)に従って洗い出し、各 US に 3 観点(なぜするか / UX へのインパクト / 受け入れ条件)で定義する。成果物は aidlc-docs/s1/ 配下に index + 1 US 1 ファイルで展開する。ユーザーが「US 書きたい」「機能洗い出したい」「ストーリー作りたい」と言ったとき、または brief.md が確定して s1/ がまだ無いときに呼ぶ。
+description: AI-DLC S1。brief.md を入力に、ユーザーストーリーを粒度定義(1US=1つの独立してテスト可能な縦スライス)に従って洗い出し、各 US に 3 観点(なぜするか / UX へのインパクト / 受け入れ条件)で定義する。成果物は aidlc-docs/{version}/s1/ 配下に index + 1 US 1 ファイルで展開する。ユーザーが「US 書きたい」「機能洗い出したい」「ストーリー作りたい」と言ったとき、または brief.md が確定して s1/ がまだ無いときに呼ぶ。
 ---
 
 # AI-DLC S1: ユーザーストーリーの定義
@@ -18,13 +18,14 @@ US は AI が生成、判断は人間。AI が出した US は叩き台。重複
 - フェーズ: **Inception** の S1
 - 前: `aidlc-docs/brief.md`(目的・対象ユーザー・スコープ)
 - 後: S2(画面モック)の入力になる
+- バージョン: `aidlc-docs/{version}/` が現在のサイクル。`{version}` は作業中バージョン(v0.0.2 等)に置換する。`aidlc-docs/brief.md` のみ全版共通(ルート)。
 
 ## 入出力と完了条件
 
 | 項目 | 内容 |
 |------|------|
 | 入力 | `aidlc-docs/brief.md` |
-| 出力 | `aidlc-docs/s1/` 配下に `index.md` + `us-NN-{slug}.md` 群 |
+| 出力 | `aidlc-docs/{version}/s1/` 配下に `index.md` + `us-NN-{slug}.md` 群 |
 | 完了条件 | (1) 各 US が粒度定義(1つの独立してテスト可能な縦スライス)を満たす。**US 数は結果であって目標ではない** / (2) 全 US に 3 観点(なぜするか・UX へのインパクト・受け入れ条件)が明記 / (3) ステークホルダー(=ユーザー本人)が読んで内容を理解できる / (4) US 間で抽象度・粒度が揃っている |
 
 ## US の粒度(数は目標ではない)
@@ -38,9 +39,9 @@ US は AI が生成、判断は人間。AI が出した US は叩き台。重複
 
 0. **最初に必ず**:
    - `aidlc-docs/brief.md` を読む。読まずに US は書かない。
-   - **前バージョンがあれば `aidlc-docs/{前vX}/ledger.yml` を読む(reconcile ゲート)**: `state: carried` で `into:` が今サイクルを指すエントリは、**全件を今サイクルの US / D に反映するまで S1 を `確定` にできない**。落とす場合は前 ledger を `dropped` + `reason:` に更新し BACKLOG.md に転記(黙って消すの禁止)。スキーマ: ledger ルール(`kit/rules/ledger.md`)。
-   - `aidlc-docs/s1/` が既にあれば中身を読む。`index.md` の引き継ぎセクションと、各 `us-NN-*.md` の状態を確認。
-   - 無ければ `aidlc-docs/s1/` ディレクトリを作り、下のテンプレで `index.md` を新規作成。
+   - **前バージョンがあれば `aidlc-docs/{前version}/ledger.yml` を読む(reconcile ゲート)**: `state: carried` で `into:` が今サイクルを指すエントリは、**全件を今サイクルの US / D に反映するまで S1 を `確定` にできない**。落とす場合は前 ledger を `dropped` + `reason:` に更新し BACKLOG.md に転記(黙って消すの禁止)。スキーマ: ledger ルール(`kit/rules/ledger.md`)。
+   - `aidlc-docs/{version}/s1/` が既にあれば中身を読む。`index.md` の引き継ぎセクションと、各 `us-NN-*.md` の状態を確認。
+   - 無ければ `aidlc-docs/{version}/s1/` ディレクトリを作り、下のテンプレで `index.md` を新規作成。
    - **以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
    - **質問の所属**: 複数 US にまたがる議論は `index.md` の Q&A に、特定 US だけの議論は該当 `us-NN-*.md` の Q&A に書く。
 
@@ -60,7 +61,7 @@ US は AI が生成、判断は人間。AI が出した US は叩き台。重複
 
 ## 成果物 md テンプレート
 
-### `aidlc-docs/s1/index.md`
+### `aidlc-docs/{version}/s1/index.md`
 
 ```markdown
 # S1 — ユーザーストーリー(一覧)
@@ -120,7 +121,7 @@ US は AI が生成、判断は人間。AI が出した US は叩き台。重複
 - 棄却した案とその理由:
 ```
 
-### `aidlc-docs/s1/us-NN-{slug}.md`
+### `aidlc-docs/{version}/s1/us-NN-{slug}.md`
 
 ```markdown
 # US-NN: {1 行タイトル}

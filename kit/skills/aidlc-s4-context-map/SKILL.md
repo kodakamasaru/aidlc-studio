@@ -26,15 +26,16 @@ PDF P.6「S4 — Unit 間関係の可視化」は以下:
 ## いまどこにいるか
 
 - フェーズ: **Inception** の S4(Inception 最終ステップ)
-- 前: `aidlc-docs/s3/`(Unit 一覧と I/F 定義)
+- 前: `aidlc-docs/{version}/s3/`(Unit 一覧と I/F 定義)
 - 後: S5(ドメインモデル)= Construction フェーズの入口
+- バージョン: `aidlc-docs/{version}/` が現在のサイクル。`{version}` は作業中バージョン(v0.0.2 等)に置換する。`aidlc-docs/brief.md` のみ全版共通(ルート)。
 
 ## 入出力と完了条件
 
 | 項目 | 内容 |
 |------|------|
-| 入力 | `aidlc-docs/s3/`(`index.md` と `unit-NN-*.md` 群) |
-| 出力 | `aidlc-docs/s4-context-map.md`(Mermaid 図入り) |
+| 入力 | `aidlc-docs/{version}/s3/`(`index.md` と `unit-NN-*.md` 群) |
+| 出力 | `aidlc-docs/{version}/s4-context-map.md`(Mermaid 図入り) |
 | 完了条件 | (1) S3 で定義した **全 Unit** がノードとして図に登場 / (2) **Unit 間の依存方向**(誰が誰を呼ぶか・必要とするか)が矢印で明示 / (3) **循環依存が無い**(あれば S3 に戻る) / (4) 1 枚で全体像が読める(分割しない) / (5) **物理アーキ要素(DB / 外部サービス / プロトコル境界 / Docker network 等)を描き込んでいない**(S5 / S7 の領域に侵食しない) / (6) **図そのものが実装順を表現している**(=Phase レイアウトで subgraph を縦に並べ、上から下に読めば着手順が分かる) |
 
 ## 進め方
