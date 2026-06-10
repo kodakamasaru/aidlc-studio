@@ -1,9 +1,9 @@
 ---
-name: aidlc-s5-domain-model
-description: AI-DLC S5。US のビジネスロジックをコード化する前にドメインモデルとして設計する。Construction フェーズ(S5〜S7)の起点。成果物は aidlc-docs/{version}/s5/ 配下に index + 1 集約 1 ファイルで展開する。ユーザーが「ドメイン設計したい」「モデル作りたい」「ロジックを整理したい」と言ったとき、または s4-context-map.md が確定して s5/ がまだ無いときに呼ぶ。
+name: aidlc-s6-domain-model
+description: AI-DLC S6 (Build PhaseGroup)。US のビジネスロジックをコード化する前にドメインモデルとして設計する。成果物は aidlc-docs/{version}/s6/ 配下に index + 1 集約 1 ファイルで展開する。ユーザーが「ドメイン設計したい」「モデル作りたい」「ロジックを整理したい」と言ったとき、または s5/ が確定して s6/ がまだ無いときに呼ぶ。
 ---
 
-# AI-DLC S5: ドメインモデリング
+# AI-DLC S6: ドメインモデリング
 
 ## あなたの役割
 
@@ -15,25 +15,25 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
 
 ## いまどこにいるか
 
-- フェーズ: **Construction** の S5(Construction フェーズの起点)
-- 前: S1〜S4 全部(US、画面、Unit、ContextMap)
-- 後: S6(純粋ドメインコード)の入力になる
+- フェーズ: **Build** の S6
+- 前: `aidlc-docs/{version}/s5/`(Work Units: Unit 分割 + 依存マップ)+ `aidlc-docs/{version}/s1/`(US 群)+ `aidlc-docs/brief.md`
+- 後: S7(ドメインコード)の入力になる
 - バージョン: `aidlc-docs/{version}/` が現在のサイクル。`{version}` は作業中バージョン(v0.0.2 等)に置換する。`aidlc-docs/brief.md` のみ全版共通(ルート)。
 
 ## 入出力と完了条件
 
 | 項目 | 内容 |
 |------|------|
-| 入力 | `aidlc-docs/{version}/s1/` + `aidlc-docs/{version}/s3/` + `aidlc-docs/{version}/s4-context-map.md` + スタック情報・アーキ概要 |
-| 出力 | `aidlc-docs/{version}/s5/` 配下に `index.md` + `{aggregate-name}.md` 群 |
+| 入力 | `aidlc-docs/{version}/s1/` + `aidlc-docs/{version}/s5/`(Work Units) + `aidlc-docs/brief.md` + スタック情報・アーキ概要 |
+| 出力 | `aidlc-docs/{version}/s6/` 配下に `index.md` + `{aggregate-name}.md` 群 |
 | 完了条件 | (1) 各 US のビジネスロジックがモデルで表現されている / (2) PM(=ユーザー本人)が読んでレビューできる / (3) DDD 採用/未採用の選択が明示 / (4) ユビキタス言語が定義済 |
 
 ## 進め方
 
 0. **最初に必ず**:
-   - `aidlc-docs/{version}/s1/`、`aidlc-docs/{version}/s3/`、`aidlc-docs/{version}/s4-context-map.md` を読む。
-   - `aidlc-docs/{version}/s5/` が既にあれば `index.md` の引き継ぎセクションと各集約ファイルを確認。
-   - 無ければ `aidlc-docs/{version}/s5/` を作り、下のテンプレで `index.md` を新規作成。
+   - `aidlc-docs/{version}/s1/`、`aidlc-docs/{version}/s5/` を読む。Unit 定義・I/F 契約・依存マップを全件把握。
+   - `aidlc-docs/{version}/s6/` が既にあれば `index.md` の引き継ぎセクションと各集約ファイルを確認。
+   - 無ければ `aidlc-docs/{version}/s6/` を作り、下のテンプレで `index.md` を新規作成。
    - **以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
    - **質問の所属**: スタック・DDD 判断・ユビキタス言語・モデル横断は `index.md`、個別集約の議論は該当 `{aggregate-name}.md`。
 
@@ -41,7 +41,7 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
    - **DDD 採用**: エンティティ・値オブジェクト・集約・ドメインサービスの語彙
    - **DDD 未採用**: PM がレビューしやすい形(テーブル・関係図・状態遷移図)
 
-2. **スタック情報を実 PJ と整合させる**(PDF 警告対応)。`aidlc-docs/{version}/s3/index.md` のアーキテクチャ前提と齟齬がないか確認。あれば S3 と擦り合わせ。
+2. **スタック情報を実 PJ と整合させる**(PDF 警告対応)。`aidlc-docs/{version}/s5/index.md` のアーキテクチャ前提と齟齬がないか確認。あれば S5 と擦り合わせ。
 
 3. AI が集約(またはモデル)候補を提案。**1 集約 1 ファイル**で起こす。
    - ファイル名: `{aggregate-name}.md`(kebab-case、英語)
@@ -50,20 +50,20 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
 
 4. AI が独自に決めた境界(集約のくくり、責務、命名)は **該当 md の「AI が独自に決めたこと と 理由」に `### D-NN` で追記**。ユーザーは `判断` で `承認 / 上書き / 保留` を選び、上書きするなら `上書き内容` に直接書く。
 
-5. 完了条件 4 つが全て埋まったら `index.md` のステータスを `確定` にして S6 を案内。
+5. 完了条件 4 つが全て埋まったら `index.md` のステータスを `確定` にして S7 を案内。
 
 ## 成果物 md テンプレート
 
-### `aidlc-docs/{version}/s5/index.md`
+### `aidlc-docs/{version}/s6/index.md`
 
 ```markdown
-# S5 — ドメインモデル(全体)
+# S6 — ドメインモデル(全体)
 
 ## メタ
-- 工程: S5 (Domain Model)
+- 工程: S6 (Domain Model)
 - 役割: ドメインモデラー
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s1/index.md](../s1/index.md), [s3/index.md](../s3/index.md), [s4-context-map.md](../s4-context-map.md) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
+- 入力参照: [s1/index.md](../s1/index.md), [s5/index.md](../s5/index.md) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
 - 作成日: YYYY-MM-DD
 - 更新日: YYYY-MM-DD
 
@@ -72,7 +72,7 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
 - フレームワーク:
 - 永続化:
 - 既存資産:
-- ※ `aidlc-docs/{version}/s3/index.md` と矛盾があれば S3 と擦り合わせて修正
+- ※ `aidlc-docs/{version}/s5/index.md` と矛盾があれば S5 と擦り合わせて修正
 
 ## DDD 採用判断
 - 採用: DDD 採用 | DDD 未採用
@@ -122,7 +122,7 @@ stateDiagram-v2
 ### R-01 — {案の内容}
 - **棄却理由**: 
 
-## 次工程 (S6) への引き継ぎ
+## 次工程 (S7) への引き継ぎ
 - フレームワーク非依存で実装すべき集約・モデル:
 - 不変条件のうちコード化が複雑なもの:
 - テストで保証したいビジネスルール:
@@ -133,15 +133,15 @@ stateDiagram-v2
 - 棄却した案とその理由:
 ```
 
-### `aidlc-docs/{version}/s5/{aggregate-name}.md`
+### `aidlc-docs/{version}/s6/{aggregate-name}.md`
 
 ```markdown
 # 集約: {Aggregate 名}
 
 ## メタ
-- 親: [s5/index.md](./index.md)
+- 親: [s6/index.md](./index.md)
 - 対応 US: [US-01](../s1/us-01-{slug}.md), [US-04](../s1/us-04-{slug}.md)
-- 所属 Unit: [Unit-02](../s3/unit-02-{slug}.md)
+- 所属 Unit: [Unit-02](../s5/unit-02-{slug}.md)
 - ステータス: 進行中 | レビュー待ち | 確定
 
 ## モデル定義
@@ -195,20 +195,20 @@ stateDiagram-v2
 
 ## やってはいけないこと
 
-- DB スキーマ、ORM、HTTP の話を混ぜる(S7 の領域)
-- フレームワーク固有の語彙(`@Entity`, `Model`, など)をモデル定義に使う(S6 で技術非依存に書くため)
+- DB スキーマ、ORM、HTTP の話を混ぜる(S8 の領域)
+- フレームワーク固有の語彙(`@Entity`, `Model`, など)をモデル定義に使う(S7 で技術非依存に書くため)
 - スタック情報を空欄のまま進める(AI が的外れな質問を返す原因、PDF 警告)
 - DDD 採用判断を曖昧にしたまま進める(モデル表現の形式が定まらない)
 - US と紐づかないモデルを作る(過剰設計の典型)
-- PM レビュー前に S6 へ進める(PDF 完了基準: PM がレビューできる状態)
+- PM レビュー前に S7 へ進める(PDF 完了基準: PM がレビューできる状態)
 - 集約横断の議論を個別集約ファイルに書く(`index.md` に書く)
 - 集約ファイルを `index.md` に登録せず孤立させる
 
 ## やり直しの判断
 
-- **S3 に戻る**: モデルを書きながら「Unit の境界とドメイン境界が一致しない」と気づいた
+- **S5 に戻る**: モデルを書きながら「Unit の境界とドメイン境界が一致しない」と気づいた
 - **S1 に戻る**: 「この US のロジックが何を達成するか曖昧」と判明した
-- **このまま S5 で書き直す**: モデル粒度・命名・集約構造の見直し
+- **このまま S6 で書き直す**: モデル粒度・命名・集約構造の見直し
 
 戻る際は `index.md` の **前サイクルからの引き継ぎ** に 1〜3 行で書く(全量コピーしない):
 
