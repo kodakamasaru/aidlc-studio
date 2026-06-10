@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-05: 回答 / 見送りの判断 (v0.0.2)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: question(質問への回答 / 選択肢 + その他=自由入力) ===================== -->
+    <section data-state="question" data-screen="scr-05-q-answer">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <a>v0.0.2</a> / <b>ドメインモデル の確認</b></span><span class="spacer"></span><span class="badge b-q">? 質問 1 / 3</span></div>
+          <div class="content content-narrow">
+            <a class="back-link mb-4">← サイクル詳細に戻る</a>
+            <h1 class="page-title">ドメインモデル の確認</h1>
+            <p class="page-sub">このステップで AI から 3 件の質問が来ています(1 件ずつ答えます)。</p>
+
+            <div class="sec-title mt-5">AI からの質問</div>
+            <div class="q-bubble">扱うデータのまとめ方は、どちらがよいですか? 「もの」ごとにまとめる方法と、「やること」ごとにまとめる方法があります。</div>
+
+            <div class="sec-title mt-6">回答を選ぶ</div>
+            <div class="options">
+              <div class="opt selected">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">「もの」ごとにまとめる <span class="rec">AI のおすすめ</span></div>
+                  <div class="opt-desc">サイクル・受信箱・成果物 のように、扱う対象ごとに整理します</div>
+                </div>
+              </div>
+              <div class="opt">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">「やること」ごとにまとめる</div>
+                  <div class="opt-desc">実行する・確認する・通知する のように、機能ごとに整理します</div>
+                </div>
+              </div>
+              <div class="opt">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">その他(自由に回答する)</div>
+                  <div class="opt-desc">上の選択肢にとらわれず、自分の言葉で答えます</div>
+                  <textarea class="opt-input" placeholder="例:「もの」ごとで。ただし通知まわりは分けてほしい。"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="rowflex between mt-5">
+              <span class="help">回答すると、AI が続きを進めます</span>
+              <button class="btn btn-primary">回答する</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: descope(見送りの相談への判断) ===================== -->
+    <section data-state="descope" data-screen="scr-05-q-answer">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count alert">4</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <a>v0.0.2</a> / <b>ドメインモデル の見送り判断</b></span><span class="spacer"></span><span class="badge b-descope">! 判断する</span></div>
+          <div class="content content-narrow">
+            <a class="back-link mb-4">← サイクル詳細に戻る</a>
+            <h1 class="page-title">見送りの相談 — ドメインモデル</h1>
+
+            <div class="sec-title mt-5">AI からの相談</div>
+            <div class="gap-box">
+              <div class="gap-item"><div class="txt">見送りたい項目:「見送りの承認が、自動で持ち越しリストに残ること」</div><div class="note">AI の理由: この項目は今回の範囲では作り込みきれず、次のバージョンに回す方が安全だと判断しました。</div></div>
+            </div>
+
+            <div class="sec-title mt-6">どうしますか?</div>
+            <div class="options">
+              <div class="opt selected">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">やっぱり今回つくってもらう</div>
+                  <div class="opt-desc">見送らず、このステップで作り直してもらいます</div>
+                </div>
+              </div>
+              <div class="opt">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">今回は見送る(次のバージョンへ)</div>
+                  <div class="opt-desc">持ち越しリストに記録し、将来あらためて検討します(確認あり)</div>
+                </div>
+              </div>
+              <div class="opt">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">前のステップからやり直す</div>
+                  <div class="opt-desc">原因が前の段階にありそうなときに選びます。</div>
+                  <div class="callout" style="margin:var(--sp-3) 0 0">AI の分析: 今回見送り対象の「持ち越しリスト」は、<b>要件ヒアリングの段階で扱いが決まっていなかった</b>ことが大元の原因です。データの整理より前に戻す必要があるため、<b>「要件ヒアリング」からのやり直し</b>をおすすめします。</div>
+                  <select class="select" style="margin-top:var(--sp-3);max-width:340px">
+                    <option>「要件ヒアリング」からやり直す(AI のおすすめ ★)</option>
+                    <option>「画面づくり」からやり直す</option>
+                    <option>「ドメインモデル」を作り直す(戻らない)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="opt">
+                <span class="radio"></span>
+                <div class="opt-main">
+                  <div class="opt-title">その他(自由に回答する)</div>
+                  <div class="opt-desc">上のどれでもないときは、自分の言葉で指示します</div>
+                  <textarea class="opt-input" placeholder="例: この項目だけ後回しにして、ほかは進めて。"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="rowflex between mt-5">
+              <span class="help">「見送る」は元に戻せないため、確認が出ます</span>
+              <button class="btn btn-primary">この内容で進める</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: confirm(「見送る」確認) ===================== -->
+    <section data-state="confirm" data-screen="scr-05-q-answer" style="position:relative">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count alert">4</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <a>v0.0.2</a> / <b>ドメインモデル の見送り判断</b></span><span class="spacer"></span><span class="badge b-descope">! 判断する</span></div>
+          <div class="content content-narrow">
+            <h1 class="page-title">見送りの相談 — ドメインモデル</h1>
+            <p class="page-sub">「今回は見送る」を選びました。</p>
+          </div>
+        </div>
+      </div>
+      <div class="scrim">
+        <div class="dialog">
+          <h3>確認</h3>
+          <p class="dialog-sub">この項目を今回は見送りますか?</p>
+          <div class="callout">「見送りの承認が、自動で持ち越しリストに残ること」</div>
+          <div class="muted" style="font-size:13px">こうなります:</div>
+          <ul>
+            <li>持ち越しリストに記録されます</li>
+            <li>今回のサイクルでは作りません</li>
+            <li>将来のサイクルであらためて検討できます</li>
+          </ul>
+          <div class="dialog-actions">
+            <button class="btn btn-ghost">やめる</button>
+            <button class="btn btn-danger">見送る</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: resume(回答後 / 処理中) ===================== -->
+    <section data-state="resume" data-screen="scr-05-q-answer">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">2</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <a>v0.0.2</a> / <b>処理中</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>処理中</span></div>
+          <div class="content content-narrow">
+            <h1 class="page-title">回答を受け取りました</h1>
+            <p class="page-sub">AI が続きを進めています…</p>
+
+            <div class="card card-pad mt-6" style="text-align:center;padding:var(--sp-12)">
+              <div class="rowflex gap-3" style="justify-content:center"><span class="spinner"></span><b class="hi">AI が続きを進めています…</b></div>
+              <div class="progress mt-5" style="max-width:360px;margin:var(--sp-5) auto 0"><span style="width:45%"></span></div>
+              <p class="muted mt-5">あなたの回答を反映して、作業を再開しました。</p>
+              <p class="low mt-2" style="font-size:12px">終わると、進行状況の画面に自動で切り替わります。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

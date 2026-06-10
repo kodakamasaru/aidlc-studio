@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-02: サイクル詳細 — 進行状況 (v0.0.2)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: working(進行中 / 作成 + 自動チェック) ===================== -->
+    <section data-state="working" data-screen="scr-02-cycle-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <b>v0.0.2</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>進行中</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.2 — 品質チェックの土台づくり</h1><p class="page-sub">いま「ドメインモデル」を進めています</p></div>
+              <button class="btn" aria-disabled="true"><span class="spinner"></span> 進行中</button></div>
+
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">要件</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">画面</div></div><div class="connector done"></div>
+                <div class="step current"><div class="node"><span class="spinner" style="width:13px;height:13px;border-width:2px"></span></div><div class="lbl">モデル</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">分割</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">実装</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">確認</div></div>
+              </div>
+              <p class="low mt-4" style="font-size:12px">青=進行中 / 緑=完了。各ステップは「AI が作る → 自動でチェック → AI が点検」の順に進みます。</p>
+            </div>
+
+            <div class="card card-pad mt-6">
+              <div class="run-head mb-4"><span class="ttl">ドメインモデル を作成中</span><span class="spacer" style="flex:1"></span><span class="badge b-running"><span class="dot d-running pulse"></span>進行中</span></div>
+              <p class="muted mb-3">AI が成果物を作り、できあがったら自動でチェックします。</p>
+              <div class="log">
+                <div>要件を読み込みました <span class="ok">✓</span></div>
+                <div>扱うデータと業務ルールを整理しています …</div>
+                <div>整理結果を書き出しています …</div>
+                <div><span class="cur">▌ 続きを待っています…</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: verifying(検証中 / AI が点検) ===================== -->
+    <section data-state="verifying" data-screen="scr-02-cycle-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <b>v0.0.2</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>検証中</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.2 — 品質チェックの土台づくり</h1><p class="page-sub">「ドメインモデル」の中身を AI が点検しています</p></div>
+              <button class="btn" aria-disabled="true"><span class="spinner"></span> 検証中</button></div>
+
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">要件</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">画面</div></div><div class="connector done"></div>
+                <div class="step current eval"><div class="node"><span class="spinner" style="width:13px;height:13px;border-width:2px;border-top-color:#1a1320"></span></div><div class="lbl">モデル</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">分割</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">実装</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">確認</div></div>
+              </div>
+              <p class="low mt-4" style="font-size:12px">紫=検証中。AI が「やりたかったことがすべて反映されているか」を点検しています。</p>
+            </div>
+
+            <div class="card card-pad mt-6">
+              <div class="run-head mb-4"><span class="ttl">ドメインモデル を点検中</span><span class="spacer" style="flex:1"></span><span class="badge b-running"><span class="dot d-running pulse"></span>検証中</span></div>
+              <p class="muted mb-3">やりたかったことが、もれなく反映されているかを確認しています。</p>
+              <div class="log">
+                <div>作成された内容を読み込みました <span class="ok">✓</span></div>
+                <div>やりたかったこと 6 件のうち、5 件まで反映を確認 <span class="warn">⚠</span></div>
+                <div>点検結果をまとめています …</div>
+                <div><span class="cur">▌ 続きを待っています…</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: sendback(AIが自分で差し戻して作り直し中) ===================== -->
+    <section data-state="sendback" data-screen="scr-02-cycle-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <b>v0.0.2</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>作り直し中</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.2 — 品質チェックの土台づくり</h1><p class="page-sub">AI が抜けに気づき、自分で作り直しています(操作は不要です)</p></div></div>
+
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">要件</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">画面</div></div><div class="connector done"></div>
+                <div class="step current"><div class="node"><span class="spinner" style="width:13px;height:13px;border-width:2px"></span></div><div class="lbl">モデル</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">分割</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">実装</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">確認</div></div>
+              </div>
+            </div>
+
+            <div class="card card-pad mt-6">
+              <div class="run-head mb-4"><span class="ttl">AI のチェックで抜けが見つかりました</span><span class="spacer" style="flex:1"></span><span class="badge b-running"><span class="dot d-running pulse"></span>作り直し中</span></div>
+              <p class="muted mb-3">やりたかったことの一部がまだ反映されていなかったため、AI が自分で作り直しています。理由のない「やり残し」はそのまま先に進めません。</p>
+              <div class="callout">まだ反映されていないこと:<br>「見送りの承認が、自動で持ち越しリストに残ること」</div>
+              <p class="low" style="font-size:12px">作り直しても解決しない場合だけ、あなたに相談(受信箱)します。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: descope-requested(AIが理由つきでスコープ調整を申請) ===================== -->
+    <section data-state="descope-requested" data-screen="scr-02-cycle-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count alert">4</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <b>v0.0.2</b></span><span class="spacer"></span><span class="badge b-descope"><span class="dot" style="background:var(--descope)"></span>あなたの判断待ち</span></div>
+          <div class="content">
+            <div class="rowflex between"><div><h1 class="page-title">v0.0.2 — 品質チェックの土台づくり</h1><p class="page-sub">AI から「この項目は今回見送りたい」と相談が来ています</p></div>
+              <button class="btn btn-primary">このサイクルで判断する →</button></div>
+
+            <div class="card card-pad mt-6">
+              <div class="pipeline">
+                <div class="step done"><div class="node">✓</div><div class="lbl">要件</div></div><div class="connector done"></div>
+                <div class="step done"><div class="node">✓</div><div class="lbl">画面</div></div><div class="connector done"></div>
+                <div class="step current"><div class="node" style="background:var(--descope-soft);border-color:var(--descope);color:var(--descope);box-shadow:0 0 0 4px var(--descope-soft)">!</div><div class="lbl">モデル</div></div><div class="connector"></div>
+                <div class="step"><div class="node">4</div><div class="lbl">分割</div></div><div class="connector"></div>
+                <div class="step"><div class="node">5</div><div class="lbl">実装</div></div><div class="connector"></div>
+                <div class="step"><div class="node">6</div><div class="lbl">確認</div></div>
+              </div>
+            </div>
+
+            <div class="card card-pad mt-6" style="border-color:rgba(245,158,11,0.35)">
+              <div class="run-head mb-4"><span class="ttl">AI からの相談 — この項目を今回は見送りたい</span><span class="spacer" style="flex:1"></span><span class="badge b-descope">! 判断待ち</span></div>
+              <div class="gap-box">
+                <div class="gap-item"><div class="txt">見送りたい項目:「見送りの承認が、自動で持ち越しリストに残ること」</div><div class="note">AI の理由: この項目は今回の範囲では作り込みきれず、次のバージョンに回す方が安全だと判断しました。</div></div>
+              </div>
+              <p class="muted mt-4">あなたの承認なしには先に進みません。下のボタンから、このサイクルの画面で「つくる / 見送る / 前のステップからやり直す」などを選べます。</p>
+              <div class="rowflex gap-3 mt-3"><button class="btn btn-primary">このサイクルで判断する</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

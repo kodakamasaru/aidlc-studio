@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-01: サイクル一覧 / ステップ構成 (v0.0.2)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: list(サイクル一覧 / ステップは控えめリンク) ===================== -->
+    <section data-state="list" data-screen="scr-01-cycle-list">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item active"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><b>サイクル</b></span><span class="spacer"></span><button class="btn btn-primary">+ 新しいサイクル</button></div>
+          <div class="content">
+            <h1 class="page-title">サイクル一覧</h1>
+            <p class="page-sub">1 サイクル = 1 つのバージョンを仕上げる単位です。</p>
+
+            <div class="cycle-card mt-6">
+              <div class="rowflex between">
+                <div><div class="ver">v0.0.3</div><div class="desc">品質チェックの強化と動画記録</div></div>
+                <span class="badge b-idle"><span class="dot d-idle"></span>未開始</span>
+              </div>
+              <div class="rowflex between mt-4">
+                <a class="subtle-link"><span class="ico">≣</span> ステップ構成(7 ステップ)を見る・調整</a>
+                <button class="btn btn-primary">▶ このサイクルを始める</button>
+              </div>
+            </div>
+
+            <div class="cycle-card">
+              <div class="rowflex between">
+                <div><div class="ver">v0.0.2</div><div class="desc">品質チェックの土台づくり</div></div>
+                <span class="badge b-running"><span class="dot d-running pulse"></span>進行中</span>
+              </div>
+              <div class="steps-line">いま「ドメインモデル」を進行中(7 ステップ中 3 つ目)</div>
+              <div class="rowflex between mt-4">
+                <a class="subtle-link"><span class="ico">≣</span> ステップ構成を見る</a>
+                <button class="btn btn-primary">中身を開く →</button>
+              </div>
+            </div>
+
+            <div class="cycle-card">
+              <div class="rowflex between">
+                <div><div class="ver">v0.0.1</div><div class="desc">人の確認ループの土台</div></div>
+                <span class="badge b-done"><span class="dot d-done"></span>完了</span>
+              </div>
+              <div class="rowflex between mt-4">
+                <a class="subtle-link"><span class="ico">≣</span> ステップ構成を見る</a>
+                <button class="btn btn-ghost">中身を開く →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: settings(設定 > デフォルトのステップ構成 / 対話で編集) ===================== -->
+    <section data-state="settings" data-screen="scr-01-cycle-list">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item active"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>設定</a> / <b>デフォルトのステップ構成</b></span></div>
+          <div class="content content-narrow">
+            <h1 class="page-title">デフォルトのステップ構成</h1>
+            <p class="page-sub">これから作る すべてのサイクルの ひな形です。下に出るのは <b class="hi">人間向けの要約</b>で、実際に AI が使う指示は、これを基にもっと詳細な全文へ展開されます。</p>
+
+            <!-- ステップ一覧(選択して詳細を見る) -->
+            <div class="card card-pad mt-6">
+              <div class="sec-title">ステップ(クリックで詳細)</div>
+              <div class="step-list">
+                <div class="step-row"><span class="sid">1</span><div class="main"><span class="sname">要件ヒアリング</span><div class="spurpose">何を作るかを言葉で整理する</div></div></div>
+                <div class="step-row"><span class="sid">2</span><div class="main"><span class="sname">画面づくり</span><div class="spurpose">画面の構成と見た目を決める</div></div></div>
+                <div class="step-row selected"><span class="sid">3</span><div class="main"><span class="sname">ドメインモデル</span><div class="spurpose">扱うデータと業務ルールを整理する</div></div></div>
+                <div class="step-row"><span class="sid">4</span><div class="main"><span class="sname">作業の分割</span><div class="spurpose">作る順番と単位に分ける</div></div></div>
+                <div class="step-row"><span class="sid">5</span><div class="main"><span class="sname">実装</span><div class="spurpose">実際に動くものを作る</div></div></div>
+                <div class="step-row"><span class="sid">6</span><div class="main"><span class="sname">動作確認・統合</span><div class="spurpose">ちゃんと動くか確かめて、ひとつにまとめる</div></div></div>
+              </div>
+            </div>
+
+            <!-- 選択中ステップの詳細(= AI を動かす指示。実際はこの粒度) -->
+            <div class="card card-pad mt-4">
+              <div class="rowflex between mb-4"><b class="hi">「ドメインモデル」の指示(要約)</b><a class="subtle-link"><span class="ico">↳</span> AI 実行用の全文を見る</a></div>
+              <div class="spec">
+                <div class="spec-row">
+                  <div class="k">このステップでやること</div>
+                  <ul>
+                    <li>扱うデータ(エンティティ)と、その関係を洗い出す</li>
+                    <li>各データが取りうる状態と、状態の移り変わりを定義する</li>
+                    <li>守るべき業務ルール・制約(やってはいけないこと)を明文化する</li>
+                    <li>全体の関係を図(関係図)にまとめる</li>
+                  </ul>
+                </div>
+                <div class="spec-divider"></div>
+                <div class="spec-row"><div class="k">参照する入力</div><div class="v">「要件ヒアリング」と「画面づくり」の成果物</div></div>
+                <div class="spec-row"><div class="k">出す成果物</div><div class="v">データモデルの定義 / 状態の一覧 / 関係図 / 用語の説明</div></div>
+                <div class="spec-row">
+                  <div class="k">完了の条件(自動でチェック)</div>
+                  <ul>
+                    <li>上の成果物がすべてそろっている</li>
+                    <li>やりたかったこと(要件)の各項目に、もれなく対応づいている</li>
+                  </ul>
+                </div>
+                <div class="spec-row"><div class="k">人の確認</div><div class="v">完了時に内容をレビューして承認する(差し戻しも可)</div></div>
+                <div class="spec-row"><div class="k">他のステップと並行</div><div class="v">しない(前のステップの結果を使うため順番に進める)</div></div>
+              </div>
+              <p class="low mt-4" style="font-size:12px">※ これは人間が読むための要約です。AI が実際に使う指示は、この要約を基に観点・チェック項目・例まで含めた全文へ展開されます。</p>
+            </div>
+
+            <!-- AI と対話して調整 -->
+            <div class="sec-title mt-6">AI に相談して調整</div>
+            <div class="thread">
+              <div class="msg user"><span class="av">あ</span><div class="bubble">このステップでは、毎回かならずテストも書かせたい。</div></div>
+              <div class="msg ai"><span class="av">AI</span><div class="bubble">承知しました。「完了の条件」に <b>テストがそろっていること</b> を追加し、自動チェックでテストの有無を確認するようにします。下の変更案でよければ適用してください。</div></div>
+            </div>
+
+            <!-- AI が提案する編集後の指示(プレビュー / 詳細粒度の差分) -->
+            <div class="proposal mt-4">
+              <div class="proposal-head">✎ AI からの変更案(プレビュー)— ドメインモデル</div>
+              <div class="proposal-body">
+                <div class="spec-row">
+                  <div class="k">完了の条件(自動でチェック)<span class="chg-tag chg" style="margin-left:var(--sp-2)">変更</span></div>
+                  <ul>
+                    <li>上の成果物がすべてそろっている</li>
+                    <li>やりたかったこと(要件)の各項目に、もれなく対応づいている</li>
+                    <li class="added">テストがそろっていること(自動でチェック)</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="proposal-foot">
+                <span class="note">ほかの項目は変更ありません</span>
+                <button class="btn btn-ghost">やめる</button>
+                <button class="btn btn-primary">この内容で適用</button>
+              </div>
+            </div>
+
+            <div class="field mt-5">
+              <textarea class="textarea" style="min-height:64px" placeholder="続けて相談する(例: 実装のステップは他と並行して進めたい)"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: cycle-steps(サイクルのステップ構成 / 確認のみ) ===================== -->
+    <section data-state="cycle-steps" data-screen="scr-01-cycle-list">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item active"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>サイクル</a> / <a>v0.0.2</a> / <b>ステップ構成</b></span><span class="spacer"></span><span class="badge b-running"><span class="dot d-running pulse"></span>進行中</span></div>
+          <div class="content content-narrow">
+            <a class="back-link mb-4">← サイクル一覧に戻る</a>
+            <h1 class="page-title">v0.0.2 のステップ構成</h1>
+            <div class="notice mt-4">このサイクルは進行中です。構成の変更はできません(始める前のサイクルでのみ調整できます)。</div>
+
+            <div class="step-list">
+              <div class="step-row"><span class="sid">1</span><div class="main"><span class="sname">要件ヒアリング</span><div class="spurpose">何を作るかを言葉で整理する</div></div><span class="badge b-done"><span class="dot d-done"></span>完了</span></div>
+              <div class="step-row"><span class="sid">2</span><div class="main"><span class="sname">画面づくり</span><div class="spurpose">画面の構成と見た目を決める</div></div><span class="badge b-done"><span class="dot d-done"></span>完了</span></div>
+              <div class="step-row selected"><span class="sid">3</span><div class="main"><span class="sname">ドメインモデル</span><div class="spurpose">扱うデータと業務ルールを整理する</div></div><span class="badge b-running"><span class="dot d-running pulse"></span>進行中</span></div>
+              <div class="step-row"><span class="sid">4</span><div class="main"><span class="sname">作業の分割</span><div class="spurpose">作る順番と単位に分ける</div></div><span class="badge b-idle"><span class="dot d-idle"></span>未着手</span></div>
+              <div class="step-row"><span class="sid">5</span><div class="main"><span class="sname">実装</span><div class="spurpose">実際に動くものを作る</div></div><span class="badge b-idle"><span class="dot d-idle"></span>未着手</span></div>
+              <div class="step-row"><span class="sid">6</span><div class="main"><span class="sname">動作確認・統合</span><div class="spurpose">ちゃんと動くか確かめて、ひとつにまとめる</div></div><span class="badge b-idle"><span class="dot d-idle"></span>未着手</span></div>
+            </div>
+
+            <div class="card card-pad mt-4">
+              <div class="rowflex between mb-4"><b class="hi">「ドメインモデル」の指示(要約)</b><a class="subtle-link"><span class="ico">↳</span> AI 実行用の全文を見る</a></div>
+              <div class="spec">
+                <div class="spec-row"><div class="k">このステップでやること</div><ul><li>扱うデータと関係を洗い出す</li><li>各データの状態と移り変わりを定義する</li><li>業務ルール・制約を明文化する</li><li>関係を図にまとめる</li></ul></div>
+                <div class="spec-divider"></div>
+                <div class="spec-row"><div class="k">出す成果物</div><div class="v">データモデルの定義 / 状態の一覧 / 関係図 / 用語の説明</div></div>
+                <div class="spec-row"><div class="k">完了の条件</div><div class="v">成果物がそろい、要件の各項目に対応づいている</div></div>
+                <div class="spec-row"><div class="k">人の確認</div><div class="v">完了時にレビューして承認</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== state: full-spec(AI 実行用の指示・全文 / 要約から開く) ===================== -->
+    <section data-state="full-spec" data-screen="scr-01-cycle-list">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item active"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>設定</a> / <a>デフォルトのステップ構成</a> / <b>ドメインモデル の全文</b></span><span class="spacer"></span><span class="badge b-idle">AI 実行用</span></div>
+          <div class="content content-narrow">
+            <a class="back-link mb-4">← 要約に戻る</a>
+            <h1 class="page-title">ドメインモデル — AI 実行用の指示(全文)</h1>
+            <p class="page-sub">これが AI のコンテキストとして渡る本文です。要約(前の画面)を基に、観点・チェック項目・出力形式・例まで展開されています。</p>
+
+            <div class="card card-pad mt-6">
+              <div class="spec">
+                <div class="spec-row"><div class="k">役割</div><div class="v">あなたはこのステップの担当 AI として、要件と画面設計をもとに、扱うデータとルールを過不足なくモデル化する。</div></div>
+                <div class="spec-row"><div class="k">目的</div><div class="v">後続の実装が迷わないだけの、データ構造・状態・制約・用語を確定する。</div></div>
+                <div class="spec-divider"></div>
+                <div class="spec-row">
+                  <div class="k">進め方(手順)</div>
+                  <ul>
+                    <li>入力(要件ヒアリング / 画面づくりの成果物)を読み、登場する「もの(エンティティ)」を抽出する</li>
+                    <li>各エンティティの属性と、エンティティ間の関係(1対多 / 多対多 など)を定義する</li>
+                    <li>各エンティティが取りうる状態と、状態遷移(いつ・何をきっかけに変わるか)を定義する</li>
+                    <li>守るべき制約・不変条件(同時に成り立ってはいけない状態 など)を明文化する</li>
+                    <li>用語(ユビキタス言語)を 1 か所に集約する</li>
+                    <li>全体を関係図にまとめる</li>
+                  </ul>
+                </div>
+                <div class="spec-row">
+                  <div class="k">観点・チェックリスト</div>
+                  <ul>
+                    <li>要件の各項目が、どのエンティティ / 属性 / 状態で表現されるか対応づいているか</li>
+                    <li>画面で必要な情報が、すべてモデルから導けるか</li>
+                    <li>状態遷移に抜け道(到達不能 / 戻れない)がないか</li>
+                    <li>命名がユビキタス言語と一致しているか</li>
+                    <li>永続化が必要なものと一時的なものを区別したか</li>
+                  </ul>
+                </div>
+                <div class="spec-row">
+                  <div class="k">出力フォーマット(成果物の構成)</div>
+                  <ul>
+                    <li>エンティティ定義一覧(名前 / 属性 / 説明)</li>
+                    <li>関係図</li>
+                    <li>状態と遷移の一覧</li>
+                    <li>制約・不変条件の一覧</li>
+                    <li>用語集</li>
+                  </ul>
+                </div>
+                <div class="spec-row">
+                  <div class="k">例(エンティティ定義の書き方)</div>
+                  <div class="callout" style="margin:0">サイクル … 1 つのバージョンを仕上げる単位。属性: 名前 / 状態(未開始・進行中・完了)/ ステップ一覧。<br>関係: サイクル 1 — 多 ステップ。</div>
+                </div>
+                <div class="spec-divider"></div>
+                <div class="spec-row">
+                  <div class="k">完了の条件</div>
+                  <ul>
+                    <li>上記すべてがそろっている</li>
+                    <li>要件の各項目に対応づいている</li>
+                    <li>(設定で有効化した場合)テストがそろっている</li>
+                  </ul>
+                </div>
+                <div class="spec-row">
+                  <div class="k">禁止 / 注意</div>
+                  <ul>
+                    <li>このプロダクトの既存ソース構造を前提にしない(人が読んで分かる説明にする)</li>
+                    <li>実装の詳細(クラス設計・ファイル分割)には踏み込まない(後続ステップの責務)</li>
+                  </ul>
+                </div>
+              </div>
+              <p class="low mt-4" style="font-size:12px">この全文は、要約への変更(対話編集)に追従して AI が更新します。人間は通常は要約だけ見れば十分です。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

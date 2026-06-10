@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-04: できあがりの確認 (v0.0.2)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ===================== state: default ===================== -->
+    <section data-state="default" data-screen="scr-04-review-detail">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="mark">A</span> aidlc-studio</div>
+          <div class="nav-section">メニュー</div>
+          <div class="nav-item"><span class="ico">◆</span> サイクル</div>
+          <div class="nav-item active"><span class="ico">✦</span> 受信箱 <span class="count">3</span></div>
+          <div class="nav-item"><span class="ico">▤</span> 成果物</div>
+          <div class="nav-item"><span class="ico">▦</span> 用語・決定メモ</div>
+          <div class="nav-grow"></div>
+          <div class="nav-item"><span class="ico">⚙</span> 設定</div>
+        </aside>
+        <div class="main">
+          <div class="topbar"><span class="crumb"><a>受信箱</a> / <b>できあがりの確認</b></span><span class="spacer"></span>
+            <button class="btn btn-ghost">やり直してもらう</button>
+            <button class="btn btn-primary">これで進める →</button>
+          </div>
+          <div class="content">
+            <a class="back-link mb-4">← 進行状況に戻る</a>
+            <h1 class="page-title">「作業の分割」のできあがり確認</h1>
+            <p class="page-sub">中身を読むだけで「進めてよいか」を判断できます。専門知識は要りません。</p>
+
+            <div class="blocks mt-6">
+
+              <!-- 1. 要件の対応状況 -->
+              <div class="block">
+                <div class="block-head"><span class="ord">1</span> やりたかったことの 対応状況 <span class="spacer"></span><span class="badge b-done"><span class="dot d-done"></span>すべて反映済み</span></div>
+                <div class="block-body">
+                  <div class="coverage"><span class="pct">6 / 6</span><span class="muted">すべて反映できています</span></div>
+                  <table class="table">
+                    <thead><tr><th>やりたかったこと</th><th>状態</th></tr></thead>
+                    <tbody>
+                      <tr><td>作る順番を、依存関係に沿って並べる</td><td><span class="badge b-done">反映済み</span></td></tr>
+                      <tr><td>同時に進められる作業をまとめる</td><td><span class="badge b-done">反映済み</span></td></tr>
+                      <tr><td>各作業に「完了の条件」を付ける</td><td><span class="badge b-done">反映済み</span></td></tr>
+                      <tr><td>前のやり方とも矛盾しないようにする</td><td><span class="badge b-done">反映済み</span></td></tr>
+                      <tr><td>見送りの承認が、自動で持ち越しリストに残る</td><td><span class="badge b-done">反映済み</span></td></tr>
+                      <tr><td>抜けがゼロになるまで確認をくり返す</td><td><span class="badge b-done">反映済み</span></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="low mt-3" style="font-size:12px">この画面に来た時点で、やりたかったことは すべて反映済みです(抜けがあるうちは AI が自分で作り直します)。</p>
+                </div>
+              </div>
+
+              <!-- 2. 修正の説明(不具合を直したとき) -->
+              <div class="block">
+                <div class="block-head"><span class="ord">2</span> 直したことの説明</div>
+                <div class="block-body">
+                  <div class="dossier">
+                    <div class="dpanel">
+                      <div class="dpanel-head">どんな不具合だったか</div>
+                      <div class="dpanel-body">
+                        <div class="cause-layer"><div class="sub">起きていたこと</div>設定を読み込むとき、一部の項目が空のままだと、先に進めなくなることがありました。</div>
+                        <div class="cause-layer"><div class="sub">なぜ起きたか</div>「項目が空のとき」を想定した確認をしていなかったためです。</div>
+                      </div>
+                    </div>
+                    <div class="dpanel">
+                      <div class="dpanel-head">誰に・どこに影響したか</div>
+                      <div class="dpanel-body">設定を使うすべてのステップで起こりえました。<span class="sev sev-high" style="margin-left:var(--sp-2)">影響: 大</span> 進行が止まる可能性がありました。</div>
+                    </div>
+                    <div class="dpanel">
+                      <div class="dpanel-head">どう直したか</div>
+                      <div class="dpanel-body">項目が空でも、安全にそのまま扱えるようにしました。</div>
+                    </div>
+                    <div class="dpanel">
+                      <div class="dpanel-head">同じことが起きないように</div>
+                      <div class="dpanel-body">「項目が空のとき」も毎回かならず確認するようにしました。</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. 動作の証拠 -->
+              <div class="block">
+                <div class="block-head"><span class="ord">3</span> 実際に動いた証拠 <span class="spacer"></span><span class="muted" style="text-transform:none;letter-spacing:0">自動で撮影した画面 2 枚</span></div>
+                <div class="block-body">
+                  <div class="shot-grid">
+                    <div class="shot"><div class="frame">ステップ構成の画面</div><div class="cap">設定が保存できた様子 <span class="ts">2026-06-10 12:34</span></div></div>
+                    <div class="shot"><div class="frame">できあがりの画面</div><div class="cap">結果が表示された様子 <span class="ts">2026-06-10 12:35</span></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. 影響したところ -->
+              <div class="block">
+                <div class="block-head"><span class="ord">4</span> 変わったところ</div>
+                <div class="block-body">
+                  <p class="muted mb-3">今回の作業で動きが変わった部分です。</p>
+                  <table class="table">
+                    <thead><tr><th>変わった機能</th><th>重要度</th></tr></thead>
+                    <tbody>
+                      <tr><td>ステップ構成の保存</td><td><span class="sev sev-high">高</span></td></tr>
+                      <tr><td>進行状況の表示</td><td><span class="sev sev-medium">中</span></td></tr>
+                      <tr><td>受信箱への通知</td><td><span class="sev sev-high">高</span></td></tr>
+                      <tr><td>できあがりの確認画面</td><td><span class="sev sev-medium">中</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 5. 動画(まだなし) -->
+              <div class="block">
+                <div class="block-head"><span class="ord">5</span> 操作の動画 <span class="spacer"></span><span class="badge b-idle">準備中</span></div>
+                <div class="block-body">
+                  <div class="video-ph">
+                    <div class="play">▶</div>
+                    <div>動画はまだありません</div>
+                    <div class="low" style="font-size:12px">(操作を録画して見せる機能は次のバージョンで追加予定)</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

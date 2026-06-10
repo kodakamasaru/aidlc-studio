@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tokens — S3 視覚カタログ (v0.0.2)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="catalog">
+      <h1>aidlc-studio — 視覚トークン (v0.0.2 / S3)</h1>
+      <p class="muted">Minimal product UI (Linear/Vercel 風) / Dark 優先 / primary = indigo・violet。v0.0.1 の視覚契約を継承し、v0.0.2 で <b class="hi">GEN/EVAL role バッジ</b>・<b class="hi">descope (amber)</b>・<b class="hi">severity</b> を追加。これは視覚意図のカタログ。実装は S7/S8 がゼロベースで React idiom で再現する。</p>
+
+      <h2>Surfaces</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--bg)"></div><div class="meta"><div class="nm">bg</div><div class="val">#09090b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface)"></div><div class="meta"><div class="nm">surface</div><div class="val">#131316</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface-2)"></div><div class="meta"><div class="nm">surface-2</div><div class="val">#1a1a20</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--surface-3)"></div><div class="meta"><div class="nm">surface-3</div><div class="val">#212129</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--line)"></div><div class="meta"><div class="nm">line</div><div class="val">#26262d</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--line-strong)"></div><div class="meta"><div class="nm">line-strong</div><div class="val">#34343d</div></div></div>
+      </div>
+
+      <h2>Text</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--text-hi)"></div><div class="meta"><div class="nm">text-hi</div><div class="val">#ededf0</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--text-mid)"></div><div class="meta"><div class="nm">text-mid</div><div class="val">#9a9aa4</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--text-low)"></div><div class="meta"><div class="nm">text-low</div><div class="val">#6a6a74</div></div></div>
+      </div>
+
+      <h2>Primary (indigo / violet)</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--primary)"></div><div class="meta"><div class="nm">primary</div><div class="val">#6366f1</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--primary-hover)"></div><div class="meta"><div class="nm">primary-hover</div><div class="val">#7c7ff5</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--violet)"></div><div class="meta"><div class="nm">violet</div><div class="val">#a78bfa</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--primary-soft)"></div><div class="meta"><div class="nm">primary-soft</div><div class="val">15% α</div></div></div>
+      </div>
+
+      <h2>State colors (Run / process)</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--running)"></div><div class="meta"><div class="nm">running (teal)</div><div class="val">#2dd4bf</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--stalled)"></div><div class="meta"><div class="nm">stalled (amber)</div><div class="val">#f59e0b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--done)"></div><div class="meta"><div class="nm">done (green)</div><div class="val">#22c55e</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--error)"></div><div class="meta"><div class="nm">error (red)</div><div class="val">#ef4444</div></div></div>
+      </div>
+
+      <h2>Inbox card kinds</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--q-wait)"></div><div class="meta"><div class="nm">Q 待ち (indigo-400)</div><div class="val">#818cf8</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--review-wait)"></div><div class="meta"><div class="nm">レビュー待ち (purple-400)</div><div class="val">#c084fc</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--descope)"></div><div class="meta"><div class="nm">descope (amber) ★新</div><div class="val">#f59e0b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--info)"></div><div class="meta"><div class="nm">info</div><div class="val">#38bdf8</div></div></div>
+      </div>
+
+      <h2>Severity (impact / dossier) ★新</h2>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--sev-high)"></div><div class="meta"><div class="nm">HIGH</div><div class="val">#ef4444</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--sev-medium)"></div><div class="meta"><div class="nm">MEDIUM</div><div class="val">#f59e0b</div></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--sev-low)"></div><div class="meta"><div class="nm">LOW</div><div class="val">#9a9aa4</div></div></div>
+      </div>
+
+      <h2>Run state badges</h2>
+      <div class="rowflex gap-3 wrap">
+        <span class="badge b-running"><span class="dot d-running"></span>running</span>
+        <span class="badge b-stalled"><span class="dot d-stalled"></span>stalled</span>
+        <span class="badge b-done"><span class="dot d-done"></span>done</span>
+        <span class="badge b-error"><span class="dot d-error"></span>failed</span>
+        <span class="badge b-idle"><span class="dot d-idle"></span>idle</span>
+      </div>
+
+      <h2>Inbox kind badges</h2>
+      <div class="rowflex gap-3 wrap">
+        <span class="badge b-q">? Q 待ち</span>
+        <span class="badge b-review">◎ レビュー待ち</span>
+        <span class="badge b-descope">! descope (gap)</span>
+      </div>
+
+      <h2>Role badges (GEN / EVAL) ★新</h2>
+      <p class="muted" style="font-size:13px">generator は indigo、evaluator は violet。<b class="hi">色 + 文字</b>の二重符号で「いまどちらが動いているか」を即判別。</p>
+      <div class="rowflex gap-4 wrap mt-3" style="align-items:flex-start">
+        <div class="rowflex gap-2"><span class="role role-gen">GEN</span> <span class="muted" style="font-size:13px">generator(成果物を出す)</span></div>
+        <div class="rowflex gap-2"><span class="role role-eval">EVAL</span> <span class="muted" style="font-size:13px">evaluator(成果物を検証する)</span></div>
+      </div>
+      <div class="rowflex gap-6 mt-6" style="align-items:flex-end">
+        <div class="step current"><div class="node" style="position:relative">3<span class="role-pin gen">GEN</span></div><div class="lbl">S3 generator</div></div>
+        <div class="step current eval"><div class="node" style="position:relative">3<span class="role-pin eval">EVAL</span></div><div class="lbl">S3 evaluator</div></div>
+      </div>
+
+      <h2>Severity pills ★新</h2>
+      <div class="rowflex gap-3 wrap">
+        <span class="sev sev-high">HIGH</span>
+        <span class="sev sev-medium">MEDIUM</span>
+        <span class="sev sev-low">LOW</span>
+      </div>
+
+      <h2>Typography — Inter / JetBrains Mono</h2>
+      <div class="type-sample"><div class="tag">display 28/700</div><div style="font-size:28px;font-weight:700;letter-spacing:-0.02em">品質を機械的に保証する</div></div>
+      <div class="type-sample"><div class="tag">h1 20/600</div><div style="font-size:20px;font-weight:600;letter-spacing:-0.01em">Step定義エディタ</div></div>
+      <div class="type-sample"><div class="tag">h2 16/600</div><div style="font-size:16px;font-weight:600">Completeness Table</div></div>
+      <div class="type-sample"><div class="tag">body 14/400</div><div style="font-size:14px">人間はコードを見ず、成果物の描画だけで承認できる。</div></div>
+      <div class="type-sample"><div class="tag">caption 12.5</div><div style="font-size:12.5px;color:var(--text-mid)">requirements 6 / addressed 6 / gap 0</div></div>
+      <div class="type-sample"><div class="tag">mono 12.5</div><div class="mono" style="font-size:12.5px;color:var(--text-mid)">[12:34:08] EVAL checking completeness: 5/6</div></div>
+
+      <h2>Spacing (4px base)</h2>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-1 / 4</div><div class="sp-bar" style="width:4px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-2 / 8</div><div class="sp-bar" style="width:8px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-3 / 12</div><div class="sp-bar" style="width:12px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-4 / 16</div><div class="sp-bar" style="width:16px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-6 / 24</div><div class="sp-bar" style="width:24px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-8 / 32</div><div class="sp-bar" style="width:32px"></div></div>
+      <div class="sp-sample"><div class="tag" style="width:120px;font-family:var(--font-mono);font-size:11px;color:var(--text-low)">sp-12 / 48</div><div class="sp-bar" style="width:48px"></div></div>
+
+      <h2>Radius / Shadow</h2>
+      <div class="radius-sample">
+        <div class="radius-box" style="border-radius:var(--r-sm)">sm 6</div>
+        <div class="radius-box" style="border-radius:var(--r-md)">md 8</div>
+        <div class="radius-box" style="border-radius:var(--r-lg)">lg 12</div>
+        <div class="radius-box" style="border-radius:var(--r-full);width:64px">full</div>
+        <div class="radius-box" style="border-radius:var(--r-lg);box-shadow:var(--shadow-pop);border-color:var(--line)">pop</div>
+      </div>
+
+      <h2>Motion (意図 — 文字で / 値は参考)</h2>
+      <ul class="muted" style="line-height:1.9;font-size:13px">
+        <li>hover / focus: <b class="hi">150ms ease-out</b>(背景・境界・shadow)</li>
+        <li>パネル / モーダル出現: <b class="hi">200ms cubic-bezier(0.16,1,0.3,1)</b> で fade + 4px slide-up</li>
+        <li>GEN→EVAL role 切替: バッジ色を <b class="hi">200ms ease-out</b> でクロスフェード(GEN indigo → EVAL violet)</li>
+        <li>deterministic gate progress: バーを <b class="hi">線形</b>に伸長 / 各 block check は <b class="hi">120ms</b> で done 色へ</li>
+        <li>running 状態: dot の <b class="hi">pulse 1.6s ease-out infinite</b> / spinner <b class="hi">0.8s linear</b></li>
+        <li>resume 待ち: skeleton shimmer <b class="hi">1.4s ease-in-out infinite</b></li>
+        <li>ステップ完了でパイプライン node が done 色へ <b class="hi">250ms ease-out</b> で遷移</li>
+      </ul>
+    </div>
+  </body>
+</html>
