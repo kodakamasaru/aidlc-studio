@@ -19,9 +19,9 @@
 ### 受け入れ条件 (AC)
 - [ ] Review detail 画面(SCR-04)に review block 描画エリアが追加される
 - [ ] completeness table: requirements ↔ addressed の照合結果をテーブル描画(gap は赤ハイライト)
-- [ ] impact table: 変更影響範囲をテーブル描画(集約/ファイル/重要度)
+- [ ] impact table: 変更影響範囲をテーブル描画(**振る舞い**=何が起きる/どの機能に効く + 重要度 高/中/低。ソース名/ファイル名は出さない ※S3 反映①)
 - [ ] bugfix dossier: cause(2層)/impact/fix/prevention/video を構造化カード描画
-- [ ] descope card: 削減提案の内容と承認/却下ボタンをカード描画
+- [ ] ~~descope card: 削減提案の内容と承認/却下ボタンをカード描画~~ → **SCR-04 から外す**(S3 反映②: 見送りは AI の理由付き申請 → サイクル側で判断する別フローに一本化。US-03 / S5 Unit-05 参照)
 - [ ] video embed: video URL があれば埋め込みプレーヤーを表示(v0.0.2 は placeholder)
 - [ ] screenshot 証拠: verify-ui で自動生成された screenshot を動作証拠として描画(ユーザー要望「確実に正しく実装されているという証拠」に対応)
 - [ ] approve/reject ボタンが各 block に紐づいて機能する
