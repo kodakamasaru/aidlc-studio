@@ -78,10 +78,11 @@ export function AppShell() {
             label="Inbox"
             count={inboxCount}
           />
+          <NavItem to="/settings/steps" icon={<ListIcon />} label="Step 設定" />
           {/* Artifacts / Wiki are framed for v0.0.x (sidebar placeholders). */}
           <span className="nav-item nav-item--disabled" aria-disabled="true">
             <span className="nav-item__icon" aria-hidden="true">
-              <ListIcon />
+              <GridIcon />
             </span>
             <span className="nav-item__label">Artifacts</span>
           </span>

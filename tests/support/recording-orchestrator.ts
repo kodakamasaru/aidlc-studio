@@ -5,6 +5,7 @@
 import type {
   OrchestratorPort,
   RunLaunch,
+  EvalLaunch,
   ResumeRun,
   RetryLaunch,
 } from "../../src/app/ports/orchestrator";
@@ -13,6 +14,7 @@ import type { RunId } from "../../src/domain/shared/ids";
 
 export type OrchestratorCall =
   | { readonly method: "launch"; readonly args: RunLaunch }
+  | { readonly method: "launchEval"; readonly args: EvalLaunch }
   | { readonly method: "resume"; readonly args: ResumeRun }
   | { readonly method: "retry"; readonly args: RetryLaunch }
   | { readonly method: "cancel"; readonly args: { readonly runId: RunId } };
@@ -22,6 +24,9 @@ export class RecordingOrchestrator implements OrchestratorPort {
 
   async launch(cmd: RunLaunch): Promise<void> {
     this.calls.push({ method: "launch", args: cmd });
+  }
+  async launchEval(cmd: EvalLaunch): Promise<void> {
+    this.calls.push({ method: "launchEval", args: cmd });
   }
   async resume(cmd: ResumeRun): Promise<void> {
     this.calls.push({ method: "resume", args: cmd });
@@ -55,6 +60,9 @@ export const noopNotify: NotifyPort = {
 export class FailingOrchestrator implements OrchestratorPort {
   async launch(): Promise<void> {
     throw new Error("launch failed (test)");
+  }
+  async launchEval(): Promise<void> {
+    throw new Error("launchEval failed (test)");
   }
   async resume(): Promise<void> {
     throw new Error("resume failed (test)");

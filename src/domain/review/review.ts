@@ -10,6 +10,7 @@
 import type { Instant, Text } from "../shared/primitives";
 import type { Step } from "../shared/vocab";
 import type { CycleId, RunId, TaskId } from "../shared/ids";
+import type { CompletenessBlock } from "./brief";
 
 // ── ReviewBlock(判別可能ユニオン / 共有 types 層の正本。S3 Unit-04) ──
 export type ReviewBlock =
@@ -61,6 +62,12 @@ export type Review = {
   readonly taskId: TaskId | null;
   readonly blocks: readonly ReviewBlock[];
   readonly producedAt: Instant;
+  /**
+   * S8 手戻り追補(加法 optional): evaluator 成果の完全性ブロック(requirements ↔
+   * addressed)。これがあると web が completeness table を描画できる(scope K / 原則#3:
+   * コードを読まず承認)。欠落=従来動作(generator や role 無し Run)。
+   */
+  readonly completeness?: CompletenessBlock;
 };
 
 export type BuildReviewCmd = {
@@ -70,6 +77,7 @@ export type BuildReviewCmd = {
   readonly taskId?: TaskId;
   readonly blocks: readonly ReviewBlock[];
   readonly producedAt: Instant;
+  readonly completeness?: CompletenessBlock;
 };
 
 /** buildResult: `ResultEmitted` 受信で Review を構築(Task 単位 or Cycle 単位)。INV-1。 */
@@ -80,6 +88,7 @@ export const buildReview = (cmd: BuildReviewCmd): Review => ({
   taskId: cmd.taskId ?? null,
   blocks: cmd.blocks,
   producedAt: cmd.producedAt,
+  ...(cmd.completeness !== undefined ? { completeness: cmd.completeness } : {}),
 });
 
 /** この Review が Task 単位か(taskId あり)。 */

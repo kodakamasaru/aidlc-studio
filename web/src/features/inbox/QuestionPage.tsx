@@ -7,6 +7,7 @@ import { useAsync } from "../../lib/useAsync";
 import { LoadingMessage, ErrorMessage } from "../../components/ui/StateMessage";
 import { isReviewKind } from "./kind-meta";
 import { AnswerView } from "./AnswerView";
+import { DescopeView } from "./DescopeView";
 import { ReviewDetail } from "../review/ReviewDetail";
 
 export function QuestionPage() {
@@ -30,9 +31,7 @@ export function QuestionPage() {
   }
 
   const question = questionQ.data;
-  return isReviewKind(question.kind) ? (
-    <ReviewDetail question={question} />
-  ) : (
-    <AnswerView question={question} />
-  );
+  if (isReviewKind(question.kind)) return <ReviewDetail question={question} />;
+  if (question.kind === "descope") return <DescopeView question={question} />;
+  return <AnswerView question={question} />;
 }

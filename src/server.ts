@@ -16,9 +16,10 @@ import { openDb } from "./infra/db/open";
 import { buildStore } from "./infra/db/store";
 import { SystemClock } from "./infra/sys/clock";
 import { UuidIdGen } from "./infra/sys/id-gen";
+import { nodeFs } from "./infra/sys/fs";
 import { createApp } from "./infra/http/app";
 import { logError } from "./infra/log";
-import { EventApplier } from "./app/services/event-applier";
+import { EngineService } from "./app/services/engine-service";
 import { reconcileRunningRuns } from "./app/services/reconcile";
 import { ScriptedOrchestrator } from "./infra/orchestrator/scripted";
 import { LiveClaudeOrchestrator } from "./infra/orchestrator/live";
@@ -57,17 +58,12 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
   const clock = new SystemClock();
   const ids = new UuidIdGen();
 
-  // The applier is the DomainEventSink: orchestrator emissions are normalized
-  // and persisted here (S7 D-04). It shares the one store/clock/ids the rest of
-  // the app uses, against the single connection.
-  const applier = new EventApplier({
-    clock,
-    ids,
-    uow: store.uow,
-    repos: store.repos,
-    notify: noopNotify,
-  });
-  const sink: DomainEventSink = (e) => applier.apply(e);
+  // The EngineService is the DomainEventSink: orchestrator emissions are persisted
+  // by its inner EventApplier (S7 D-04), then it drives the gen→gate→eval pipeline
+  // (S8). Mutual dependency (engine→orchestrator.launchEval, orchestrator→sink→
+  // engine) is broken with a late-bound sink closure.
+  let engine: EngineService;
+  const sink: DomainEventSink = (e) => engine.handle(e);
 
   // Selection precedence: explicit opts → AIDLC_ORCHESTRATOR env → "scripted".
   // "scripted" stays the default so the deterministic suite + visual E2E are
@@ -80,11 +76,13 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
   const ports: Ports = {
     clock,
     ids,
+    fs: nodeFs,
     uow: store.uow,
     repos: store.repos,
     orchestrator,
     notify: noopNotify,
   };
+  engine = new EngineService(ports);
 
   // Startup recovery: any run still "running" at boot is orphaned (this fresh
   // process holds no live child/stall-timer behind it — see reconcile.ts), so

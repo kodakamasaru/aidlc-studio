@@ -59,3 +59,33 @@
 .answer-form__foot .field-hint {
   margin-top: 0;
 }
+
+/* descope 4-choice — a 2×2 bento of labelled actions, each stacking a strong
+   action label over a quiet hint so the consequence reads at a glance. */
+.descope-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+.descope-choice {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding: var(--sp-4);
+  min-height: 64px;
+  text-align: left;
+  white-space: normal;
+}
+.descope-choice__label {
+  font-weight: 600;
+}
+.descope-choice__hint {
+  font-size: var(--text-caption);
+  opacity: 0.78;
+}
+@media (max-width: 560px) {
+  .descope-choices {
+    grid-template-columns: 1fr;
+  }
+}

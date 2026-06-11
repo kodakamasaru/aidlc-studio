@@ -10,7 +10,7 @@ import { errorMessage } from "../../lib/format";
 import { useSetTopbar } from "../../components/shell/topbar-context";
 import { StateBadge } from "../../components/ui/StateBadge";
 import { CheckIcon, BacktrackIcon } from "../../components/ui/Icon";
-import { ReviewBlocks } from "./ReviewBlocks";
+import { ReviewBlocks, CompletenessTable } from "./ReviewBlocks";
 import { BacktrackModal, type StepOption } from "./BacktrackModal";
 import { reviewCrumb } from "./review-crumb";
 import "./review.css";
@@ -150,6 +150,10 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
       <p className="sr-only" aria-live="polite">
         {busy ? "送信しています…" : ""}
       </p>
+
+      {review.completeness ? (
+        <CompletenessTable completeness={review.completeness} />
+      ) : null}
 
       <ReviewBlocks blocks={review.blocks} />
 

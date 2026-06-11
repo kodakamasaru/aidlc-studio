@@ -17,6 +17,7 @@ import { openDb } from "../../src/infra/db/open";
 import { buildStore } from "../../src/infra/db/store";
 import { SystemClock } from "../../src/infra/sys/clock";
 import { UuidIdGen } from "../../src/infra/sys/id-gen";
+import { nodeFs } from "../../src/infra/sys/fs";
 import { EventApplier } from "../../src/app/services/event-applier";
 import { LiveClaudeOrchestrator } from "../../src/infra/orchestrator/live";
 import { ProjectService } from "../../src/app/services/project-service";
@@ -81,6 +82,7 @@ suite("LiveClaudeOrchestrator — real local Claude run", () => {
       const ports: Ports = {
         clock,
         ids,
+        fs: nodeFs,
         uow: store.uow,
         repos: store.repos,
         orchestrator,

@@ -106,3 +106,8 @@
 
 ## 前サイクルからの引き継ぎ (手戻り時のみ追記)
 - (なし。本サイクル内で S6 から順送り)
+
+## S8 からの手戻り追補 (2026-06-11)
+- **何が漏れていたか**: gen→gate→eval ループで evaluator(AI)の完全性判断(`CompletenessBlock.addressed`)を app の決定的 completeness gate へ返す**ドメインイベント経路が無かった**(`ResultEmitted` は `blocks` のみ / S8 I/F 整合表 #10)。
+- **解決(加法的・後方互換)**: `src/domain/events/events.ts` の `ResultEmitted` に `completeness?: CompletenessBlock` を optional 追加(欠落=従来動作 / 純粋性・回帰 225 tests 不変)。descope 申請の搬送は既存 `QuestionRaised{kind:"descope"}` を再利用(新チャネル不要)。
+- **裁定**: S8 Q-01 でユーザーが (A) を選択。型の加法的追加のみでドメイン純粋性は不変。ledger に `done` で台帳化。

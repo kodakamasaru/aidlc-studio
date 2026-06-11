@@ -15,10 +15,12 @@ import {
   type QuestionError,
 } from "../../domain/question/question";
 import type { Fact } from "../../domain/facts/facts";
+import { proposeTask, acceptProposal } from "../../domain/task/task";
 import {
   backtrackTo,
   approvePhase,
   advanceRun,
+  resumeRun,
   completeCycle,
 } from "../../domain/cycle/cycle";
 import type { Cycle } from "../../domain/cycle/cycle";
@@ -160,10 +162,11 @@ export class InboxService {
           await this.ports.orchestrator.cancel({ runId: command.runId });
           return;
         case "descopeToBacklog":
-          // S6 descope-policy D-03: 見送り承認→backlog 化(proposeTask→acceptProposal)。
-          // 配線は S8(s7-domain-code.md 引き継ぎ)。未配線の間は silent no-op にせず明示的に
-          // fail-loud にして、回答済み Question/Fact が宙に浮く事故を防ぐ(silent failure 禁止)。
-          throw fail(500, "DescopeBacklogNotWired");
+          // S6 descope-policy D-03 / S8 #5: 見送り承認→backlog 化。proposeTask で AI 申請を
+          // 起こし、人間が下した descope/defer verdict を acceptProposal の判断ゲート(INV-5)
+          // として通し、backlog Task を生成する。DB のみの同期書き込み(orchestrator 不要)。
+          this.descopeToBacklog(question, command);
+          return;
       }
     } catch (err) {
       // A ServiceError from a lookup (e.g. 404 ProjectNotFound in dispatchRetry)
@@ -200,6 +203,100 @@ export class InboxService {
       step: phase.step,
       repoPath: project.repoPath,
     });
+  }
+
+  /**
+   * descope/defer approval → backlog Task (S6 descope-policy D-03 / Unit-05).
+   * The human already judged the AI's descope request by answering the Question,
+   * so proposeTask (AI source) and acceptProposal (the INV-5 human gate, satisfied
+   * by the verdict) happen together here. The requirement becomes a backlog Task;
+   * `deferred` is carried in the Task kind (no new TaskState / S6 Q-02). Persisted
+   * in ONE transaction. A domain error (e.g. empty requirement) surfaces as a
+   * ServiceError so dispatch()'s catch re-throws it untouched (no run compensation).
+   */
+  private descopeToBacklog(
+    question: Question,
+    command: Extract<Unit02Command, { type: "descopeToBacklog" }>,
+  ): void {
+    const cycle = this.loadCycle(question);
+    const projectId = cycle.projectId;
+    // Append to the end of the project's backlog (priority = current count).
+    const priority = this.ports.repos.tasks.listByProject(projectId).length;
+    const kind = command.deferred ? "descoped-deferred" : "descoped";
+
+    const proposal = proposeTask({
+      id: this.ports.ids.proposalId(),
+      source: "ai",
+      title: command.requirement,
+      body: command.deferred
+        ? `後回し(defer): ${command.requirement}`
+        : `見送り(descope): ${command.requirement}`,
+      rationale: command.aiReason,
+    });
+    const accepted = acceptProposal(proposal, {
+      taskId: this.ports.ids.taskId(),
+      projectId,
+      kind,
+      priority,
+      createdAt: this.ports.clock.now(),
+    });
+    if (isErr(accepted)) throw fail(500, `DescopeToBacklogFailed: ${accepted.error}`);
+
+    this.ports.uow.run(() => {
+      this.ports.repos.proposals.save(projectId, accepted.value.proposal);
+      this.ports.repos.tasks.save(accepted.value.task);
+    });
+
+    // The gap is now an approved 見送り (backlogged). Per Unit-05's hard gate a
+    // step is done-able once every gap is resolved OR approved-descoped — so once
+    // this run has no MORE open descope Questions, unwedge the gen→gate→eval
+    // evaluator run the EngineService stalled and let the phase complete.
+    this.resolveDescopedRun(question, command.runId);
+  }
+
+  /**
+   * After a descope/defer approval, if the run has no remaining open descope
+   * Questions, complete the gen→gate→eval step: the EngineService left the
+   * evaluator run "stalled" awaiting this human decision, so resume it → done →
+   * approve the phase (review → done) → complete the cycle if it was the last
+   * phase. Mirrors finalizeApprovedReview but starts from a stalled run. A no-op
+   * when the run is not a stalled evaluator (role-less / still-pending gaps).
+   */
+  private resolveDescopedRun(question: Question, runId: RunId): void {
+    const cycle = this.ports.repos.cycles.findById(question.cycleId);
+    if (!cycle) return;
+    const phase = cycle.phases.find((p) => p.runs.some((r) => r.id === runId));
+    const run = phase?.runs.find((r) => r.id === runId);
+    if (!phase || !run || run.state !== "stalled") return; // nothing to unwedge.
+
+    // More descope decisions still pending for this run → wait for them.
+    const openDescopes = this.ports.repos.questions
+      .listByRun(runId)
+      .filter((q) => q.kind === "descope" && q.state === "open");
+    if (openDescopes.length > 0) return;
+
+    const resumed = resumeRun(cycle, runId);
+    if (isErr(resumed)) return;
+    const advanced = advanceRun(resumed.value, {
+      runId,
+      to: "done",
+      at: this.ports.clock.now(),
+    });
+    if (isErr(advanced)) return;
+
+    // No visual_review is raised on the descope path, so the run's reviews are all
+    // closed → the phase may be approved.
+    const openReviews = this.ports.repos.questions
+      .listByRun(runId)
+      .filter((q) => q.kind === "visual_review" && q.state === "open");
+    const approved = approvePhase(advanced.value, {
+      phaseId: phase.id,
+      allTaskReviewsApproved: openReviews.length === 0,
+    });
+    const next = isOk(approved) ? approved.value : advanced.value;
+    const completed = completeCycle(next);
+    const finalCycle = isOk(completed) ? completed.value : next;
+    this.ports.uow.run(() => this.ports.repos.cycles.save(finalCycle));
   }
 
   /**

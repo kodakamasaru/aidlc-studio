@@ -8,6 +8,7 @@
 import type { Text } from "../../domain/shared/primitives";
 import type { Step } from "../../domain/shared/vocab";
 import type { ProjectId, CycleId, PhaseId, RunId } from "../../domain/shared/ids";
+import type { RunRole } from "../../domain/cycle/cycle";
 import type { DomainEvent } from "../../domain/events/events";
 
 /** Context needed to start a headless run for one Phase attempt. */
@@ -20,6 +21,31 @@ export interface RunLaunch {
   /** Absolute repo path of the target project (worktree base). */
   readonly repoPath: string;
   /** Optional git worktree ref for parallel-cycle isolation. */
+  readonly worktreeRef?: string;
+  /**
+   * S8 / S5 Unit-03: when "generator", this run is the gen half of a gen→gate→eval
+   * step — the adapter emits a typed BriefOut (ResultEmitted carrying completeness)
+   * instead of the v0.0.1 single-run flow. Omitted = role-less (legacy single run).
+   */
+  readonly role?: RunRole;
+}
+
+/**
+ * Context to launch the evaluator half of a gen→gate→eval step (S5 Unit-03 §3 / C).
+ * Distinct from RunLaunch because it references the generator run it verifies and
+ * carries the step's verification observations (what the evaluator must check).
+ */
+export interface EvalLaunch {
+  readonly runId: RunId;
+  readonly projectId: ProjectId;
+  readonly cycleId: CycleId;
+  readonly phaseId: PhaseId;
+  readonly step: Step;
+  readonly repoPath: string;
+  /** The generator run whose BriefOut this evaluator verifies. */
+  readonly generatorRunId: RunId;
+  /** The step's VerificationContract observations (what to check). */
+  readonly verification?: readonly Text[];
   readonly worktreeRef?: string;
 }
 
@@ -70,6 +96,12 @@ export type DomainEventSink = (emission: RunEmission) => Promise<void>;
 export interface OrchestratorPort {
   /** Launch a fresh headless run for a Phase. Resolves once the run is started. */
   launch(cmd: RunLaunch): Promise<void>;
+  /**
+   * Launch the evaluator run for a gen→gate→eval step, after the deterministic gate
+   * passed (S5 Unit-03 §3). Emits the evaluator's ResultEmitted (carrying its
+   * completeness verdict) + any descope QuestionRaised through the same sink.
+   */
+  launchEval(cmd: EvalLaunch): Promise<void>;
   /** Inject a human answer and resume a waiting run. */
   resume(cmd: ResumeRun): Promise<void>;
   /** Start a new attempt for a failed/stalled run. */

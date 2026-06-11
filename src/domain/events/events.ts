@@ -9,6 +9,7 @@
 import type { RunState } from "../cycle/cycle";
 import type { QuestionKind, QuestionPayload } from "../question/question";
 import type { ReviewBlock } from "../review/review";
+import type { CompletenessBlock } from "../review/brief";
 import type {
   ArtifactKind,
   WikiSection,
@@ -40,6 +41,12 @@ export type ResultEmitted = {
   readonly runId: RunId;
   readonly taskId?: TaskId;
   readonly blocks: readonly ReviewBlock[];
+  /**
+   * S8 手戻り追補(v0.0.2 / 後方互換 optional): evaluator(AI)が書いた完全性判断
+   * (requirements ↔ addressed)を app の決定的 completeness gate へ搬送する。generator は
+   * requirements のみ(addressed 空)、evaluator が addressed を埋める。欠落 = 従来動作。
+   */
+  readonly completeness?: CompletenessBlock;
 };
 
 /** aidlc-docs に成果物が書かれた → ArtifactRef を索引化(v0.0.x)。 */

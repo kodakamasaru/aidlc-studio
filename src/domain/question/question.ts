@@ -34,9 +34,12 @@ export type QuestionPayload =
   // S6 descope-policy: AI が理由付きで起こす見送り申請(1 申請 = 1 カード)。
   | {
       readonly kind: "descope";
-      readonly requirement: Text; // 見送りたい要件の平易文
+      readonly requirement: Text; // 見送りたい要件の平易文(人間表示)
       readonly aiReason: Text; // 必須(理由なき見送りは発生しない / 原則#6)
       readonly recommendedStep?: Step; // 「前のステップからやり直す」候補
+      // S8 手戻り追補(加法 optional): requirement の安定 key。app の completeness
+      // gate が gap.key と決定的に照合するため(text 照合の揺れを排除)。欠落=従来動作。
+      readonly requirementKey?: string;
     };
 
 export type Question = {

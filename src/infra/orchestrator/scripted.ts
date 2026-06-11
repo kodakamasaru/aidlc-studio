@@ -4,9 +4,16 @@
 // injected DomainEventSink (it never writes the DB itself). All sink calls are
 // awaited so emission ordering is fully deterministic. The live Claude-CLI
 // adapter (Phase 5b) implements the same port with the same emission shape.
+//
+// v0.0.2: when a launch carries role="generator", the run is the gen half of a
+// gen→gate→eval step — it emits a typed BriefOut (ResultEmitted + completeness)
+// and leaves the gate + evaluator launch to the app EngineService. launchEval
+// then emits the evaluator's verdict (addressed) and, per scenario, a descope
+// QuestionRaised for a gap. Role-less launches keep the v0.0.1 ask→result flow.
 import type {
   OrchestratorPort,
   RunLaunch,
+  EvalLaunch,
   ResumeRun,
   RetryLaunch,
   DomainEventSink,
@@ -14,9 +21,17 @@ import type {
 } from "../../app/ports/orchestrator";
 import type { DomainEvent } from "../../domain/events/events";
 import type { RunId } from "../../domain/shared/ids";
+import type { Requirement } from "../../domain/review/brief";
 import { buildRunContext, type LaunchLike } from "./shared";
 
-export type ScriptedScenario = "happy" | "stall-first";
+export type ScriptedScenario =
+  | "happy"
+  | "stall-first"
+  // gen→gate→eval scenarios (v0.0.2): the generator emits a BriefOut; launchEval
+  // emits the evaluator verdict. "complete" addresses every requirement (→ allow
+  // done); "descope" leaves one gap WITH a descope request (→ await-descope).
+  | "gen-eval-complete"
+  | "gen-eval-descope";
 
 type RunPhase = "asked" | "reviewed" | "stalled" | "done";
 
@@ -24,6 +39,17 @@ export interface ScriptedOptions {
   readonly sink: DomainEventSink;
   readonly scenario?: ScriptedScenario;
 }
+
+// Fixed requirement set the scripted gen→gate→eval scenarios reason over.
+const SCRIPTED_REQUIREMENTS: readonly Requirement[] = [
+  { key: "r1", text: "要件1: 一覧が表示される" },
+  { key: "r2", text: "要件2: 空状態が表示される" },
+];
+
+const SCRIPTED_BLOCKS = [
+  { type: "summary" as const, title: "Step output", body: "Deterministic scripted result." },
+  { type: "screenshot" as const, src: "screenshots/x.png", caption: "verify-ui screenshot" },
+];
 
 export class ScriptedOrchestrator implements OrchestratorPort {
   private readonly sink: DomainEventSink;
@@ -48,8 +74,53 @@ export class ScriptedOrchestrator implements OrchestratorPort {
       this.states.set(cmd.runId, "stalled");
       return;
     }
+    // gen→gate→eval: a generator run emits its BriefOut (blocks + completeness with
+    // an empty `addressed` — the evaluator fills that). It does NOT advance itself
+    // to done; the EngineService runs the deterministic gate, then advances the
+    // generator and launches the evaluator.
+    if (cmd.role === "generator") {
+      await this.emit(ctx, {
+        type: "ResultEmitted",
+        runId: cmd.runId,
+        blocks: SCRIPTED_BLOCKS,
+        completeness: { requirements: SCRIPTED_REQUIREMENTS, addressed: [] },
+      });
+      this.states.set(cmd.runId, "reviewed");
+      return;
+    }
     await this.emit(ctx, this.askEvent(cmd.runId));
     this.states.set(cmd.runId, "asked");
+  }
+
+  async launchEval(cmd: EvalLaunch): Promise<void> {
+    const ctx = this.ctxFor(cmd, cmd.runId);
+    // "descope" scenario: the evaluator judged r1 addressed but r2 NOT, and raises
+    // a reasoned descope request for r2 (the app await-descope path). "complete"
+    // (and any other scenario) addresses every requirement → app allow-done.
+    const isDescope = this.scenario === "gen-eval-descope";
+    if (isDescope) {
+      await this.emit(ctx, {
+        type: "QuestionRaised",
+        runId: cmd.runId,
+        kind: "descope",
+        payload: {
+          kind: "descope",
+          requirement: "要件2: 空状態が表示される",
+          requirementKey: "r2",
+          aiReason: "今サイクルでは一覧表示を優先。空状態は次サイクルで対応推奨。",
+        },
+      });
+    }
+    await this.emit(ctx, {
+      type: "ResultEmitted",
+      runId: cmd.runId,
+      blocks: SCRIPTED_BLOCKS,
+      completeness: {
+        requirements: SCRIPTED_REQUIREMENTS,
+        addressed: isDescope ? ["r1"] : ["r1", "r2"],
+      },
+    });
+    this.states.set(cmd.runId, "reviewed");
   }
 
   async resume(cmd: ResumeRun): Promise<void> {

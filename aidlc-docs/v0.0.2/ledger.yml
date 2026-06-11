@@ -1,0 +1,78 @@
+# 引き継ぎ台帳 — v0.0.2(スキーマ: kit/rules/ledger.md)
+# S1〜S8 で確定した D-NN と次サイクルへ渡す項目を state 付きで台帳化する。
+# 次サイクル(v0.0.x)S1 は into: が当該サイクルを指す carried を全消し込みするまで確定不可。
+
+# ── S8 で確定し、このサイクル内で消化済(done)──
+- id: S8-Q01
+  origin: v0.0.2/s8-integration.md
+  decision: "S7 ドメインに ResultEmitted.completeness?: CompletenessBlock を加法 optional 追加(evaluator の addressed を app へ搬送 / 後方互換)"
+  state: done
+  closed_in: "src/domain/events/events.ts / s7-domain-code.md S8手戻り追補 / 回帰229"
+
+- id: S8-D01
+  origin: v0.0.2/s8-integration.md
+  decision: "Deterministic gate = app 層純粋関数 runDeterministicGate + Fs ポート注入(AI 非依存・存在検査)"
+  state: done
+  closed_in: "src/app/services/deterministic-gate.ts / deterministic-gate.test.ts(5 pass)"
+
+- id: S8-D02
+  origin: v0.0.2/s8-integration.md
+  decision: "descope/defer 承認 dispatch = proposeTask→acceptProposal を同一ターンで通し backlog Task 化(human verdict が INV-5 ゲート)"
+  state: done
+  closed_in: "src/app/services/inbox-service.ts descopeToBacklog / descope-backlog.test.ts(4 pass)"
+
+- id: S8-D03
+  origin: v0.0.2/s8-integration.md
+  decision: "gen→gate→eval の進行は新 app サービス EngineService が DomainEventSink を包んで run.role で駆動(進行状態をドメイン/RunState に持たせない)"
+  state: done
+  closed_in: "src/app/services/engine-service.ts / gen-gate-eval.test.ts(4 pass)"
+
+- id: S8-D04
+  origin: v0.0.2/s8-integration.md
+  decision: "completeness gate = evaluateCompleteness→decideDisposition の 3 分岐を app 実行。descope 申請は evaluator が既存 QuestionRaised{descope} で emit"
+  state: done
+  closed_in: "src/app/services/engine-service.ts onEvaluatorResult"
+
+- id: S8-D05
+  origin: v0.0.2/s8-integration.md
+  decision: "descope/defer 承認で step が deadlock しないよう、当該 run の open descope が 0 になったら resumeRun→done→approvePhase→completeCycle で step を解決(architect 敵対レビューの REAL-BUG fix)"
+  state: done
+  closed_in: "src/app/services/inbox-service.ts resolveDescopedRun / gen-gate-eval.test.ts(descope→done 検証)"
+
+- id: S8-launchEval
+  origin: v0.0.2/s8-integration.md
+  decision: "OrchestratorPort に launchEval + EvalLaunch を追加、RunLaunch.role を加法追加。scripted/live/Recording/Failing 全実装"
+  state: done
+  closed_in: "src/app/ports/orchestrator.ts / src/infra/orchestrator/{scripted,live}.ts / tests/support/recording-orchestrator.ts"
+
+# ── 当初 carried → このサイクルで消化(done)。ユーザー指示「持ち越すとステップ崩れる」で本来スコープを完成 ──
+- id: S8-K-rich
+  origin: v0.0.2/s8-integration.md
+  decision: "リッチ描画(scope K / US-07): completeness table(CompletenessTable)/ test・coverage・diff・risk(impact)・video枠 の全 ReviewBlock 描画 + descope card。原則③(コード不要で承認)を充足。video の録画実体のみ v0.0.3(scope.md 明示除外)。"
+  state: done
+  closed_in: "web ReviewBlocks.tsx / ReviewDetail.tsx + review.css / domain Review.completeness? 加法 + event-applier 配線 / web build GREEN"
+
+- id: S8-I-stepui
+  origin: v0.0.2/s8-integration.md
+  decision: "Step 定義カスタム UI(scope I / US-06): PATCH /api/projects/:id/steps/:stepId/contracts + ProjectService.updateStepContracts + web StepConfigPage(出力/検証/人間ゲート/エスカレーション編集)。次回起動に反映(US-06 AC)。"
+  state: done
+  closed_in: "routes/projects.ts(parseStepContracts boundary 検証)/ project-service.ts updateStepContracts / web StepConfigPage.tsx / tests/integration/step-contracts.test.ts(4 pass)"
+
+- id: S8-descope-key
+  origin: v0.0.2/s8-integration.md
+  decision: "descope QuestionRaised payload に requirement の安定 key(requirementKey)を加法追加し、engine.descopeRequestsFor を key-first(text fallback)照合に変更。live evaluator の文言ブレ誤分類リスクを解消。"
+  state: done
+  closed_in: "domain question.ts requirementKey? 加法 / engine-service.ts descopeRequestsFor / scripted.ts / gen-gate-eval.test.ts(4 pass)"
+
+# ── 次サイクル(v0.0.x / scope.md 明示除外)へ持ち越し(carried)──
+- id: S8-live-completeness
+  origin: v0.0.2/s8-integration.md
+  decision: "live evaluator が completeness(addressed)を emit する(stream-json パース)。現状 scripted のみが completeness を出し、live は completeness なし→visual_review fallback。"
+  state: carried
+  into: v0.0.x
+
+- id: S8-Q02
+  origin: v0.0.2/s8-integration.md
+  decision: "auto-rework(理由なし gap)の完全 silent 自動再生成。v0.0.2 は loud(eval run stalled+理由)で代替。Unit-05 の silent UX 最適化が残(新ドメイン再生成コマンド要)。"
+  state: carried
+  into: v0.0.x

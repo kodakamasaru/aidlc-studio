@@ -6,6 +6,7 @@ import { CycleListPage } from "./features/cycles/CycleListPage";
 import { CycleDetailPage } from "./features/cycle-detail/CycleDetailPage";
 import { InboxPage } from "./features/inbox/InboxPage";
 import { QuestionPage } from "./features/inbox/QuestionPage";
+import { StepConfigPage } from "./features/settings/StepConfigPage";
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
         <Route index element={<CycleListPage />} />
         <Route path="cycles/:cycleId" element={<CycleDetailPage />} />
         <Route path="inbox" element={<InboxPage />} />
+        <Route path="settings/steps" element={<StepConfigPage />} />
         <Route path="cycles/:cycleId/q/:questionId" element={<QuestionPage />} />
         <Route path="questions/:questionId" element={<QuestionPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

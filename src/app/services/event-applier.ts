@@ -46,6 +46,21 @@ export class EventApplier {
     }
   }
 
+  /**
+   * True when the run that emitted this event carries a role (generator/
+   * evaluator) — i.e. it is part of a gen→gate→eval step the EngineService drives.
+   * Role-less runs return false so the legacy auto visual_review still fires.
+   */
+  private isRoleBearingRun(ctx: RunContext): boolean {
+    const cycle = this.ports.repos.cycles.findById(ctx.cycleId);
+    if (!cycle) return false;
+    for (const phase of cycle.phases) {
+      const run = phase.runs.find((r) => r.id === ctx.runId);
+      if (run) return run.role !== undefined;
+    }
+    return false;
+  }
+
   private persist(
     ctx: RunContext,
     event: DomainEvent,
@@ -97,8 +112,19 @@ export class EventApplier {
           ...(event.taskId !== undefined ? { taskId: event.taskId } : {}),
           blocks: event.blocks,
           producedAt: clock.now(),
+          // Carry the evaluator's completeness verdict so the visual_review can
+          // render a completeness table (scope K). Absent for generator/role-less.
+          ...(event.completeness !== undefined
+            ? { completeness: event.completeness }
+            : {}),
         });
         repos.reviews.save(review);
+        // S8 gen→gate→eval: role-bearing runs (generator/evaluator) are driven by
+        // the EngineService, which decides whether/when to raise a visual_review
+        // (only on the evaluator's allow-done). So the applier raises the legacy
+        // auto visual_review ONLY for role-less runs (v0.0.1 single-run flow) —
+        // keeping that path byte-for-byte unchanged (backward compatible).
+        if (this.isRoleBearingRun(ctx)) return;
         // US-13: a step's output is presented to the human as a visual-review
         // card. Guard against duplicates: a redelivered/retried ResultEmitted for
         // the same (runId, taskId) must not stack a second open review card. The

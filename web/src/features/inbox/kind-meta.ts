@@ -21,6 +21,7 @@ const META: Record<QuestionKind, KindMeta> = {
   decision: { variant: "q", icon: "✓", label: "決定待ち", action: "回答する" },
   backtrack: { variant: "review", icon: "↩", label: "手戻り確認", action: "レビュー" },
   stall_retry: { variant: "q", icon: "↻", label: "stall retry", action: "確認する" },
+  descope: { variant: "q", icon: "⊘", label: "見送り判断", action: "判断する" },
 };
 
 export function kindMeta(kind: QuestionKind): KindMeta {

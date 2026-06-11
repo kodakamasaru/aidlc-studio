@@ -8,13 +8,16 @@ import type { Ports } from "../ports/composition";
 import { fail } from "./errors";
 import {
   openProject,
+  customizePipeline,
+  readPipeline,
   type Project,
   type StepDef,
   type EnvConfig,
   type VisionRef,
   type SkillRef,
 } from "../../domain/project/project";
-import { DEFAULT_STEPS } from "../../domain/shared/vocab";
+import type { StepContracts } from "../../domain/project/step-contracts";
+import { DEFAULT_STEPS, Step, sameStep } from "../../domain/shared/vocab";
 import { ProjectId } from "../../domain/shared/ids";
 import { isErr } from "../../domain/shared/result";
 
@@ -86,5 +89,33 @@ export class ProjectService {
 
   listProjects(): readonly Project[] {
     return this.ports.repos.projects.list();
+  }
+
+  /**
+   * US-06 (scope I): edit one step's contracts from the UI. Replaces that
+   * StepDef's `contracts` in the project's pipelineDef (re-validating via
+   * customizePipeline) and persists. The change applies to the NEXT cycle/phase
+   * launched (existing cycles snapshot their phases at creation, so running
+   * cycles are unaffected). Returns the updated Project.
+   */
+  updateStepContracts(
+    projectIdRaw: string,
+    stepIdRaw: string,
+    contracts: StepContracts,
+  ): Project {
+    const project = this.getProject(projectIdRaw);
+    const stepId = Step(stepIdRaw);
+    const current = readPipeline(project);
+    if (!current.some((sd) => sameStep(sd.id, stepId))) {
+      throw fail(404, "StepNotInPipeline");
+    }
+    const updated: StepDef[] = current.map((sd) =>
+      sameStep(sd.id, stepId) ? { ...sd, contracts } : sd,
+    );
+    const result = customizePipeline(project, updated);
+    if (isErr(result)) throw fail(400, result.error);
+    const next = result.value;
+    this.ports.uow.run(() => this.ports.repos.projects.save(next));
+    return next;
   }
 }

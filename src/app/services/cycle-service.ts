@@ -17,7 +17,9 @@ import {
   type CycleError,
 } from "../../domain/cycle/cycle";
 import { assignToCycle } from "../../domain/task/task";
-import type { Project } from "../../domain/project/project";
+import { readPipeline, type Project } from "../../domain/project/project";
+import { resolveContracts } from "../../domain/project/step-contracts";
+import type { RunRole } from "../../domain/cycle/cycle";
 import { Step, sameStep } from "../../domain/shared/vocab";
 import { ProjectId, CycleId, TaskId, RunId } from "../../domain/shared/ids";
 import { isErr } from "../../domain/shared/result";
@@ -174,11 +176,17 @@ export class CycleService {
     const project = this.loadProject(cycle.projectId);
     const step = Step(stepRaw);
     const runId = this.ports.ids.runId();
+    // gen→gate→eval opt-in (S5 Unit-03 / S8): a step that declares a verification
+    // contract runs as a "generator" whose BriefOut is gated then verified by an
+    // evaluator. Steps without a verification contract stay role-less (the v0.0.1
+    // single-run flow), so existing pipelines are unaffected.
+    const role = this.generatorRoleFor(project, step);
 
     const started = domainStartPhase(cycle, {
       step,
       runId,
       startedAt: this.ports.clock.now(),
+      ...(role !== undefined ? { role } : {}),
     });
     if (isErr(started)) throw cycleErrorStatus(started.error);
 
@@ -189,7 +197,15 @@ export class CycleService {
       step,
       runId,
       "AI 実行の起動に失敗しました",
+      role,
     );
+  }
+
+  /** "generator" when the step declares a VerificationContract; else undefined. */
+  private generatorRoleFor(project: Project, step: Step): RunRole | undefined {
+    const stepDef = readPipeline(project).find((sd) => sameStep(sd.id, step));
+    const contracts = stepDef ? resolveContracts(stepDef) : undefined;
+    return contracts?.verification ? "generator" : undefined;
   }
 
   /**
@@ -233,6 +249,7 @@ export class CycleService {
     step: Step,
     runId: RunId,
     failMsg: string,
+    role?: RunRole,
   ): Promise<Cycle> {
     this.ports.uow.run(() => this.ports.repos.cycles.save(next));
 
@@ -247,6 +264,7 @@ export class CycleService {
         phaseId: phase.id,
         step,
         repoPath: project.repoPath,
+        ...(role !== undefined ? { role } : {}),
       });
     } catch (err) {
       compensateRun(

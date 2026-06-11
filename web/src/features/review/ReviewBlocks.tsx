@@ -4,7 +4,7 @@
 // placeholder (forward-compat contract). Mermaid is shown as a labelled source
 // panel (deterministic — no async diagram renderer).
 import { useEffect, useState } from "react";
-import type { ReviewBlock } from "../../lib/api";
+import type { ReviewBlock, CompletenessBlock } from "../../lib/api";
 
 // Screenshot src is model-produced. Only allow safe, renderable schemes:
 // https/http URLs, root-relative paths, blob: object URLs, and data:image/*.
@@ -16,7 +16,11 @@ const KIND_LABEL: Record<string, string> = {
   "ac-map": "AC-MAP · US → UNIT 対応",
   mermaid: "Mermaid · UNIT 依存",
   screenshot: "Screenshot",
-  risk: "Risk",
+  risk: "Risk · 影響",
+  test: "Test",
+  coverage: "Coverage",
+  diff: "Diff · 変更差分",
+  video: "Video · 操作録画",
 };
 
 interface ReviewBlocksProps {
@@ -104,6 +108,84 @@ function BlockBody({ block }: { block: ReviewBlock }) {
       );
     }
 
+    case "test": {
+      const passed = readNumber(block, "passed");
+      const total = readNumber(block, "total");
+      const ok = total > 0 && passed >= total;
+      return (
+        <p className="test-row">
+          <span className={`test-badge test-badge--${ok ? "pass" : "fail"}`}>
+            {passed}/{total} pass
+          </span>
+          {readString(block, "detail") ? (
+            <span className="test-row__detail">{readString(block, "detail")}</span>
+          ) : null}
+        </p>
+      );
+    }
+
+    case "coverage": {
+      const pct = readNumber(block, "pct");
+      const byFile = readArray(block, "byFile");
+      return (
+        <div className="coverage-block">
+          <div className="coverage-bar" aria-hidden="true">
+            <span
+              className="coverage-bar__fill"
+              style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+            />
+          </div>
+          <p className="coverage-block__pct">{pct}% カバレッジ</p>
+          {byFile.length > 0 ? (
+            <ul className="coverage-block__files">
+              {byFile.map((f, i) => (
+                <li key={i} className="coverage-block__file">
+                  <span className="mono">{readField(f, "path")}</span>
+                  <span>{readField(f, "pct")}%</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      );
+    }
+
+    case "diff": {
+      const files = readArray(block, "files");
+      return (
+        <div className="diff-block">
+          <p className="diff-block__summary">{readString(block, "summary")}</p>
+          <ul className="diff-block__files">
+            {files.map((f, i) => (
+              <li key={i} className="diff-block__file">
+                <span className="mono diff-block__path">{readField(f, "path")}</span>
+                <span className="diff-block__stat diff-block__stat--add">
+                  +{readField(f, "add")}
+                </span>
+                <span className="diff-block__stat diff-block__stat--del">
+                  −{readField(f, "del")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    case "video":
+      // scope.md: video block は v0.0.2 では「型と描画枠のみ」(録画実体は v0.0.3)。
+      return (
+        <div className="video-block">
+          <div className="video-block__frame" role="img" aria-label="操作録画(プレースホルダ)">
+            <span className="video-block__icon" aria-hidden="true">►</span>
+            <span>操作録画(v0.0.3 で録画実体を表示)</span>
+          </div>
+          {readString(block, "src") ? (
+            <p className="field-hint mono">{readString(block, "src")}</p>
+          ) : null}
+        </div>
+      );
+
     default:
       // Forward-compat: skip safely with a labelled placeholder + note.
       return (
@@ -113,6 +195,43 @@ function BlockBody({ block }: { block: ReviewBlock }) {
         </p>
       );
   }
+}
+
+/**
+ * CompletenessTable (scope K / 原則#3) — requirements ↔ addressed を ✓/未対応 の表で
+ * 描画。人間がコードを読まず「要件が満たされたか」を一目で承認判断できる中核ビュー。
+ */
+export function CompletenessTable({ completeness }: { completeness: CompletenessBlock }) {
+  const addressed = new Set(completeness.addressed);
+  const total = completeness.requirements.length;
+  const done = completeness.requirements.filter((r) => addressed.has(r.key)).length;
+  return (
+    <section className="completeness surface-card" aria-label="完全性チェック">
+      <header className="completeness__head">
+        <h2 className="completeness__title">完全性チェック</h2>
+        <span className="completeness__count">
+          {done}/{total} 要件 対応
+        </span>
+      </header>
+      <ul className="completeness__list">
+        {completeness.requirements.map((r) => {
+          const ok = addressed.has(r.key);
+          return (
+            <li key={r.key} className="completeness__row">
+              <span
+                className={`completeness__mark completeness__mark--${ok ? "ok" : "gap"}`}
+                aria-hidden="true"
+              >
+                {ok ? "✓" : "✕"}
+              </span>
+              <span className="completeness__text">{r.text}</span>
+              <span className="sr-only">{ok ? "対応済み" : "未対応"}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 // Screenshot block: renders the captured image, degrading to a labelled
@@ -165,4 +284,8 @@ function readField(obj: unknown, key: string): string {
 function readArray(obj: object, key: string): unknown[] {
   const v = (obj as Record<string, unknown>)[key];
   return Array.isArray(v) ? v : [];
+}
+function readNumber(obj: object, key: string): number {
+  const v = (obj as Record<string, unknown>)[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }

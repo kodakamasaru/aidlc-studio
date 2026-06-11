@@ -38,11 +38,27 @@ export interface Cycle {
   readonly phases: readonly Phase[];
 }
 
+export type HumanGateMode = "visual_review" | "device_check" | "none";
+export type EscalationKind = "retry" | "backtrack" | "human";
+
+/** Mirror of the domain StepContracts VO (all sub-contracts optional). */
+export interface StepContracts {
+  readonly output?: { readonly profileKind?: string; readonly artifactGlob?: string };
+  readonly verification?: { readonly observations: readonly string[] };
+  readonly humanGate?: { readonly mode: HumanGateMode; readonly note?: string };
+  readonly escalation?: {
+    readonly onStall: EscalationKind;
+    readonly backtrackTo?: string;
+    readonly maxRetry?: number;
+  };
+}
+
 export interface StepDef {
   readonly id: string;
   readonly label: string;
   readonly order: number;
   readonly skillRef: string;
+  readonly contracts?: StepContracts;
 }
 
 export interface Project {
@@ -84,6 +100,12 @@ export type ReviewBlock =
   // Forward-compat: unknown block types must degrade gracefully.
   | { readonly type: string; readonly [key: string]: unknown };
 
+/** Completeness verdict carried on an evaluator Review (requirements ↔ addressed). */
+export interface CompletenessBlock {
+  readonly requirements: readonly { readonly key: string; readonly text: string }[];
+  readonly addressed: readonly string[];
+}
+
 export interface Review {
   readonly runId: string;
   readonly cycleId: string;
@@ -91,6 +113,8 @@ export interface Review {
   readonly taskId: string | null;
   readonly blocks: readonly ReviewBlock[];
   readonly producedAt: string;
+  /** evaluator 成果のとき completeness table を描画する元データ(scope K)。 */
+  readonly completeness?: CompletenessBlock;
 }
 
 export type QuestionKind =
@@ -99,7 +123,8 @@ export type QuestionKind =
   | "device_check"
   | "decision"
   | "backtrack"
-  | "stall_retry";
+  | "stall_retry"
+  | "descope";
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
@@ -109,7 +134,14 @@ export type QuestionPayload =
   | { readonly kind: "device_check"; readonly instructions: string }
   | { readonly kind: "decision"; readonly statement: string }
   | { readonly kind: "backtrack"; readonly toStep: string; readonly proposal: string }
-  | { readonly kind: "stall_retry"; readonly runId: string; readonly stalledAt: string };
+  | { readonly kind: "stall_retry"; readonly runId: string; readonly stalledAt: string }
+  | {
+      readonly kind: "descope";
+      readonly requirement: string;
+      readonly aiReason: string;
+      readonly recommendedStep?: string;
+      readonly requirementKey?: string;
+    };
 
 export interface Question {
   readonly id: string;
@@ -133,7 +165,16 @@ export interface AnswerResult {
   readonly fact: Fact;
 }
 
-export type Verdict = "answer" | "approve" | "reject" | "confirm";
+export type Verdict =
+  | "answer"
+  | "approve"
+  | "reject"
+  | "confirm"
+  // descope 4-choice (S6 descope-policy): つくる / 見送る / 後回し / 前のステップからやり直す.
+  | "rework"
+  | "descope"
+  | "defer"
+  | "rewind";
 
 export interface AnswerBody {
   readonly verdict: Verdict;
@@ -245,4 +286,16 @@ export const api = {
     request(`/questions/${encodeURIComponent(questionId)}`),
   answerQuestion: (questionId: string, body: AnswerBody): Promise<AnswerResult> =>
     request(`/questions/${encodeURIComponent(questionId)}/answer`, jsonBody(body)),
+
+  // US-06 (scope I): edit a step's contracts. PATCH so it reads as an in-place
+  // update of one step within the project's pipeline.
+  updateStepContracts: (
+    projectId: string,
+    stepId: string,
+    contracts: StepContracts,
+  ): Promise<Project> =>
+    request(
+      `/projects/${encodeURIComponent(projectId)}/steps/${encodeURIComponent(stepId)}/contracts`,
+      { method: "PATCH", body: JSON.stringify(contracts) },
+    ),
 };

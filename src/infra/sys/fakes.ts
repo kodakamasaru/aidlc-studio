@@ -2,7 +2,7 @@
 // deterministically in later phases, so these must be reproducible: FixedClock
 // returns a fixed instant (or steps through a supplied sequence), SeqIdGen
 // emits `${kind}-1`, `${kind}-2`, … per id kind.
-import type { Clock, IdGen } from "../../app/ports/sys";
+import type { Clock, IdGen, Fs } from "../../app/ports/sys";
 import type { Instant } from "../../domain/shared/primitives";
 import { instant } from "../../domain/shared/primitives";
 import type {
@@ -57,6 +57,21 @@ export class FixedClock implements Clock {
     // Guarded above: index is clamped into range and the array is non-empty.
     if (value === undefined) throw new Error("FixedClock sequence empty");
     return value;
+  }
+}
+
+/**
+ * FakeFs — deterministic Fs port for tests. Default `exists` returns true (every
+ * artifact path is treated as present, so the Deterministic gate only exercises
+ * its block check); pass a `present` set to pin which paths exist.
+ */
+export class FakeFs implements Fs {
+  private readonly present: ReadonlySet<string> | undefined;
+  constructor(present?: readonly string[]) {
+    this.present = present ? new Set(present) : undefined;
+  }
+  exists(path: string): boolean {
+    return this.present === undefined ? true : this.present.has(path);
   }
 }
 

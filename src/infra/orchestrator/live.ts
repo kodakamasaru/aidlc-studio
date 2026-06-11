@@ -14,6 +14,7 @@
 import type {
   OrchestratorPort,
   RunLaunch,
+  EvalLaunch,
   ResumeRun,
   RetryLaunch,
   DomainEventSink,
@@ -95,6 +96,25 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       this.buildPrompt(cmd),
       cmd.repoPath,
     );
+  }
+
+  /**
+   * Launch the evaluator half of a gen→gate→eval step (S5 Unit-03 §3). v0.0.2
+   * scope: spawn a bounded `claude -p` that verifies the step against its
+   * observations and emits a single ResultEmitted summary — same non-blocking
+   * spawn+detach model as launch(). The live evaluator does NOT yet emit a typed
+   * completeness verdict (real-AI `addressed` parsing is a v0.0.x enhancement); the
+   * deterministic completeness loop is proven by the ScriptedOrchestrator. The app
+   * EngineService falls back to a visual_review when an evaluator emits no
+   * completeness, so the live path still surfaces a reviewable card.
+   */
+  async launchEval(cmd: EvalLaunch): Promise<void> {
+    const obs = (cmd.verification ?? []).map((o) => `- ${o as string}`).join("\n");
+    const prompt =
+      `You are the EVALUATOR for AI-DLC step ${cmd.step as string}. Verify the ` +
+      `generator's output${obs.length > 0 ? ` against:\n${obs}` : ""}\nIn ONE ` +
+      `sentence, state whether the step's requirements are met. Reply with only that sentence.`;
+    this.startAttempt(buildRunContext(cmd, cmd.runId), prompt, cmd.repoPath);
   }
 
   async retry(cmd: RetryLaunch): Promise<void> {

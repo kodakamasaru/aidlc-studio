@@ -9,14 +9,14 @@ import { Database } from "bun:sqlite";
 import type { Hono } from "hono";
 import { openDb } from "../../src/infra/db/open";
 import { buildStore } from "../../src/infra/db/store";
-import { FixedClock, SeqIdGen } from "../../src/infra/sys/fakes";
+import { FixedClock, SeqIdGen, FakeFs } from "../../src/infra/sys/fakes";
 import { createApp } from "../../src/infra/http/app";
 import type { Ports } from "../../src/app/ports/composition";
 import type {
   DomainEventSink,
   OrchestratorPort,
 } from "../../src/app/ports/orchestrator";
-import { EventApplier } from "../../src/app/services/event-applier";
+import { EngineService } from "../../src/app/services/engine-service";
 import {
   ScriptedOrchestrator,
   type ScriptedScenario,
@@ -48,6 +48,7 @@ export function buildTestApp(): TestApp {
   const ports: Ports = {
     clock: new FixedClock(),
     ids: new SeqIdGen(),
+    fs: new FakeFs(),
     uow: store.uow,
     repos: store.repos,
     orchestrator,
@@ -73,6 +74,7 @@ export function buildFailingApp(
   const ports: Ports = {
     clock: new FixedClock(),
     ids: new SeqIdGen(),
+    fs: new FakeFs(),
     uow: store.uow,
     repos: store.repos,
     orchestrator,
@@ -115,24 +117,24 @@ export function buildLoopTestApp(
   const clock = new FixedClock(LOOP_INSTANTS);
   const ids = new SeqIdGen();
 
-  const applier = new EventApplier({
-    clock,
-    ids,
-    uow: store.uow,
-    repos: store.repos,
-    notify: noopNotify,
-  });
-  const sink: DomainEventSink = (e) => applier.apply(e);
+  // The EngineService wraps the EventApplier as the sink and drives gen→gate→eval.
+  // Mutual dependency (engine→orchestrator for launchEval, orchestrator→sink→engine
+  // for emissions) is broken with a late-bound sink closure: the orchestrator is
+  // built first over `(e) => engine.handle(e)`, then `engine` is assigned.
+  let engine: EngineService;
+  const sink: DomainEventSink = (e) => engine.handle(e);
   const orchestrator = new ScriptedOrchestrator({ sink, scenario });
 
   const ports: Ports = {
     clock,
     ids,
+    fs: new FakeFs(),
     uow: store.uow,
     repos: store.repos,
     orchestrator,
     notify: noopNotify,
   };
+  engine = new EngineService(ports);
   const app = createApp(ports);
   return { app, ports, db, orchestrator };
 }
