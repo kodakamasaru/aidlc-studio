@@ -4,9 +4,11 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/shell/AppShell";
 import { CycleListPage } from "./features/cycles/CycleListPage";
 import { CycleDetailPage } from "./features/cycle-detail/CycleDetailPage";
+import { CycleStepsPage } from "./features/cycle-detail/CycleStepsPage";
 import { InboxPage } from "./features/inbox/InboxPage";
 import { QuestionPage } from "./features/inbox/QuestionPage";
 import { StepConfigPage } from "./features/settings/StepConfigPage";
+import { StepSpecPage } from "./features/settings/StepSpecPage";
 
 export function App() {
   return (
@@ -14,8 +16,10 @@ export function App() {
       <Route element={<AppShell />}>
         <Route index element={<CycleListPage />} />
         <Route path="cycles/:cycleId" element={<CycleDetailPage />} />
+        <Route path="cycles/:cycleId/steps" element={<CycleStepsPage />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="settings/steps" element={<StepConfigPage />} />
+        <Route path="settings/steps/:stepId" element={<StepSpecPage />} />
         <Route path="cycles/:cycleId/q/:questionId" element={<QuestionPage />} />
         <Route path="questions/:questionId" element={<QuestionPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

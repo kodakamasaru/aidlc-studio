@@ -151,3 +151,22 @@ v0.0.1 単一 Run フロー(role 無し)は **無改変で維持**: `event-appli
 
 ## 前サイクルからの引き継ぎ (手戻り時のみ追記)
 - (なし。本サイクル内で S7 から順送り)
+
+## S10 からの差し戻し (2026-06-11 / 手戻り)
+S10 でユーザーが **却下 → S8 差し戻し**(詳細: [s10-acceptance.md](./s10-acceptance.md))。mock 突合を S3 全 15 状態起点で実スクショ目視し直したところ、視覚契約への一致が **2/15** の系統的乖離。S8 で UI を S3 視覚契約に合わせて作り直す。**何が漏れていたか / 暫定方針**:
+
+- **共通 chrome の英語・内部語**(全画面): AppShell ナビ `Inbox/Artifacts/Wiki/WORKSPACE` → 受信箱/成果物/用語・決定メモ/メニュー。見出し `Cycles`/`Human Inbox` → サイクル一覧/受信箱。内部語 `Run/resume/worktree/Phase/Cycle/S1/attempt/Q` を平易な状態語へ。→ 単一の語彙 localization 層で一括(`step-label.ts` 同様の方針)。
+- **カード情報不足**: サイクル一覧の行に status 語・進捗「○○を進行中 N/M」・「ステップ構成を見る」リンクを追加。受信箱カードにサイクル/ステップ文脈 + 件数 + 平易な種別ラベル(質問/できあがりの確認/見送りの相談)を追加。
+- **未実装(実装 or 明示 carried を人間判断)**: `scr-01.cycle-steps`(read-only 構成ビュー)/ `scr-01.full-spec`(AI 指示全文)/ `scr-05.confirm`(「見送る」不可逆 confirm ダイアログ)/ `scr-01.settings` 対話式編集(`S9-US06-dialog`)/ **`scr-05.question` 選択肢付き質問**(Question payload に options 追加が必要 = ドメイン S7 変更。US-08 AC overclaim の是正)。
+- **維持する前進**: G-1〜G-4 修正(開発者文字列除去 / ステップ名平易化 / ブロックラベル平易化 / 戻り先 select)は契約方向の前進なので戻さない。
+- **再開後の経路**: S8 → mock 突合(全 S3 状態起点・完全性ゲート)→ S9 → S10。
+- **暫定の未検証**: `scr-02.working/verifying/sendback/descope-requested` は実キャプチャ未取得。S8/S9 で `gen-eval-gap`/`gen-eval-descope`/`serve:live` で撮って突合する。
+
+### S8 rework 完了 (2026-06-11)
+S10 差し戻しの是正を実施・検証(**tsc clean(web+server)/ 回帰 235 pass / E2E 6 pass**):
+- **全画面 localization**: AppShell ナビ(受信箱/成果物/用語・決定メモ/メニュー)/ 見出し(サイクル一覧/受信箱)/ 内部語(Run・resume・worktree・Phase・Cycle・attempt・Q・stalled・retry → 平易語)。`web/src/lib/step-label.ts` で全ステップを平易名に。`STATE_LABEL` 日本語化。
+- **新規画面**: `CycleStepsPage`(scr-01.cycle-steps)/ `StepSpecPage`(scr-01.full-spec = ステップ契約の全文)+ ルート + 導線。
+- **見送り confirm**: DescopeView に不可逆確認ダイアログ(scr-05.confirm)。
+- **選択肢付き質問(US-08 是正)**: domain `Question.options`(後方互換)+ scripted/api/AnswerView。`scr-05.default` 再撮影が mock(もの/やること/AIのおすすめ/その他)と一致。
+- **残 carried**: `S9-US06-dialog`(対話式編集 UX)/ `S10-skill-prose`(スキル本文 in-app 表示 = step↔skill マッピング要)。いずれも大型・別作業。
+- **次**: mock 突合の全 S3 状態 再走(cycle-steps/full-spec/working系の実キャプチャ含む)→ S9 → S10 再提示。

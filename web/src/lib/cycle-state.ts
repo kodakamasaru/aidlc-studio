@@ -90,12 +90,13 @@ export function currentStep(cycle: Cycle): string | undefined {
   return activePhase(cycle)?.step;
 }
 
+// 平易な状態語(S3 scr-02 用語方針: 内部語でなく「進行中 / 停止 …」)。
 export const STATE_LABEL: Record<DisplayState, string> = {
-  running: "running",
-  stalled: "stalled",
-  failed: "failed",
-  done: "done",
-  idle: "idle",
+  running: "進行中",
+  stalled: "停止",
+  failed: "失敗",
+  done: "完了",
+  idle: "未起動",
 };
 
 export const STATE_BADGE_CLASS: Record<DisplayState, string> = {

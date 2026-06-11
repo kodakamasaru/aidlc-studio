@@ -23,9 +23,21 @@ export type QuestionKind =
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
+/**
+ * 選択肢付き質問の 1 択(S3 scr-05: ラジオ + AI 推奨 + その他自由入力)。`options` 欠落 =
+ * 従来の自由入力のみ(後方互換)。回答は選んだ label もしくは自由入力テキストを Answer.body
+ * に載せる(回答モデルは不変)。
+ */
+export type QuestionOption = {
+  readonly id: string;
+  readonly label: Text;
+  readonly hint?: Text;
+  readonly recommended?: boolean;
+};
+
 /** kind 依存の中身(payload)。判別子は kind。 */
 export type QuestionPayload =
-  | { readonly kind: "question"; readonly prompt: Text }
+  | { readonly kind: "question"; readonly prompt: Text; readonly options?: readonly QuestionOption[] }
   | { readonly kind: "visual_review"; readonly review: Review }
   | { readonly kind: "device_check"; readonly instructions: Text }
   | { readonly kind: "decision"; readonly statement: Text }

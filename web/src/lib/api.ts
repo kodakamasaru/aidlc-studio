@@ -8,11 +8,14 @@ import { logError } from "./log";
 export type RunState = "running" | "stalled" | "done" | "failed";
 export type PhaseState = "pending" | "running" | "review" | "done";
 export type CycleState = "planned" | "active" | "paused" | "done";
+/** S6 run-role: generator = 成果物を作る / evaluator = 検証する。欠落 = 従来動作。 */
+export type RunRole = "generator" | "evaluator";
 
 export interface Run {
   readonly id: string;
   readonly attempt: number;
   readonly state: RunState;
+  readonly role?: RunRole;
   readonly startedAt: string;
   readonly endedAt?: string;
   /** Human-readable reason when the run reached failed/stalled. */
@@ -128,8 +131,19 @@ export type QuestionKind =
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
+export interface QuestionOption {
+  readonly id: string;
+  readonly label: string;
+  readonly hint?: string;
+  readonly recommended?: boolean;
+}
+
 export type QuestionPayload =
-  | { readonly kind: "question"; readonly prompt: string }
+  | {
+      readonly kind: "question";
+      readonly prompt: string;
+      readonly options?: readonly QuestionOption[];
+    }
   | { readonly kind: "visual_review"; readonly review: Review }
   | { readonly kind: "device_check"; readonly instructions: string }
   | { readonly kind: "decision"; readonly statement: string }
@@ -297,5 +311,22 @@ export const api = {
     request(
       `/projects/${encodeURIComponent(projectId)}/steps/${encodeURIComponent(stepId)}/contracts`,
       { method: "PATCH", body: JSON.stringify(contracts) },
+    ),
+
+  // full-spec: ステップの指示・全文(スキル本文)。対応スキルが無ければ content="".
+  getStepSkill: (
+    step: string,
+  ): Promise<{ readonly skill: string | null; readonly content: string }> =>
+    request(`/steps/${encodeURIComponent(step)}/skill`),
+
+  // US-06 対話式編集: 要望から契約の提案を取得(適用はしない / 承認時に updateStepContracts)。
+  proposeStepContracts: (
+    projectId: string,
+    stepId: string,
+    requestText: string,
+  ): Promise<{ readonly current: StepContracts; readonly proposed: StepContracts }> =>
+    request(
+      `/projects/${encodeURIComponent(projectId)}/steps/${encodeURIComponent(stepId)}/propose`,
+      { method: "POST", body: JSON.stringify({ request: requestText }) },
     ),
 };

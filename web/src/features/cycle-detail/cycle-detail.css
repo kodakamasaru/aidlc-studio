@@ -242,3 +242,143 @@ a.crumb:hover {
   vertical-align: text-bottom;
   animation: pulse-dot 1s steps(2, start) infinite;
 }
+
+/* cycle-steps（scr-01.cycle-steps）: 確認のみのステップ構成リスト。 */
+.cycle-steps-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cycle-steps-view__row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--color-border-muted, #2a2a33);
+}
+.cycle-steps-view__row:last-child {
+  border-bottom: none;
+}
+.cycle-steps-view__row--active {
+  font-weight: 600;
+}
+.cycle-steps-view__mark {
+  display: inline-flex;
+  justify-content: center;
+  color: var(--color-ok, #3ecf8e);
+}
+.cycle-steps-view__code {
+  font-size: 12px;
+  color: var(--color-text-muted, #9a9aa6);
+}
+.cycle-steps-view__state {
+  font-size: 13px;
+  color: var(--color-text-muted, #9a9aa6);
+  min-width: 4em;
+  text-align: right;
+}
+
+/* cycle-steps カード構成(scr-01.cycle-steps の正式レイアウト)。 */
+.cycle-steps-note {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #e7c06a;
+  background: color-mix(in oklab, #e7a93a 14%, transparent);
+  border: 1px solid color-mix(in oklab, #e7a93a 36%, transparent);
+}
+.cycle-steps-cards {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.step-card-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+}
+.step-card-row--active {
+  border-color: var(--color-accent, #6c6cf0);
+  box-shadow: 0 0 0 1px var(--color-accent, #6c6cf0) inset;
+}
+.step-card-row__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  color: var(--color-text-muted, #9a9aa6);
+  border: 1px solid var(--color-border-muted, #2a2a33);
+}
+.step-card-row__num--done {
+  color: #fff;
+  background: var(--color-ok, #3ecf8e);
+  border-color: transparent;
+}
+.step-card-row__num--active {
+  color: #fff;
+  background: var(--color-accent, #6c6cf0);
+  border-color: transparent;
+}
+.step-card-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.step-card-row__name {
+  font-weight: 600;
+}
+.step-card-row__desc {
+  font-size: 13px;
+  color: var(--color-text-muted, #9a9aa6);
+}
+.step-summary {
+  padding: 18px 20px;
+}
+.step-summary__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.step-summary__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.step-summary__list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 22px;
+  margin: 0;
+}
+.step-summary__list dt {
+  font-weight: 600;
+  color: var(--color-text-muted, #9a9aa6);
+}
+.step-summary__list dd {
+  margin: 0;
+}
+.step-summary__obs {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.step-summary__empty {
+  color: var(--color-text-muted, #9a9aa6);
+}

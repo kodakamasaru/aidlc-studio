@@ -13,6 +13,7 @@ import { CheckIcon, BacktrackIcon } from "../../components/ui/Icon";
 import { ReviewBlocks, CompletenessTable } from "./ReviewBlocks";
 import { BacktrackModal, type StepOption } from "./BacktrackModal";
 import { reviewCrumb } from "./review-crumb";
+import { stepLabel } from "../../lib/step-label";
 import "./review.css";
 
 interface ReviewDetailProps {
@@ -136,9 +137,11 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
         <StateBadge variant="review" noDot icon={<span aria-hidden="true">◎</span>}>
           レビュー待ち
         </StateBadge>
-        <h1 className="review-detail__title">{review.step} 成果の確定レビュー</h1>
+        <h1 className="review-detail__title">
+          「{stepLabel(review.step)}」のできあがり確認
+        </h1>
         <p className="review-detail__meta">
-          {review.step} · ReviewBlock[] を上から描画
+          コードを読まずに、できあがりを確認できます。問題なければ「承認」、直しが要るなら「差し戻し」。
         </p>
       </header>
 

@@ -1,7 +1,62 @@
 /* ── SCR-01 list ─────────────────────────────────────────── */
 .cycle-list {
-  overflow: hidden;
-  padding: var(--sp-1) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* リッチカード(scr-01.list 正式レイアウト)。 */
+.cycle-card {
+  padding: var(--sp-5) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.cycle-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+.cycle-card__title {
+  margin: 0;
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.cycle-card__version {
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-low);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+.cycle-card__progress {
+  margin: 0;
+  color: var(--color-text-mid);
+}
+.cycle-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-top: var(--sp-1);
+}
+.cycle-card__steps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  text-decoration: none;
+}
+.cycle-card__steps-link:hover {
+  color: var(--color-text-hi);
+  text-decoration: underline;
 }
 
 .cycle-row {

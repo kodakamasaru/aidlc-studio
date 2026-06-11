@@ -9,19 +9,20 @@ export interface KindMeta {
   readonly action: string;
 }
 
+// 平易な日本語の種別ラベル(S3 scr-03 用語: 質問 / できあがりの確認 / 見送りの相談)。
 const META: Record<QuestionKind, KindMeta> = {
-  question: { variant: "q", icon: "?", label: "Q 待ち", action: "回答する" },
+  question: { variant: "q", icon: "?", label: "質問", action: "回答する" },
   visual_review: {
     variant: "review",
     icon: "◎",
-    label: "レビュー待ち",
-    action: "レビュー",
+    label: "できあがりの確認",
+    action: "確認する",
   },
   device_check: { variant: "q", icon: "▣", label: "実機確認", action: "確認する" },
-  decision: { variant: "q", icon: "✓", label: "決定待ち", action: "回答する" },
-  backtrack: { variant: "review", icon: "↩", label: "手戻り確認", action: "レビュー" },
-  stall_retry: { variant: "q", icon: "↻", label: "stall retry", action: "確認する" },
-  descope: { variant: "q", icon: "⊘", label: "見送り判断", action: "判断する" },
+  decision: { variant: "q", icon: "✓", label: "決定の確認", action: "回答する" },
+  backtrack: { variant: "review", icon: "↩", label: "手戻りの確認", action: "確認する" },
+  stall_retry: { variant: "q", icon: "↻", label: "再開待ち", action: "確認する" },
+  descope: { variant: "q", icon: "⊘", label: "見送りの相談", action: "判断する" },
 };
 
 export function kindMeta(kind: QuestionKind): KindMeta {

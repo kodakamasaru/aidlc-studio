@@ -11,16 +11,17 @@ import type { ReviewBlock, CompletenessBlock } from "../../lib/api";
 // Anything else (javascript:, data:text/html, …) is treated as not-renderable.
 const SAFE_IMG_SRC_RE = /^(https?:\/\/|\/|blob:|data:image\/)/i;
 
+// 平易な日本語ラベル(S3 scr-04 用語方針: 内部語・英語を出さず、振る舞いで示す)。
 const KIND_LABEL: Record<string, string> = {
-  summary: "Summary",
-  "ac-map": "AC-MAP · US → UNIT 対応",
-  mermaid: "Mermaid · UNIT 依存",
-  screenshot: "Screenshot",
-  risk: "Risk · 影響",
-  test: "Test",
-  coverage: "Coverage",
-  diff: "Diff · 変更差分",
-  video: "Video · 操作録画",
+  summary: "まとめ",
+  "ac-map": "対応マップ",
+  mermaid: "依存関係の図",
+  screenshot: "実際に動いた証拠",
+  risk: "変わったところ · 影響",
+  test: "テスト結果",
+  coverage: "カバレッジ",
+  diff: "変更点",
+  video: "操作の動画",
 };
 
 interface ReviewBlocksProps {
@@ -98,10 +99,12 @@ function BlockBody({ block }: { block: ReviewBlock }) {
 
     case "risk": {
       const level = readString(block, "level");
+      // 重要度は日本語(S3 scr-04 D-02: HIGH/MEDIUM/LOW でなく 高/中/低)。
+      const LEVEL_JA: Record<string, string> = { high: "高", med: "中", low: "低" };
       return (
         <p className="risk-row">
           <span className={`risk-badge risk-badge--${level}`}>
-            {level.toUpperCase()}
+            重要度 {LEVEL_JA[level] ?? level}
           </span>
           <span>{readString(block, "note")}</span>
         </p>
@@ -206,11 +209,11 @@ export function CompletenessTable({ completeness }: { completeness: Completeness
   const total = completeness.requirements.length;
   const done = completeness.requirements.filter((r) => addressed.has(r.key)).length;
   return (
-    <section className="completeness surface-card" aria-label="完全性チェック">
+    <section className="completeness surface-card" aria-label="やりたかったことの 対応状況">
       <header className="completeness__head">
-        <h2 className="completeness__title">完全性チェック</h2>
+        <h2 className="completeness__title">やりたかったことの 対応状況</h2>
         <span className="completeness__count">
-          {done}/{total} 要件 対応
+          {done}/{total} 反映済み
         </span>
       </header>
       <ul className="completeness__list">

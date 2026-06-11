@@ -88,3 +88,130 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* step-spec（scr-01.full-spec）: ステップ契約の全文(read-only)。 */
+.step-spec {
+  padding: 20px 22px;
+}
+.step-spec__list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px 24px;
+  margin: 0;
+}
+.step-spec__list dt {
+  font-weight: 600;
+  color: var(--color-text-muted, #9a9aa6);
+}
+.step-spec__list dd {
+  margin: 0;
+}
+.step-spec__obs {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.step-spec__empty {
+  color: var(--color-text-muted, #9a9aa6);
+}
+.step-spec__note {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-muted, #2a2a33);
+}
+.step-card__spec-link,
+.page-head__link {
+  font-size: 13px;
+  color: var(--color-accent, #6c6cf0);
+  text-decoration: none;
+  margin-left: auto;
+}
+.page-head__link {
+  display: inline-block;
+  margin-top: 6px;
+  margin-left: 0;
+}
+.step-card__spec-link:hover,
+.page-head__link:hover {
+  text-decoration: underline;
+}
+.step-spec__prose-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.step-spec__prose {
+  margin: 0;
+  max-height: 460px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--color-text, #d8d8e0);
+  background: var(--color-surface-2, #16161c);
+  border: 1px solid var(--color-border-muted, #2a2a33);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+/* US-06 対話式編集（scr-01.settings の AI 相談）。 */
+.step-dialog {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-border-muted, #2a2a33);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.step-dialog__row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.step-dialog__input {
+  flex: 1;
+  min-height: 44px;
+}
+.step-dialog__row .btn {
+  white-space: nowrap;
+}
+.step-proposal {
+  border: 1px solid var(--color-accent, #6c6cf0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: color-mix(in oklab, var(--color-accent, #6c6cf0) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.step-proposal__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-accent, #6c6cf0);
+}
+.step-proposal__list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.step-proposal__add {
+  font-weight: 600;
+}
+.step-proposal__tag {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent, #6c6cf0) 22%, transparent);
+  color: var(--color-accent, #6c6cf0);
+}
+.step-proposal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

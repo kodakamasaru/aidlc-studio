@@ -92,9 +92,9 @@
 # ── 次サイクル(v0.0.x)へ持ち越し(carried)。S9 敵対レビューで検出した未充足 AC ──
 - id: S9-US06-dialog
   origin: v0.0.2/s9-validation.md
-  decision: "US-06 の S3 更新 AC『対話式編集(要望→AI提案→差分プレビュー→承認して適用)』が未実装。現状 StepConfigPage は手入力フォーム。編集→永続化→次Run反映は充足済だが対話 UX は未実装。"
-  state: carried
-  into: v0.0.x
+  decision: "US-06 の S3 更新 AC『対話式編集(要望→AI提案→差分プレビュー→承認して適用)』。S8 rework(2026-06-12)で今サイクル実装。"
+  state: done
+  closed_in: "POST /api/projects/:pid/steps/:sid/propose(決定的提案 / live AI 提案は加算層)+ StepConfigPage の対話 UI(要望→提案を見る→差分プレビュー(追加バッジ)→この内容で適用)。E2E『US-06 対話式編集』で実走・scr-01.settings-dialog 撮影。提案ロジックは rule-based(real-ai-tests-additive で live 拡張)。"
 
 - id: S9-US08-liveE2E
   origin: v0.0.2/s9-validation.md
@@ -116,3 +116,44 @@
   decision: "auto-rework(理由なし gap)の完全 silent 自動再生成。v0.0.2 は loud(eval run stalled+理由)で代替。Unit-05 の silent UX 最適化が残(新ドメイン再生成コマンド要)。"
   state: carried
   into: v0.0.x
+
+# ── S10 却下(2026-06-11)→ S8 差し戻し。v0.0.2 を reopen し UI を S3 視覚契約へ。──
+# mock 突合を全 15 状態起点で実スクショ目視し直し、一致 2/15 の系統的乖離が判明。
+# US-02/06/08/09 却下・ロールバック先 S8(詳細: s10-acceptance.md)。
+# S8 rework(2026-06-11)で消化(done)。tsc clean(web+server)/ 回帰 235 pass / E2E 6 pass で検証。
+- id: S10-reject-ui-contract
+  origin: v0.0.2/s10-acceptance.md
+  decision: "S10 却下 → S8 reopen。系統的乖離を S8 で是正: ①AppShell 日本語化 + 内部語(Run/resume/worktree/Phase/Cycle/S1/attempt/Q)除去 ②サイクル一覧/受信箱カードの情報強化 ③mock 突合→S9→S10 の再走。"
+  state: done
+  closed_in: "AppShell/InboxPage/AnswerView/CycleListPage/RunPanel/CycleDetailPage/cycle-state(STATE_LABEL)/StepConfig/kind-meta/question-summary を平易日本語化 + step-label.ts。E2E/ユニット連動更新。tsc/235/E2E6 green。"
+- id: S10-cycle-steps
+  origin: v0.0.2/s10-acceptance.md
+  decision: "scr-01.cycle-steps(read-only ステップ構成ビュー)。"
+  state: done
+  closed_in: "web/src/features/cycle-detail/CycleStepsPage.tsx + route /cycles/:id/steps + サイクル詳細からの『ステップ構成を見る』導線。"
+- id: S10-full-spec
+  origin: v0.0.2/s10-acceptance.md
+  decision: "scr-01.full-spec(AI 実行用の指示・全文ビュー)。skillRef↔skill dir 不整合のため、スキル散文でなくステップ契約の全項目を read-only 全文表示する形で実装。"
+  state: done
+  closed_in: "web/src/features/settings/StepSpecPage.tsx + route /settings/steps/:stepId + ステップ設定からの『全文を見る』導線。スキル本文の in-app 表示(step↔skill マッピング解決)は別途 = S10-skill-prose で carried。"
+- id: S10-descope-confirm
+  origin: v0.0.2/s10-acceptance.md
+  decision: "scr-05.confirm(「見送る」不可逆の confirm ダイアログ)。"
+  state: done
+  closed_in: "DescopeView に Modal 確認ダイアログ(『見送って進める』)を追加。gen-eval.spec 更新。"
+- id: S10-question-choices
+  origin: v0.0.2/s10-acceptance.md
+  decision: "scr-05.question の選択肢付き質問(ラジオ+AI推奨+その他自由入力)= US-08 AC overclaim 是正。"
+  state: done
+  closed_in: "domain Question.options(QuestionOption 型・後方互換)+ api.ts + scripted askEvent(日本語選択肢)+ AnswerView 選択肢描画 + answer.css。loop.spec で選択肢回答を実走。scr-05.default が mock 一致。"
+# S8 rework で新たに切り出した carried。
+- id: S10-skill-prose
+  origin: v0.0.2/s8-integration.md
+  decision: "full-spec で『スキル本文(役割/手順/出力形式/禁止…)』を in-app 表示。step↔skill dir マッピング(`S1`→`aidlc-s1-*`)は skill dir 実在のため解決可能だった(当初『ブロック』判断は誤り)。"
+  state: done
+  closed_in: "GET /api/steps/:step/skill(step を ^S\\d+(\\.\\d+)?$ 厳格検証 → kit/skills/aidlc-{lower}-*/SKILL.md を frontmatter 除去で返す)+ StepSpecPage が本文を全文表示。full-spec(us-06.full-spec)が S1 スキル本文を実表示。"
+- id: S10-running-role
+  origin: v0.0.2/s10-acceptance.md
+  decision: "scr-02 の working(進行中=generator)/ verifying(検証中=evaluator)の UI ラベル区別。"
+  state: done
+  closed_in: "Run.role を web api.ts に公開 + RunPanel の RunningPanel が role で 進行中/検証中 を出し分け(検証中は『成果の中身を点検中』)。"

@@ -35,8 +35,7 @@ export function RepoSetupForm({ onReady }: RepoSetupFormProps) {
         リポジトリ設定
       </h2>
       <p className="repo-setup__body">
-        対象リポジトリ(= プロジェクト)を 1 つ登録すると、Cycle を作って Phase
-        を回せます。
+        対象リポジトリ(= プロジェクト)を 1 つ登録すると、サイクルを作って各ステップを進められます。
       </p>
       <form onSubmit={handleSubmit} className="repo-setup__form">
         <div>

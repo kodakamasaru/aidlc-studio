@@ -60,7 +60,7 @@ export async function ensureProject(page: Page): Promise<void> {
     // After registration the cycle-list "新規 Cycle" affordance appears (the
     // empty list renders both a topbar button and an empty-state CTA → .first()).
     await expect(
-      page.getByRole("button", { name: /新規 Cycle|最初の Cycle を作る/ }).first(),
+      page.getByRole("button", { name: /新規サイクル|最初のサイクルを作る/ }).first(),
     ).toBeVisible();
   }
 }

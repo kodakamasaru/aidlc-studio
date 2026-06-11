@@ -71,7 +71,7 @@ export function CreateCycleModal({
         <div className="modal-body">
           <div>
             <label className="field-label" htmlFor={`${titleId}-goal`}>
-              Cycle 名(ゴール)
+              サイクル名(ゴール)
             </label>
             <input
               id={`${titleId}-goal`}

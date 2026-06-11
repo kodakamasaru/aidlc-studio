@@ -50,8 +50,18 @@ const SCRIPTED_REQUIREMENTS: readonly Requirement[] = [
 ];
 
 const SCRIPTED_BLOCKS = [
-  { type: "summary" as const, title: "Step output", body: "Deterministic scripted result." },
-  { type: "screenshot" as const, src: "screenshots/x.png", caption: "verify-ui screenshot" },
+  {
+    type: "summary" as const,
+    title: "直したこと",
+    body: "一覧と空状態の両方を表示するようにした。要件の取りこぼしはない。",
+  },
+  { type: "screenshot" as const, src: "screenshots/x.png", caption: "実際に動いた画面" },
+  {
+    type: "risk" as const,
+    level: "med" as const,
+    note: "変わったところ: 一覧の表示処理(空のときの分岐を追加)",
+  },
+  { type: "video" as const, src: "videos/x.mp4", poster: "screenshots/x.png" },
 ];
 
 export class ScriptedOrchestrator implements OrchestratorPort {
@@ -201,7 +211,20 @@ export class ScriptedOrchestrator implements OrchestratorPort {
       kind: "question",
       payload: {
         kind: "question",
-        prompt: "Confirm the scope before I proceed?",
+        prompt: "進め方を選んでください。扱うデータのまとめ方はどちらにしますか?",
+        options: [
+          {
+            id: "by-entity",
+            label: "「もの」ごとにまとめる",
+            hint: "扱う対象(データ)ごとに整理します",
+            recommended: true,
+          },
+          {
+            id: "by-task",
+            label: "「やること」ごとにまとめる",
+            hint: "機能(操作)ごとに整理します",
+          },
+        ],
       },
     };
   }

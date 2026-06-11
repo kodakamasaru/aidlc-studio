@@ -17,7 +17,7 @@ test("inbox shows the designed empty state when no questions are open", async ({
 
   // Empty-state heading + the topbar "0 件" marker prove nothing is queued.
   await expect(
-    page.getByRole("heading", { name: "いま捌くものはありません" }),
+    page.getByRole("heading", { name: "いまはお知らせはありません" }),
   ).toBeVisible();
   await expect(page.getByText("0 件", { exact: true })).toBeVisible();
 

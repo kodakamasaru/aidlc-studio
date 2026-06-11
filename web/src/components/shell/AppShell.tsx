@@ -69,28 +69,28 @@ export function AppShell() {
           </span>
           <span className="brand__name">aidlc-studio</span>
         </div>
-        <nav className="nav" aria-label="ワークスペース">
-          <p className="nav__heading">Workspace</p>
+        <nav className="nav" aria-label="メニュー">
+          <p className="nav__heading">メニュー</p>
           <NavItem to="/" end icon={<DiamondIcon />} label="サイクル" />
           <NavItem
             to="/inbox"
             icon={<SparkIcon />}
-            label="Inbox"
+            label="受信箱"
             count={inboxCount}
           />
-          <NavItem to="/settings/steps" icon={<ListIcon />} label="Step 設定" />
-          {/* Artifacts / Wiki are framed for v0.0.x (sidebar placeholders). */}
+          <NavItem to="/settings/steps" icon={<ListIcon />} label="ステップ設定" />
+          {/* 成果物 / 用語・決定メモ は v0.0.x 向けの枠(サイドバーのプレースホルダ)。 */}
           <span className="nav-item nav-item--disabled" aria-disabled="true">
             <span className="nav-item__icon" aria-hidden="true">
               <GridIcon />
             </span>
-            <span className="nav-item__label">Artifacts</span>
+            <span className="nav-item__label">成果物</span>
           </span>
           <span className="nav-item nav-item--disabled" aria-disabled="true">
             <span className="nav-item__icon" aria-hidden="true">
               <GridIcon />
             </span>
-            <span className="nav-item__label">Wiki</span>
+            <span className="nav-item__label">用語・決定メモ</span>
           </span>
         </nav>
       </aside>

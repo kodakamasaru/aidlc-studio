@@ -1,6 +1,6 @@
-// SCR-01 — Cycle list + create (/). Resolves the active project (repo-setup form
-// when none), lists its cycles, and offers create via modal. States: empty /
-// list / create. On create success → navigate to SCR-02.
+// SCR-01 — サイクル一覧 + 作成 (/)。アクティブな PJ を解決(無ければ repo 登録フォーム)、
+// サイクルを一覧し、モーダルで作成。状態: empty / list / create。作成成功で SCR-02 へ遷移。
+// 用語は平易な日本語(Cycle/Phase 等の内部語を出さない / S3 視覚契約)。
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Cycle } from "../../lib/api";
@@ -30,13 +30,13 @@ export function CycleListPage() {
       disabled={!project}
     >
       <PlusIcon size={15} />
-      新規 Cycle
+      新規サイクル
     </button>
   );
 
   useSetTopbar(
     {
-      left: <span className="crumb__current">Cycles</span>,
+      left: <span className="crumb__current">サイクル</span>,
       right: project ? newButton : undefined,
     },
     [project, status],
@@ -131,12 +131,12 @@ function ResolvedCycleList({
       <div className="content-inner">
         <EmptyState
           glyph={<DiamondIcon size={26} />}
-          title="まだ Cycle がありません"
-          body="最初の Cycle を作ると、S1〜S7 の Phase をサイトから起動できます。人間は IDE を触らず Inbox を捌くだけ。"
+          title="まだサイクルがありません"
+          body="最初のサイクルを作ると、各ステップをこの画面から始められます。あなたは IDE を触らず、受信箱のお知らせに答えるだけで進みます。"
           action={
             <button type="button" className="btn btn--primary" onClick={onOpenCreate}>
               <PlusIcon size={15} />
-              最初の Cycle を作る
+              最初のサイクルを作る
             </button>
           }
         />
@@ -152,13 +152,13 @@ function ResolvedCycleList({
   return (
     <div className="content-inner cycles-page">
       <header className="page-head">
-        <h1 className="page-title">Cycles</h1>
+        <h1 className="page-title">サイクル一覧</h1>
         <p className="page-sub">
-          マイルストーン(= サイクル / vX.Y.Z)を作り、Phase を回す起点。
+          1 サイクル = 1 つのバージョンを仕上げる単位です。
         </p>
       </header>
 
-      <section className="cycle-list surface-card" aria-label="Cycle 一覧">
+      <section className="cycle-list" aria-label="サイクル一覧">
         {sorted.map((cycle) => (
           <CycleRow key={cycle.id} cycle={cycle} />
         ))}

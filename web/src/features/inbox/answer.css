@@ -89,3 +89,92 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 選択肢付き質問(US-08 / scr-05.question): ラジオカードの縦並び。 */
+.answer-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.answer-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #2a2a33);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color var(--dur, 150ms),
+    background var(--dur, 150ms);
+}
+.answer-choice:hover {
+  border-color: var(--accent, #6c6cf0);
+}
+.answer-choice--on {
+  border-color: var(--accent, #6c6cf0);
+  background: color-mix(in oklab, var(--accent, #6c6cf0) 12%, transparent);
+}
+.answer-choice input {
+  grid-row: 1 / span 2;
+  margin-top: 2px;
+}
+.answer-choice__label {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.answer-choice__rec {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent, #6c6cf0) 22%, transparent);
+  color: var(--accent, #6c6cf0);
+}
+.answer-choice__hint {
+  grid-column: 2;
+  font-size: 13px;
+  color: var(--text-muted, #9a9aa6);
+}
+
+/* 質問への回答ヘッダ(scr-05.question): タイトル + 質問 N/M。 */
+.answer-view__head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.answer-view__progress {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #9a9aa6);
+  white-space: nowrap;
+}
+.answer-card__sublabel {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #9a9aa6);
+}
+/* 質問文の gap-box(強調枠)。 */
+.answer-gapbox {
+  border-left: 3px solid var(--color-accent, #6c6cf0);
+  background: color-mix(in oklab, var(--color-accent, #6c6cf0) 8%, transparent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  line-height: 1.7;
+}
+.answer-gapbox--warn {
+  border-left-color: #e7a93a;
+  background: color-mix(in oklab, #e7a93a 10%, transparent);
+}
+.answer-gapbox__line {
+  margin: 0 0 4px;
+}
+.answer-gapbox__line:last-child {
+  margin-bottom: 0;
+}

@@ -1,7 +1,7 @@
-// SCR-02 — Cycle detail + run (/cycles/:cycleId). Shows the phase pipeline and a
-// state-dependent run panel; the topbar primary action switches by state
-// (idle=起動 / running=生成中 disabled / stalled=retry / done=Inbox review).
-// Starting/retrying mutates the cycle then reloads. States: idle/running/stalled/done.
+// SCR-02 — サイクル詳細 + 実行 (/cycles/:cycleId)。ステップのパイプラインと状態依存の
+// ランパネルを表示。トップバーの主アクションは状態で切替(未起動=始める / 進行中=作成中
+// disabled / 停止=やり直す / 完了=受信箱で確認)。起動/やり直しはサイクルを更新→再読込。
+// 用語は平易な日本語(Cycle/Phase/Run/retry/Inbox 等の内部語を出さない)。
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Cycle, type Question } from "../../lib/api";
@@ -23,6 +23,7 @@ import { LoadingMessage, ErrorMessage } from "../../components/ui/StateMessage";
 import { PlayIcon, RetryIcon, PersonIcon } from "../../components/ui/Icon";
 import { PhasePipeline } from "./PhasePipeline";
 import { RunPanel } from "./RunPanel";
+import { stepLabel } from "../../lib/step-label";
 import "./cycle-detail.css";
 
 /** How often SCR-02 re-fetches the cycle + its open questions while live. */
@@ -55,9 +56,7 @@ export function CycleDetailPage() {
   const cycle = cycleQ.data;
 
   // Live poll: while the cycle is still active (not done/paused), re-fetch both
-  // the cycle and its open questions so progress (AI → human-waiting → done)
-  // appears without a manual reload. Terminal/paused cycles aren't polled; the
-  // interval pauses while the tab is hidden and resumes on focus.
+  // the cycle and its open questions so progress appears without a manual reload.
   const isLive = cycle?.state === "active";
   const reloadCycle = cycleQ.reload;
   const reloadInbox = inboxQ.reload;
@@ -65,9 +64,6 @@ export function CycleDetailPage() {
     if (!isLive) return;
     const tick = () => {
       if (document.hidden) return;
-      // Soft refresh: refetch in the background, keeping the current data on
-      // screen. Without this the 2.5s tick flips status to "loading" and the
-      // screen blinks to its blank/loading state every interval.
       reloadCycle({ background: true });
       reloadInbox({ background: true });
     };
@@ -83,29 +79,14 @@ export function CycleDetailPage() {
   }, [isLive, reloadCycle, reloadInbox]);
 
   const phase = cycle ? activePhase(cycle) : undefined;
-  // The run the human acts on is the ACTIVE phase's own latest run — NOT the
-  // cycle-global latest. After a backtrack the active phase is an earlier one
-  // whose latest run is a stale terminal run (or none); keying off the global
-  // latest would mislabel the topbar (e.g. show "Inbox でレビュー" for a phase
-  // that actually needs re-execution). RunPanel keys off this same run.
   const activeRun = phase ? latestRunOfPhase(phase) : undefined;
   const runState = activeRun?.state;
   const nextStep = cycle ? nextPendingStep(cycle) : undefined;
   const displayState: DisplayState = cycle ? cycleDisplayState(cycle) : "idle";
-  // Backtrack rewinds the target phase to domain state "running" WITHOUT adding
-  // a fresh run (US-13 pipeline rewind). The rewound phase therefore has either
-  // NO run or only a stale terminal `done` run from its earlier completion — that
-  // is what distinguishes it from a genuinely live run. A stalled/failed run is
-  // a real actionable run (retry), NOT a rewind, so it must not match here.
-  // Auto-relaunch is deferred to v0.0.x (ledger S7-C4), so the rewound state is
-  // surfaced as a disabled-with-explanation re-run affordance.
   const rewound =
     phase?.state === "running" &&
     (activeRun === undefined || activeRun.state === "done");
 
-  // #1/#5: the active run is "running" but actually blocked on the human (an open
-  // Question targets it). Surfaced as a distinct human-waiting state — NOT the
-  // "AI 生成中" log — so the screen never misleads while it waits on the Inbox.
   const openQuestions: readonly Question[] = inboxQ.data ?? [];
   const humanWait = rewound
     ? undefined
@@ -113,17 +94,17 @@ export function CycleDetailPage() {
 
   const onStart = (step: string) => mutate(() => api.startPhase(cycleId, step));
   const onRetry = (runId: string) => mutate(() => api.retryRun(cycleId, runId));
-  // Re-run a backtrack-rewound phase: domain relaunchPhase appends a fresh run on
-  // the "running" (run-less) phase and launches it. Closes the backtrack loop.
   const onRelaunch = (step: string) =>
     mutate(() => api.relaunchPhase(cycleId, step));
+
+  const stepName = phase ? stepLabel(phase.step) : "";
 
   useSetTopbar(
     {
       left: (
         <span className="crumb-wrap">
           <Link to="/" className="crumb">
-            Cycles
+            サイクル
           </Link>
           <span className="crumb__sep">/</span>
           <span className="crumb__current">{cycle?.version ?? "…"}</span>
@@ -140,14 +121,14 @@ export function CycleDetailPage() {
           stateBadge={
             humanWait ? (
               <StateBadge variant="stalled" icon={<PersonIcon size={13} />}>
-                {phase ? `${phase.step} ` : ""}待ち(あなた)
+                {phase ? `${stepName} ` : ""}待ち(あなた)
               </StateBadge>
             ) : (
               <StateBadge
                 variant={displayState}
                 pulse={displayState === "running"}
               >
-                {phase ? `${phase.step} ` : ""}
+                {phase ? `${stepName} ` : ""}
                 {STATE_LABEL[displayState]}
               </StateBadge>
             )
@@ -178,11 +159,11 @@ export function CycleDetailPage() {
   }
 
   const headSub = rewound
-    ? `${phase?.step ?? ""} へ差し戻し済み — 再実行が必要です`
+    ? `「${stepName}」へ差し戻し済み — 再実行が必要です`
     : humanWait
       ? humanWait.mode === "review"
-        ? `${phase?.step ?? ""} の成果レビュー待ち — Inbox であなたの確認が必要です`
-        : `${phase?.step ?? ""} は回答待ち — Inbox であなたの回答が必要です`
+        ? `「${stepName}」の成果を確認待ち — 受信箱であなたの確認が必要です`
+        : `「${stepName}」は回答待ち — 受信箱であなたの回答が必要です`
       : runSubtitle(displayState, phase?.step, nextStep);
 
   return (
@@ -190,6 +171,9 @@ export function CycleDetailPage() {
       <header className="page-head">
         <h1 className="page-title">{cycle.title}</h1>
         <p className="page-sub">{headSub}</p>
+        <Link to={`/cycles/${cycleId}/steps`} className="page-head__link">
+          ステップ構成を見る →
+        </Link>
       </header>
 
       {actionError ? (
@@ -226,7 +210,6 @@ interface TopbarActionsProps {
   readonly rewound: boolean;
   readonly busy: boolean;
   readonly stateBadge: ReactNode;
-  /** When the active run is blocked on the human, the open question's id. */
   readonly humanWaitId: string | undefined;
   readonly onStart: (step: string) => void;
   readonly onRetry: (runId: string) => void;
@@ -247,10 +230,9 @@ function TopbarActions({
   onRelaunch,
 }: TopbarActionsProps) {
   let action: ReactNode = null;
+  const name = step ? stepLabel(step) : "";
 
   if (humanWaitId) {
-    // The run is running but waiting on the human — point straight at the card
-    // under this cycle (a cycle-child review/answer screen, not the Inbox).
     action = (
       <Link
         to={`/cycles/${encodeURIComponent(cycleId)}/q/${encodeURIComponent(humanWaitId)}`}
@@ -260,8 +242,6 @@ function TopbarActions({
       </Link>
     );
   } else if (rewound && step) {
-    // Backtracked phase: domain state is "running" with no live run. Relaunch
-    // appends a fresh run on it and launches — closing the backtrack loop.
     action = (
       <button
         type="button"
@@ -269,13 +249,13 @@ function TopbarActions({
         onClick={() => onRelaunch(step)}
         disabled={busy}
       >
-        <PlayIcon size={14} /> {step} を再実行
+        <PlayIcon size={14} /> 「{name}」を再実行
       </button>
     );
   } else if (runState === "running") {
     action = (
       <button type="button" className="btn btn--surface" disabled>
-        <Spinner size={14} /> 生成中
+        <Spinner size={14} /> 作成中
       </button>
     );
   } else if ((runState === "stalled" || runState === "failed") && runId) {
@@ -286,7 +266,7 @@ function TopbarActions({
         onClick={() => onRetry(runId)}
         disabled={busy}
       >
-        <RetryIcon size={14} /> retry
+        <RetryIcon size={14} /> やり直す
       </button>
     );
   } else if (step && runState !== "done") {
@@ -297,13 +277,13 @@ function TopbarActions({
         onClick={() => onStart(step)}
         disabled={busy}
       >
-        <PlayIcon size={14} /> {step} Phase 起動
+        <PlayIcon size={14} /> 「{name}」を始める
       </button>
     );
   } else if (runState === "done") {
     action = (
       <Link to="/inbox" className="btn btn--primary">
-        Inbox でレビュー →
+        受信箱で確認 →
       </Link>
     );
   }
@@ -328,13 +308,15 @@ function runSubtitle(
 ): string {
   switch (state) {
     case "running":
-      return `${step ?? ""} を生成中…`;
+      return `「${stepLabel(step ?? "")}」を作成中…`;
     case "stalled":
     case "failed":
-      return "Run が停止しました";
+      return "AI の作業が停止しました";
     case "done":
-      return "Cycle 完了";
+      return "サイクル完了";
     default:
-      return nextStep ? `次に ${nextStep} を起動できます` : "Phase を起動できます";
+      return nextStep
+        ? `次に「${stepLabel(nextStep)}」を始められます`
+        : "ステップを始められます";
   }
 }

@@ -1,6 +1,8 @@
 // Project routes — bootstrap (POST) + list (GET). Bodies are validated for
 // required fields here before the service runs.
 import { Hono } from "hono";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Ports } from "../../../app/ports/composition";
 import { ProjectService } from "../../../app/services/project-service";
 import type { CreateProjectInput } from "../../../app/services/project-service";
@@ -102,6 +104,35 @@ function parseStepContracts(body: unknown): StepContracts {
   };
 }
 
+const SKILLS_DIR = "kit/skills";
+const STEP_RE = /^S\d+(?:\.\d+)?$/;
+
+/**
+ * step("S1") → `kit/skills/aidlc-s1-*​/SKILL.md` の本文(YAML frontmatter 除去)。
+ * step は `^S\d+(\.\d+)?$` に厳格一致させ、パストラバーサルを排除した上で prefix 照合する。
+ * 対応スキルが無ければ null(S2.5 等、dir が無い step を含む)。
+ */
+function readStepSkill(step: string): { readonly skill: string; readonly content: string } | null {
+  if (!STEP_RE.test(step)) return null;
+  const prefix = `aidlc-${step.toLowerCase()}-`;
+  let entries: string[];
+  try {
+    entries = readdirSync(SKILLS_DIR);
+  } catch {
+    return null;
+  }
+  const dir = entries.find((d) => d.startsWith(prefix));
+  if (!dir) return null;
+  let md: string;
+  try {
+    md = readFileSync(join(SKILLS_DIR, dir, "SKILL.md"), "utf8");
+  } catch {
+    return null;
+  }
+  const content = md.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+  return { skill: dir, content };
+}
+
 export function projectRoutes(ports: Ports): Hono {
   const app = new Hono();
   const service = new ProjectService(ports);
@@ -137,6 +168,36 @@ export function projectRoutes(ports: Ports): Hono {
         contracts,
       ),
     );
+  });
+
+  // US-06 対話式編集: 要望から契約の「提案」を作る(決定的・永続化しない)。要望の各行を
+  // 検証観点として現契約にマージした proposed を返す。承認すると上の PATCH で適用される。
+  // 提案ロジックは決定的 rule-based。live AI 提案は加算層([real-ai-tests-additive])。
+  app.post("/api/projects/:projectId/steps/:stepId/propose", async (c) => {
+    const body = await readJson(c);
+    const requestText = asString(body, "request");
+    const project = service.getProject(c.req.param("projectId"));
+    const stepId = c.req.param("stepId");
+    const step = project.pipelineDef.find((s) => s.id === stepId);
+    const current: StepContracts = step?.contracts ?? {};
+    const existing = current.verification?.observations ?? [];
+    const existingSet = new Set(existing.map((o) => o as string));
+    const additions = requestText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !existingSet.has(l))
+      .map((l) => l as Text);
+    const proposed: StepContracts =
+      additions.length > 0
+        ? { ...current, verification: { observations: [...existing, ...additions] } }
+        : current;
+    return ok(c, { current, proposed });
+  });
+
+  // full-spec: ステップの指示・全文(スキル本文)。step は厳格検証済み(パストラバーサル不可)。
+  app.get("/api/steps/:step/skill", (c) => {
+    const result = readStepSkill(c.req.param("step"));
+    return ok(c, result ?? { skill: null, content: "" });
   });
 
   return app;

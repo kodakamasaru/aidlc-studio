@@ -1,6 +1,6 @@
-// SCR-03 — Human Inbox (/inbox). Lists the active project's open questions as a
-// time-ordered card list (Q-wait + review-wait mixed). States: empty / list. The
-// topbar shows the wait count; the nav badge mirrors it.
+// SCR-03 — 受信箱 (/inbox)。アクティブな PJ の未対応 Question を時系列カード一覧で
+// 表示(質問待ち + レビュー待ち混在)。状態: empty / list。トップバーに待ち件数、
+// ナビバッジも同数。用語は平易な日本語(内部語を出さない / S3 視覚契約)。
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAsync } from "../../lib/useAsync";
@@ -27,7 +27,7 @@ export function InboxPage() {
 
   useSetTopbar(
     {
-      left: <span className="crumb__current">Inbox</span>,
+      left: <span className="crumb__current">受信箱</span>,
       right:
         count > 0 ? (
           <span className="inbox-count">{count} 件 待ち</span>
@@ -61,12 +61,12 @@ export function InboxPage() {
       <div className="content-inner">
         <EmptyState
           glyph={<SparkIcon size={26} />}
-          title="いま捌くものはありません"
-          body="AI が判断を求めると、Q 回答 / レビュー待ち / 実機確認 がここにカードで届きます。Cycle を進めて Phase を起動しましょう。"
+          title="いまはお知らせはありません"
+          body="AI があなたの対応を必要としたとき、ここに「質問」「できあがりの確認」「見送りの相談」が並びます。"
           action={
             <Link to="/" className="btn btn--surface">
               <DiamondIcon size={15} />
-              Cycles を見る
+              サイクルを見る
             </Link>
           }
         />
@@ -81,13 +81,13 @@ export function InboxPage() {
   return (
     <div className="content-inner inbox-page">
       <header className="page-head">
-        <h1 className="page-title">Human Inbox</h1>
+        <h1 className="page-title">受信箱</h1>
         <p className="page-sub">
-          AI → 人間 の依頼が全部カードになる。Q 待ちは回答へ、レビュー待ちは詳細へ。
+          AI からのお知らせ一覧です。クリックすると、そのサイクルの画面で対応できます(判断はサイクル側で行います)。
         </p>
       </header>
 
-      <section className="inbox-list surface-card" role="list" aria-label="Inbox">
+      <section className="inbox-list surface-card" role="list" aria-label="受信箱">
         {sorted.map((question) => (
           <InboxCard key={question.id} question={question} />
         ))}

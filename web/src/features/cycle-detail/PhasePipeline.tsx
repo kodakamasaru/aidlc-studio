@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import type { Cycle, Phase } from "../../lib/api";
 import { latestRunOfCycle } from "../../lib/cycle-state";
+import { stepLabel } from "../../lib/step-label";
 import { Spinner } from "../../components/ui/Spinner";
 import { CheckIcon, BacktrackIcon, PersonIcon } from "../../components/ui/Icon";
 
@@ -79,13 +80,16 @@ export function PhasePipeline({ cycle, humanWaiting = false }: PhasePipelineProp
               ) : null}
               <div className="pipeline__node-col">
                 <PipelineNode node={node} index={i} />
-                <span className="pipeline__step-label">{node.phase.step}</span>
+                <span className="pipeline__step-label">{stepLabel(node.phase.step)}</span>
               </div>
             </li>
           );
         })}
       </ol>
 
+      <p className="pipeline__legend pipeline__legend--info">
+        青 = 進行中 / 緑 = 完了。各ステップは「AI が作る → 自動でチェック → AI が点検」の順に進みます。
+      </p>
       {anyBacktrack ? (
         <p className="pipeline__legend">
           <BacktrackIcon size={13} /> = 手戻り履歴(該当ステップへ一度戻って再開した)
@@ -101,7 +105,7 @@ function PipelineNode({ node, index }: { node: NodeView; index: number }) {
 
   let dotClass = `pipeline__node pipeline__node--${status}`;
   let inner: ReactNode = nodeNumber(node.phase, index);
-  let label = `${node.phase.step} `;
+  let label = `${stepLabel(node.phase.step)} `;
 
   if (status === "done") {
     dotClass = "pipeline__node pipeline__node--done";
