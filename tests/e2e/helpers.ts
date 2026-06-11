@@ -9,6 +9,16 @@ import { expect } from "@playwright/test";
 const here = dirname(fileURLToPath(import.meta.url)); // tests/e2e
 export const REPO_ROOT = join(here, "..", "..");
 export const SHOTS_DIR = join(REPO_ROOT, "aidlc-docs", "s7", "screenshots");
+// S9 (Validation) visual evidence for v0.0.2, kept separate from the v0.0.1 S7
+// shots so the S9 deliverable is self-contained. Each name is keyed to the US
+// it proves (us-06 / us-02 / us-03 / us-07).
+export const SHOTS_DIR_S9 = join(
+  REPO_ROOT,
+  "aidlc-docs",
+  "v0.0.2",
+  "s9",
+  "screenshots",
+);
 
 // An absolute, existing directory to register as the project repo (D-06: the
 // repo IS the project). The repo root itself is the safest always-present path.
@@ -23,6 +33,15 @@ export const EXISTING_REPO_PATH = REPO_ROOT;
 export async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({
     path: join(SHOTS_DIR, name),
+    fullPage: true,
+    animations: "disabled",
+  });
+}
+
+/** Same as `shot`, but writes into the v0.0.2 S9 evidence dir. */
+export async function shotS9(page: Page, name: string): Promise<void> {
+  await page.screenshot({
+    path: join(SHOTS_DIR_S9, name),
     fullPage: true,
     animations: "disabled",
   });

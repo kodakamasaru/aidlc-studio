@@ -50,7 +50,9 @@ function seedProjectWithVerification(
   ports.uow.run(() => ports.repos.projects.save(project));
 }
 
-async function runToEval(scenario: "gen-eval-complete" | "gen-eval-descope") {
+async function runToEval(
+  scenario: "gen-eval-complete" | "gen-eval-descope" | "gen-eval-gap",
+) {
   const harness = buildLoopTestApp(scenario);
   seedProjectWithVerification(harness.ports);
   const cycles = new CycleService(harness.ports);
@@ -97,6 +99,20 @@ describe("gen→gate→eval E2E", () => {
       .listByRun(ev.id)
       .filter((q) => q.kind === "descope" && q.state === "open");
     expect(descopes.length).toBe(1);
+  });
+
+  test("auto-rework: a gap with NO descope request stalls the evaluator loud and raises NO human card (原則#6)", async () => {
+    const { harness, cycle } = await runToEval("gen-eval-gap");
+    const ev = cycle.phases[0]!.runs.find((r) => r.role === "evaluator")!;
+    // 申請のない gap は人間に出さず、generator の再生成が必要だと loud に stall する。
+    expect(ev.state).toBe("stalled");
+    expect(ev.failureReason ?? "").toContain("見送り申請なし");
+    // No descope / human card is created — the requirement is NOT silently dropped,
+    // but it is also NOT surfaced to the human (auto-rework is an AI-only loop).
+    const cards = harness.ports.repos.questions
+      .listByRun(ev.id)
+      .filter((q) => q.state === "open");
+    expect(cards.length).toBe(0);
   });
 
   test("descope → backlog: answering the descope Question creates a backlog Task", async () => {

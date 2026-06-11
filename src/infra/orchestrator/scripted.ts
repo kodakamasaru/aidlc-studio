@@ -29,9 +29,12 @@ export type ScriptedScenario =
   | "stall-first"
   // gen→gate→eval scenarios (v0.0.2): the generator emits a BriefOut; launchEval
   // emits the evaluator verdict. "complete" addresses every requirement (→ allow
-  // done); "descope" leaves one gap WITH a descope request (→ await-descope).
+  // done); "descope" leaves one gap WITH a reasoned descope request (→ await-
+  // descope); "gap" leaves the SAME gap with NO request (→ auto-rework: the run
+  // stalls loud, no human card — Q-02 / 原則#6「理由のない見送りは発生しない」).
   | "gen-eval-complete"
-  | "gen-eval-descope";
+  | "gen-eval-descope"
+  | "gen-eval-gap";
 
 type RunPhase = "asked" | "reviewed" | "stalled" | "done";
 
@@ -94,10 +97,12 @@ export class ScriptedOrchestrator implements OrchestratorPort {
 
   async launchEval(cmd: EvalLaunch): Promise<void> {
     const ctx = this.ctxFor(cmd, cmd.runId);
-    // "descope" scenario: the evaluator judged r1 addressed but r2 NOT, and raises
-    // a reasoned descope request for r2 (the app await-descope path). "complete"
-    // (and any other scenario) addresses every requirement → app allow-done.
+    // "descope"/"gap" both leave r2 unaddressed; "descope" additionally raises a
+    // reasoned descope request for r2 (→ app await-descope), while "gap" raises
+    // NONE (→ app auto-rework: stall loud, no human card). "complete" (and any
+    // other scenario) addresses every requirement → app allow-done.
     const isDescope = this.scenario === "gen-eval-descope";
+    const hasGap = isDescope || this.scenario === "gen-eval-gap";
     if (isDescope) {
       await this.emit(ctx, {
         type: "QuestionRaised",
@@ -117,7 +122,7 @@ export class ScriptedOrchestrator implements OrchestratorPort {
       blocks: SCRIPTED_BLOCKS,
       completeness: {
         requirements: SCRIPTED_REQUIREMENTS,
-        addressed: isDescope ? ["r1"] : ["r1", "r2"],
+        addressed: hasGap ? ["r1"] : ["r1", "r2"],
       },
     });
     this.states.set(cmd.runId, "reviewed");

@@ -21,7 +21,10 @@ import { createApp } from "./infra/http/app";
 import { logError } from "./infra/log";
 import { EngineService } from "./app/services/engine-service";
 import { reconcileRunningRuns } from "./app/services/reconcile";
-import { ScriptedOrchestrator } from "./infra/orchestrator/scripted";
+import {
+  ScriptedOrchestrator,
+  type ScriptedScenario,
+} from "./infra/orchestrator/scripted";
 import { LiveClaudeOrchestrator } from "./infra/orchestrator/live";
 import type { Ports } from "./app/ports/composition";
 import type { OrchestratorPort, DomainEventSink } from "./app/ports/orchestrator";
@@ -157,8 +160,18 @@ function buildOrchestrator(
   }
   // AIDLC_SCENARIO lets E2E pick the deterministic script: "happy" (default)
   // drives the full Q→review→done loop; "stall-first" stalls on launch so the
-  // stalled/retry surface can be exercised. Unknown values fall back to happy.
+  // stalled/retry surface can be exercised. "gen-eval-complete"/"gen-eval-descope"
+  // drive the v0.0.2 gen→gate→eval pipeline (a step with a verification contract
+  // launches as generator) so S9 can validate the completeness gate, descope
+  // decision, and rich rendering through the browser. Unknown values → happy.
+  const allowed: readonly ScriptedScenario[] = [
+    "happy",
+    "stall-first",
+    "gen-eval-complete",
+    "gen-eval-descope",
+  ];
+  const requested = process.env.AIDLC_SCENARIO as ScriptedScenario | undefined;
   const scenario =
-    process.env.AIDLC_SCENARIO === "stall-first" ? "stall-first" : "happy";
+    requested && allowed.includes(requested) ? requested : "happy";
   return new ScriptedOrchestrator({ sink, scenario });
 }

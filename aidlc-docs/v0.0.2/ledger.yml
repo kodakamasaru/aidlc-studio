@@ -1,5 +1,5 @@
 # 引き継ぎ台帳 — v0.0.2(スキーマ: kit/rules/ledger.md)
-# S1〜S8 で確定した D-NN と次サイクルへ渡す項目を state 付きで台帳化する。
+# S1〜S9 で確定した D-NN と次サイクルへ渡す項目を state 付きで台帳化する。
 # 次サイクル(v0.0.x)S1 は into: が当該サイクルを指す carried を全消し込みするまで確定不可。
 
 # ── S8 で確定し、このサイクル内で消化済(done)──
@@ -64,7 +64,47 @@
   state: done
   closed_in: "domain question.ts requirementKey? 加法 / engine-service.ts descopeRequestsFor / scripted.ts / gen-gate-eval.test.ts(4 pass)"
 
+# ── S9(Validation)で確定(done)──
+- id: S9-D01
+  origin: v0.0.2/s9-validation.md
+  decision: "gen-eval-complete / gen-eval-descope の 2 決定的シナリオを AIDLC_SCENARIO env から選べるよう server.ts に配線(allowlist + 不正値は happy fallback)。S8 実装済シナリオの test-enablement のみ、ドメイン/app/アダプタは無変更。US-02/03/07 のブラウザ視覚証拠取得の経路。"
+  state: done
+  closed_in: "src/server.ts buildOrchestrator / playwright.config.ts(8893 complete・8894 descope)/ 回帰234 pass・tsc clean"
+
+- id: S9-D02
+  origin: v0.0.2/s9-validation.md
+  decision: "gen→gate→eval を「Step UI で検証観点付与(US-06)→ role=generator 起動」の縦ループで E2E 化。US-06→02→03/07 を 1 本のユーザー実導線で証明(専用 seed fixture を作らない)。"
+  state: done
+  closed_in: "tests/e2e/gen-eval.spec.ts(optInGenEval / complete・descope 2 test pass)/ E2E 6 pass"
+
+- id: S9-D03
+  origin: v0.0.2/s9-validation.md
+  decision: "S9 視覚証拠は aidlc-docs/v0.0.2/s9/screenshots/ に US キー命名で保存(shotS9 ヘルパを加法追加 / 既存 shot は無改変)。"
+  state: done
+  closed_in: "tests/e2e/helpers.ts shotS9 / SHOTS_DIR_S9 / us-06・us-07・us-03・us-02 *.png(5枚)"
+
+- id: S9-D04
+  origin: v0.0.2/s9-validation.md
+  decision: "dogfood 敵対レビュー(pr-test-analyzer)で検出した US-03 auto-rework(申請なし gap→loud stall)未テストを充足。gen-eval-gap fixture(scripted・integration 専用 / browser 非公開)+ 統合テスト追加。pre-save badge の弱点も reload 永続化検証で是正。"
+  state: done
+  closed_in: "src/infra/orchestrator/scripted.ts(gen-eval-gap)/ tests/integration/gen-gate-eval.test.ts(auto-rework)/ tests/e2e/gen-eval.spec.ts(reload 検証)/ 235 pass"
+
+# ── 次サイクル(v0.0.x)へ持ち越し(carried)。S9 敵対レビューで検出した未充足 AC ──
+- id: S9-US06-dialog
+  origin: v0.0.2/s9-validation.md
+  decision: "US-06 の S3 更新 AC『対話式編集(要望→AI提案→差分プレビュー→承認して適用)』が未実装。現状 StepConfigPage は手入力フォーム。編集→永続化→次Run反映は充足済だが対話 UX は未実装。"
+  state: carried
+  into: v0.0.x
+
+- id: S9-US08-liveE2E
+  origin: v0.0.2/s9-validation.md
+  decision: "US-08 AC『実 AI 使用の E2E で Q→回答→resume が pass』の常時実行化。現状 live-run.test.ts は bun test:live の環境ゲート付き加算層(real-ai-tests-additive 方針)で S9 決定的ゲート外。"
+  state: carried
+  into: v0.0.x
+
 # ── 次サイクル(v0.0.x / scope.md 明示除外)へ持ち越し(carried)──
+# S9 観察 O-01(scripted では verify-ui screenshot が実ファイル無く placeholder 描画)は
+# 下記 S8-live-completeness が埋まれば実画像に解消する。新規 carried は起こさない。
 - id: S8-live-completeness
   origin: v0.0.2/s8-integration.md
   decision: "live evaluator が completeness(addressed)を emit する(stream-json パース)。現状 scripted のみが completeness を出し、live は completeness なし→visual_review fallback。"
