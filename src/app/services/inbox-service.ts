@@ -159,6 +159,11 @@ export class InboxService {
         case "cancelRun":
           await this.ports.orchestrator.cancel({ runId: command.runId });
           return;
+        case "descopeToBacklog":
+          // S6 descope-policy D-03: 見送り承認→backlog 化(proposeTask→acceptProposal)。
+          // 配線は S8(s7-domain-code.md 引き継ぎ)。未配線の間は silent no-op にせず明示的に
+          // fail-loud にして、回答済み Question/Fact が宙に浮く事故を防ぐ(silent failure 禁止)。
+          throw fail(500, "DescopeBacklogNotWired");
       }
     } catch (err) {
       // A ServiceError from a lookup (e.g. 404 ProjectNotFound in dispatchRetry)

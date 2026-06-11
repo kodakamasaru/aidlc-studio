@@ -155,3 +155,63 @@ describe("isAwaitingHuman (INV-6: waiting is derived, not stored)", () => {
     expect(isAwaitingHuman([answered], RunId("r1"))).toBe(false);
   });
 });
+
+describe("descope kind (S6 descope-policy: 4 択 verdict → Unit02Command)", () => {
+  const descope = (recommendedStep?: Step): Question =>
+    raise({
+      kind: "descope",
+      requirement: "オフライン同期",
+      aiReason: "v0.0.3 のスコープ。今期は縦ループ優先",
+      ...(recommendedStep ? { recommendedStep } : {}),
+    });
+
+  test("raiseQuestion derives kind=descope from payload", () => {
+    expect(descope().kind).toBe("descope");
+  });
+
+  test("つくる(rework) → retryLaunch(差し戻して再 generate)", () => {
+    const out = unwrap(applyAnswer(descope(), { verdict: "rework" }, ctx));
+    expect(out.command).toEqual({ type: "retryLaunch", runId: RunId("r1") });
+  });
+
+  test("見送る(descope) → descopeToBacklog(deferred=false) + 証跡 Fact", () => {
+    const out = unwrap(applyAnswer(descope(), { verdict: "descope" }, ctx));
+    expect(out.command).toEqual({
+      type: "descopeToBacklog",
+      runId: RunId("r1"),
+      requirement: "オフライン同期",
+      aiReason: "v0.0.3 のスコープ。今期は縦ループ優先",
+      deferred: false,
+    });
+    // 原則#6: 見送りの証跡(要件 + AI 理由)が Fact に残る
+    expect(effectiveRevision(out.fact).statement).toContain("オフライン同期");
+    expect(effectiveRevision(out.fact).statement).toContain("v0.0.3");
+  });
+
+  test("後回し(defer) → descopeToBacklog(deferred=true)", () => {
+    const out = unwrap(applyAnswer(descope(), { verdict: "defer" }, ctx));
+    expect(out.command).toMatchObject({ type: "descopeToBacklog", deferred: true });
+  });
+
+  test("前のステップからやり直す(rewind) → 既存 backtrack 経路(推奨ステップ + 理由)", () => {
+    const out = unwrap(
+      applyAnswer(descope(Step("S5")), { verdict: "rewind", reason: "Unit 境界を見直す" }, ctx),
+    );
+    expect(out.command).toEqual({ type: "backtrack", toStep: Step("S5"), reason: "Unit 境界を見直す" });
+  });
+
+  test("rewind without a target (no recommendedStep / no backtrackTo) → MissingBacktrackTarget", () => {
+    const res = applyAnswer(descope(), { verdict: "rewind", reason: "理由あり" }, ctx);
+    expect(res).toEqual({ ok: false, error: "MissingBacktrackTarget" });
+  });
+
+  test("rewind without a reason → EmptyReason", () => {
+    const res = applyAnswer(descope(Step("S5")), { verdict: "rewind" }, ctx);
+    expect(res).toEqual({ ok: false, error: "EmptyReason" });
+  });
+
+  test("a verdict outside the descope 4-set is InvalidVerdict", () => {
+    const res = applyAnswer(descope(), { verdict: "approve" }, ctx);
+    expect(res).toEqual({ ok: false, error: "InvalidVerdict" });
+  });
+});

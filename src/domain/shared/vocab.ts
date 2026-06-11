@@ -6,14 +6,31 @@
 declare const brand: unique symbol;
 type Brand<T, B extends string> = T & { readonly [brand]: B };
 
-/** 回答の判定(Question の verdict / Facts の verdict が共有)。 */
-export type Verdict = "approve" | "reject" | "answer" | "confirm";
+/**
+ * 回答の判定(Question の verdict / Facts の verdict が共有)。
+ * v0.0.2(S6 descope-policy D-01)で descope の 4 択を追加:
+ *   rework=つくる(差し戻し) / descope=見送る / defer=後回し / rewind=前のステップからやり直す。
+ * 加法的(既存 kind の verdict 集合には影響しない)。
+ */
+export type Verdict =
+  | "approve"
+  | "reject"
+  | "answer"
+  | "confirm"
+  | "rework"
+  | "descope"
+  | "defer"
+  | "rewind";
 
 export const VERDICTS: readonly Verdict[] = [
   "approve",
   "reject",
   "answer",
   "confirm",
+  "rework",
+  "descope",
+  "defer",
+  "rewind",
 ];
 
 /**

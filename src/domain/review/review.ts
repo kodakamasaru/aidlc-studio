@@ -33,7 +33,11 @@ export const MVP_BLOCK_TYPES: ReadonlySet<ReviewBlockType> = new Set([
   "screenshot",
 ]);
 
-const KNOWN_BLOCK_TYPES: ReadonlySet<string> = new Set([
+/**
+ * 既知 block 型の正本(S6 artifact-profile: 「block 型の正本は review.ts」)。
+ * Profile はこれを参照する側(逆流させない)。export して profile.ts が missing 算出に使う。
+ */
+export const KNOWN_BLOCK_TYPES: ReadonlySet<ReviewBlockType> = new Set([
   "summary",
   "ac-map",
   "mermaid",
@@ -46,7 +50,7 @@ const KNOWN_BLOCK_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export const isKnownBlockType = (type: string): boolean =>
-  KNOWN_BLOCK_TYPES.has(type);
+  (KNOWN_BLOCK_TYPES as ReadonlySet<string>).has(type);
 
 // ── 集約ルート Review(= S5 Result。生成後不変のスナップショット) ──
 export type Review = {
@@ -84,8 +88,11 @@ export const isTaskScoped = (review: Review): boolean => review.taskId !== null;
 /**
  * 前方互換(INV-2): 永続/受信した生 block 列から、既知 type だけを Review 用に採用し、
  * 未知 type は skipped に分離して返す(エラーにしない / warn はレンダラ側)。純粋。
+ *
+ * 命名(S7 D-01): 旧名 `coerceBlocks`。Profile 照合版 `coerceBlocks(profile, raw)`(profile.ts)が
+ * この型レベル前方互換を前段で内部再利用するため、型フィルタ側は `filterKnownBlocks` に改名した。
  */
-export const coerceBlocks = (
+export const filterKnownBlocks = (
   raw: readonly { readonly type: string }[],
 ): { readonly blocks: readonly ReviewBlock[]; readonly skipped: readonly string[] } => {
   const blocks: ReviewBlock[] = [];

@@ -18,7 +18,8 @@ export type QuestionKind =
   | "device_check"
   | "decision"
   | "backtrack"
-  | "stall_retry";
+  | "stall_retry"
+  | "descope";
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
@@ -29,7 +30,14 @@ export type QuestionPayload =
   | { readonly kind: "device_check"; readonly instructions: Text }
   | { readonly kind: "decision"; readonly statement: Text }
   | { readonly kind: "backtrack"; readonly toStep: Step; readonly proposal: Text }
-  | { readonly kind: "stall_retry"; readonly runId: RunId; readonly stalledAt: Instant };
+  | { readonly kind: "stall_retry"; readonly runId: RunId; readonly stalledAt: Instant }
+  // S6 descope-policy: AI が理由付きで起こす見送り申請(1 申請 = 1 カード)。
+  | {
+      readonly kind: "descope";
+      readonly requirement: Text; // 見送りたい要件の平易文
+      readonly aiReason: Text; // 必須(理由なき見送りは発生しない / 原則#6)
+      readonly recommendedStep?: Step; // 「前のステップからやり直す」候補
+    };
 
 export type Question = {
   readonly id: QuestionId;
@@ -65,6 +73,8 @@ const ALLOWED_VERDICTS: Record<QuestionKind, ReadonlySet<Verdict>> = {
   decision: new Set(["approve", "reject"]),
   backtrack: new Set(["approve", "reject"]),
   stall_retry: new Set(["approve", "reject"]),
+  // descope 4 択(S6 descope-policy D-01): つくる/見送る/後回し/前のステップからやり直す。
+  descope: new Set(["rework", "descope", "defer", "rewind"]),
 };
 
 // ── Unit-02 へ渡す命令(回答の効果。S5 kind×verdict 効果表) ──────
@@ -73,7 +83,16 @@ export type Unit02Command =
   | { readonly type: "approveTaskReview"; readonly runId: RunId; readonly taskId: TaskId | null }
   | { readonly type: "backtrack"; readonly toStep: Step; readonly reason: Text }
   | { readonly type: "retryLaunch"; readonly runId: RunId }
-  | { readonly type: "cancelRun"; readonly runId: RunId };
+  | { readonly type: "cancelRun"; readonly runId: RunId }
+  // S6 descope-policy D-01/D-03: 見送り承認→backlog 化の橋渡し。app 層が proposeTask→acceptProposal
+  // (INV-5 = 人間判断ゲート)に繋ぐ。deferred=後回し(既存 backlog + 優先度/種別で表現 / Q-02)。
+  | {
+      readonly type: "descopeToBacklog";
+      readonly runId: RunId;
+      readonly requirement: Text;
+      readonly aiReason: Text;
+      readonly deferred: boolean;
+    };
 
 export type RaiseQuestionCmd = {
   readonly id: QuestionId;
@@ -141,6 +160,35 @@ const deriveCommand = (
       return answer.verdict === "approve"
         ? ok({ type: "retryLaunch", runId: q.runId })
         : ok({ type: "cancelRun", runId: q.runId });
+    case "descope": {
+      // payload は kind=descope のとき必ず descope(raiseQuestion が kind を payload から導く)。
+      const p = q.payload.kind === "descope" ? q.payload : undefined;
+      if (!p) return err("InvalidVerdict");
+      switch (answer.verdict) {
+        case "rework": // つくる: 差し戻して再 generate
+          return ok({ type: "retryLaunch", runId: q.runId });
+        case "descope": // 見送る: backlog 化(app 層が acceptProposal ゲートを通す)
+          return ok({
+            type: "descopeToBacklog",
+            runId: q.runId,
+            requirement: p.requirement,
+            aiReason: p.aiReason,
+            deferred: false,
+          });
+        case "defer": // 後回し: backlog 化(deferred)
+          return ok({
+            type: "descopeToBacklog",
+            runId: q.runId,
+            requirement: p.requirement,
+            aiReason: p.aiReason,
+            deferred: true,
+          });
+        case "rewind": // 前のステップからやり直す: 既存 backtrack 経路へ合流
+          return backtrack(answer.backtrackTo ?? p.recommendedStep);
+        default:
+          return err("InvalidVerdict");
+      }
+    }
   }
 };
 
@@ -148,6 +196,11 @@ const deriveCommand = (
 const statementOf = (q: Question, answer: Answer): Text => {
   const base = `${q.kind}:${answer.verdict}`;
   if (q.kind === "question" && nonEmpty(answer.body)) return `${base} — ${answer.body}`;
+  // descope は要件 + AI 理由を Fact に残す(原則#6: 見送りの証跡が backlog/台帳に残る)。
+  if (q.kind === "descope" && q.payload.kind === "descope") {
+    const { requirement, aiReason } = q.payload;
+    return `${base} — ${requirement}(理由: ${aiReason})`;
+  }
   if (nonEmpty(answer.reason)) return `${base} — ${answer.reason}`;
   return base;
 };

@@ -21,6 +21,13 @@ export type CycleState = "planned" | "active" | "paused" | "done";
 export type PhaseState = "pending" | "running" | "review" | "done";
 export type RunState = "running" | "stalled" | "done" | "failed";
 
+/**
+ * Run の役割(S6 run-role)。generator = 成果物(BriefOut)を出す / evaluator = verification 契約で検証。
+ * optional な discriminator(別集約にしない / RunState には入れない = role と二重の真実を避ける / S6 D-01,D-02)。
+ * gen→gate→eval の進行は RunState ではなく app 層の明示的オーケストレーション状態が持つ。
+ */
+export type RunRole = "generator" | "evaluator";
+
 // ── 値オブジェクト Version(vX.Y.Z) ──────────────────────────────
 declare const versionBrand: unique symbol;
 export type Version = string & { readonly [versionBrand]: "Version" };
@@ -37,6 +44,11 @@ export type Run = {
   readonly endedAt?: Instant;
   /** Human-readable reason when the run reached failed/stalled. Empty for done. */
   readonly failureReason?: string;
+  /**
+   * S6 run-role: generator / evaluator の判別子。optional(欠落 = 従来動作 / 後方互換)。
+   * evaluator は generator 成果物が Deterministic gate を pass した後に `launchEval` で起こす(app 層)。
+   */
+  readonly role?: RunRole;
 };
 
 export type Phase = {
@@ -154,6 +166,8 @@ export type StartPhaseCmd = {
   readonly step: Step;
   readonly runId: RunId;
   readonly startedAt: Instant;
+  /** S6 run-role: 起動する Run の役割(既定なし = 従来動作 / 後方互換)。generator 起動で渡す。 */
+  readonly role?: RunRole;
 };
 
 /**
@@ -177,6 +191,7 @@ export const startPhase = (
     attempt: 1,
     state: "running",
     startedAt: cmd.startedAt,
+    ...(cmd.role !== undefined ? { role: cmd.role } : {}),
   };
   const started = replacePhase(cycle, target.id, (p) => ({
     ...p,
@@ -184,6 +199,49 @@ export const startPhase = (
     runs: [...p.runs, run],
   }));
   return ok({ ...started, state: "active" });
+};
+
+export type LaunchEvalCmd = {
+  readonly step: Step;
+  readonly runId: RunId;
+  readonly startedAt: Instant;
+};
+
+/**
+ * launchEval(S6 run-role): generator 成果物が Deterministic gate を pass した後に、
+ * evaluator(role="evaluator")の Run を当該 Phase に新規追加する。gen と eval は別 Run で runs[] に並ぶ。
+ *
+ * gate 判定そのものは AI 非依存の app 層チェック(D-02)であり、本コマンドの呼び出し前提。ドメインは
+ * 「先行 Run が存在し running な Run が無い Phase に evaluator Run を 1 つ append」する純粋更新のみ行う。
+ * 進行(gen→gate→eval)は RunState に入れず app 層が明示状態で持つ(D-02)。Phase は running を維持/復帰。
+ * INV-2(running は高々 1)を守る: 既に running Run があれば PhaseAlreadyRunning。先行 Run 無しは RunNotFound。
+ */
+export const launchEval = (
+  cycle: Cycle,
+  cmd: LaunchEvalCmd,
+): Result<Cycle, CycleError> => {
+  if (cycle.state === "paused") return err("CyclePaused");
+  const target = findPhaseByStep(cycle, cmd.step);
+  if (!target) return err("StepNotInPipeline");
+  if (target.runs.length === 0) return err("RunNotFound"); // 評価対象(generator)が無い
+  if (target.runs.some((r) => r.state === "running")) {
+    return err("PhaseAlreadyRunning");
+  }
+
+  const nextAttempt = (latestRun(target)?.attempt ?? 0) + 1;
+  const evalRun: Run = {
+    id: cmd.runId,
+    attempt: nextAttempt,
+    state: "running",
+    startedAt: cmd.startedAt,
+    role: "evaluator",
+  };
+  const launched = replacePhase(cycle, target.id, (p) => ({
+    ...p,
+    state: "running",
+    runs: [...p.runs, evalRun],
+  }));
+  return ok({ ...launched, state: "active" });
 };
 
 export type RelaunchPhaseCmd = {

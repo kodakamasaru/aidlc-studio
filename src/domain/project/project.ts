@@ -9,6 +9,7 @@ import { type Result, ok, err } from "../shared/result";
 import type { Instant, Text } from "../shared/primitives";
 import type { Step } from "../shared/vocab";
 import type { ProjectId } from "../shared/ids";
+import type { StepContracts, ExecMode } from "./step-contracts";
 
 declare const brand: unique symbol;
 type Brand<T, B extends string> = T & { readonly [brand]: B };
@@ -28,12 +29,18 @@ export type EnvConfig = {
   readonly maxAttempt: number; // 既定 3
 };
 
-/** 1 工程の定義(意味・並び・対応スキル)。per-PJ 可変(US-27)。 */
+/**
+ * 1 工程の定義(意味・並び・対応スキル)。per-PJ 可変(US-27)。
+ * contracts / execMode は v0.0.2 追加の optional VO(S6 step-contracts)。
+ * 欠落 = 従来動作(後方互換)。`validatePipeline` の検証対象には含めない。
+ */
 export type StepDef = {
   readonly id: Step;
   readonly label: Text;
   readonly order: number;
   readonly skillRef: SkillRef;
+  readonly contracts?: StepContracts;
+  readonly execMode?: ExecMode;
 };
 
 export type Project = {

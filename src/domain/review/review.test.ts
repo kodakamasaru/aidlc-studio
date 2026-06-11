@@ -8,7 +8,7 @@ import {
   buildReview,
   isTaskScoped,
   isKnownBlockType,
-  coerceBlocks,
+  filterKnownBlocks,
   MVP_BLOCK_TYPES,
 } from "./review";
 
@@ -58,14 +58,14 @@ describe("MVP block types", () => {
   });
 });
 
-describe("coerceBlocks (INV-2: forward compatible, unknown skipped not errored)", () => {
+describe("filterKnownBlocks (INV-2: forward compatible, unknown skipped not errored)", () => {
   test("keeps known blocks and separates unknown types", () => {
     const raw = [
       { type: "summary", title: "x", body: "y" },
       { type: "future-3d-scene", payload: 123 },
       { type: "mermaid", src: "graph TD" },
     ];
-    const { blocks: kept, skipped } = coerceBlocks(raw);
+    const { blocks: kept, skipped } = filterKnownBlocks(raw);
     expect(kept.map((b) => b.type)).toEqual(["summary", "mermaid"]);
     expect(skipped).toEqual(["future-3d-scene"]);
   });

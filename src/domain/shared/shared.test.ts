@@ -49,8 +49,17 @@ describe("NonEmptyText", () => {
 });
 
 describe("vocab", () => {
-  test("VERDICTS has the four shared verdicts", () => {
-    expect([...VERDICTS]).toEqual(["approve", "reject", "answer", "confirm"]);
+  test("VERDICTS has the base verdicts plus the v0.0.2 descope verdicts", () => {
+    expect([...VERDICTS]).toEqual([
+      "approve",
+      "reject",
+      "answer",
+      "confirm",
+      "rework",
+      "descope",
+      "defer",
+      "rewind",
+    ]);
   });
 
   test("DEFAULT_STEPS is the AI-DLC S1..S7 pipeline", () => {
