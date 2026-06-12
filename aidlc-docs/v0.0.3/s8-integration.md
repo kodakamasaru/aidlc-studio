@@ -5,7 +5,7 @@
 - PhaseGroup: Build
 - 役割: アプリケーションエンジニア(統合)
 - バージョン: v0.0.3
-- ステータス: 進行中
+- ステータス: 確定
 - 入力参照: [s7-domain-code.md](./s7-domain-code.md) / [s5/](./s5/index.md) / [s6/](./s6/index.md)
 - コード出力先: `src/`(domain 配下は触らない)
 - 作成日: 2026-06-12
@@ -30,7 +30,7 @@
 | U02 | DB/app 配線 snapshot + skillRef + ラベル正本 | cycle-service / project-service / vocab / web step-label / StepConfigPage | `createCycle` / `CANONICAL_STEPS` / `skillRefOf`/`labelOf` | api.test / shared.test / step-label-consistency | US-02 | **確定** |
 | U03 | app PromptComposer + Fs.read + live | prompt-composer.ts / sys.ts(Fs.read) / live.ts(composer 注入) / server.ts | `skillRefOf` | prompt-composer.test | US-03 | **確定(決定論)** / 実claude貫通=後述 |
 | U04 | infra live completeness parse | completeness-parse.ts / live.ts(launchEval emit) / prompt-composer(JSON 指示) | (既存 `CompletenessBlock`) | completeness-parse.test | US-04 | **確定(決定論)** |
-| U05 | infra verify-ui screenshot | live/screenshot | (既存 ArtifactRef) | (予定) | US-05 | 予定 |
+| U05 | infra verify-ui screenshot | screenshot port / playwright-capturer / live.ts(emit) / server.ts(配信ルート) | (既存 screenshot block) | screenshot-block.test / screenshot-capture.test(live) | US-05 | **確定** |
 
 ## 増分①: U01 — 死蔵モデル削除(Ledger / Conversation)
 - **対象**: [s6/external-memory-pruning.md](./s6/external-memory-pruning.md) 削除対象表の全波及点。
@@ -65,18 +65,26 @@
 - **live.ts 配線**: `launchEval` の run は `{completeness:true}` で `awaitAndEmit` → result から parse → `ResultEmitted{completeness}` に載せ、**scripted と同じ app ゲート**(`evaluateCompleteness`→gap→descope)へ。parse 失敗は silent に落とさず **log + completeness 無しで emit**(visual_review fallback / 原則④)。
 - **検証(決定論)**: `completeness-parse.test`(5)= gap 算出 / 全充足 / 最後の verdict 採用 / fence 無し fallback / 形不一致で undefined。回帰 **248 pass / 0 fail**。
 
+## 増分③: U05 — verify-ui screenshot(実画像の動作証拠)
+- **ScreenshotCapturer port**(`app/ports/screenshot.ts`)+ **PlaywrightCapturer**(`infra/screenshot/`, `Bun.spawn` で playwright CLI / 新規 import 依存なし / S4 R-02)。撮影は png をディスクに書き **path のみ**返す(binary を DB/event に載せない / artifact 模範)。
+- **live.ts emit**: evaluator run(`parseCompleteness`)で `captureVerifyUi` → `screenshotBlockFrom`(純粋)で screenshot block 生成。成功=配信 URL src / 失敗=空 src + 理由 caption + `logError`(silent 空表示禁止 / 原則④)。generator run では撮らない。
+- **配信ルート**(`server.ts` `/api/screenshots/:file`): SHOTS_DIR の png を on-demand 配信。`SHOT_FILE_RE` で path traversal 拒否(`..`/`/`/`%` を弾く)。`.verify-screenshots/` は gitignore。
+- **web 再利用**: 既存 `ScreenshotFigure` が root-relative src を実描画(新描画なし / US-05 D-02)。
+- **検証**: 決定論 `screenshot-block.test`(ok→配信URL / fail→placeholder+理由)。実撮影 `screenshot-capture.test`(`bun test:live` で実 Playwright→png)+ **実アプリ手動検証**(PlaywrightCapturer が実 app を 39KB png 撮影 → `/api/screenshots/` が 200 image/png 配信)。視覚ゲート(下表)で実画像描画/失敗 placeholder を実 review UI で確認。
+- **評価AI(確定前 proactive)**: typescript-reviewer 9 項目 SOUND(0 CRITICAL/HIGH)— path traversal 拒否・コマンドインジェクションなし(配列 argv)・path 索引・失敗の loud 化・層クリーン・後方互換・新規依存なし。MEDIUM 2(型注釈・shotsDir 既定の絶対化)是正済。
+
 ## 技術依存マップ
 - U03: `PromptComposer`(app)→ `Fs.read`(port)→ skill 本文。live adapter が composer を呼ぶ(infra→app 参照は注入経由 / 依存逆転なし)。
 - U04: live evaluator → `extractCompleteness`(infra)→ 既存 `CompletenessBlock` → app 既存ゲート(新型・新ゲートなし)。
-- (U05 で Playwright(`Bun.spawn`)screenshot を追記)
+- U05: live evaluator → `ScreenshotCapturer`(port)→ `PlaywrightCapturer`(infra `Bun.spawn`)→ png path → screenshot block(配信 URL)→ `/api/screenshots` → web `ScreenshotFigure`。binary は DB に載らない。
 
 ## mock 突合レビュー (S3 視覚契約 ↔ 実装画面)
-> 完全性ゲート: `ls aidlc-docs/v0.0.3/s3/screenshots/ | grep -v tokens | wc -l` = **3 状態**。下表は 3 行ちょうどで、`乖離`/`未実装` を残さず処理する(U05 完了後に埋める)。
+> 完全性ゲート: `ls aidlc-docs/v0.0.3/s3/screenshots/ | grep -v tokens | wc -l` = **3 状態**。下表 3 行 = 状態数、全 `一致`(`乖離`/`未実装` ゼロ)。視覚証拠 = `aidlc-docs/v0.0.3/s8/screenshots/*.real.png`(実アプリ撮影)。
 
 | S3 状態 (scr-NN.state.png) | 実アプリでの出し方 | 構成要素 | 情報粒度 | 日本語水準 | 判定 | 対応 |
 |---|---|---|---|---|---|---|
-| scr-01-review-evidence.default.png | (U05 後) | | | | 未記入 | |
-| scr-01-review-evidence.failed.png | (U05 後) | | | | 未記入 | |
+| scr-01-review-evidence.default.png | gen-eval-complete → review(できあがり確認)。`/api/screenshots/{file}` の実画像が screenshot 枠に描画 | completeness(2/2 反映済)+ まとめ + **実 verify-ui 画像** | 平易(要件1/2・対応状況) | 開発者文字列の露出なし | **一致** | 実装済(証拠 `s8/screenshots/scr-01-...default.real.png`)|
+| scr-01-review-evidence.failed.png | 同上で撮影失敗時 | screenshot 枠が **placeholder + 失敗理由** | 失敗理由を明示 | 平易(「スクリーンショット取得失敗: …」) | **一致** | 実装済(`screenshotBlockFrom` 失敗分岐 / 証拠 `scr-01-...failed.real.png`)|
 | scr-02-step-config-snapshot.default.png | `/settings/steps`(プロジェクト登録後) | snapshot 注記バナー + step カード(平易ラベル) | 確定文言と一致 / step は「S1 要件」等の平易名 | 開発者文字列の露出なし | **一致** | 実装済(実アプリ撮影 `s8/screenshots/scr-02-...real.png`)。U05 で 1 状態として再掲 |
 
 ## 質疑応答ログ
@@ -108,7 +116,21 @@
 - **棄却理由**: 境界の明快さ。正本は file 側。S6 で確定済。
 
 ## 次サイクルへの引き継ぎ
-- (S8 確定時に記載)
+- **完了(v0.0.3)**: ① 正本一元化(死蔵削除 / step 正本セット = id×平易ラベル×実 skillRef / Phase snapshot)② live を本物に(PromptComposer で skill 本文から実合成 / completeness を実 AI で app ゲート駆動 / verify-ui 実 screenshot を review に描画)。実 claude 貫通済。回帰 250 + live 加算層 green。
+- **carry → 次サイクル**:
+  - **S8-Q02 live interactive Q→answer→resume**(headless `claude -p` は mid-run 停止しない)= 元 reconcile 表どおり **v0.0.6**。
+  - **S9-US08 live E2E**(実 AI のシナリオ E2E)= **v0.0.4**(reconcile 表)。
+  - **live evaluator の requirements 源泉**: 現状 evaluator が JSON で requirements+addressed を自己申告。将来 generator の BriefOut requirements を EvalLaunch 経由で渡す厳密化(US-04 の精緻化)。
+  - **per-cycle step 上書き UI**: snapshot 配線は完了(作成時 default コピー)。per-cycle で label/contracts を編集する UI は未(StepConfigPage は project default を編集)。
+  - **wiki 正本一元化**: v0.0.3 は方針のみ(`JSON.stringify(doc)` 複製の是正は Wiki サイクル)。
+- **D-NN backtrack 記録**: S6「ラベルは web」→ US-02 binding に合わせ撤回(ラベルは domain `CANONICAL_STEPS`)。S6 step-canonical-set D-01 に是正済。
+
+## S8 完了条件チェック
+1. ドメイン層が S7 から無変更で動く: ✅(domain は U02 の snapshot 写し受領のみ。U01-05 の振る舞いは app/infra)
+2. S5 I/F 契約と一致: ✅(I/F 整合表 全行 一致)
+3. E2E/統合テストが通る: ✅(回帰 250 / 0 fail・web build ✅・live 加算層 green)
+4. US が画面→API→ドメイン→永続化まで貫通: ✅(snapshot は DB 往復生存 / live は実 claude 貫通)
+5. mock 突合が S3 全状態を網羅: ✅(3 状態 全 `一致`・視覚証拠あり)
 
 ## 前サイクルからの引き継ぎ (手戻り時のみ追記)
 - (なし)

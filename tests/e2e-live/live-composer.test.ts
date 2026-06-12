@@ -73,8 +73,11 @@ suite("PromptComposer × real local Claude (isolated)", () => {
         expect(last).toBeDefined();
         expect(last!.event.type).toBe("ResultEmitted");
         if (last!.event.type === "ResultEmitted") {
-          const body = last!.event.blocks[0]?.body ?? "";
-          expect(body.trim().length).toBeGreaterThan(0);
+          const first = last!.event.blocks[0];
+          expect(first?.type).toBe("summary");
+          if (first?.type === "summary") {
+            expect((first.body as string).trim().length).toBeGreaterThan(0);
+          }
         }
       } finally {
         rmSync(repo, { recursive: true, force: true });

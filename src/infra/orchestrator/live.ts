@@ -24,8 +24,12 @@ import type { DomainEvent } from "../../domain/events/events";
 import type { RunId } from "../../domain/shared/ids";
 import type { Step } from "../../domain/shared/vocab";
 import type { PromptComposer } from "../../app/services/prompt-composer";
+import type { ScreenshotCapturer, CaptureResult } from "../../app/ports/screenshot";
+import type { ReviewBlock } from "../../domain/review/review";
+import type { Text } from "../../domain/shared/primitives";
 import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
+import { join, resolve } from "node:path";
 import { logError } from "../log";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
@@ -44,6 +48,29 @@ const evalStubPrompt = (cmd: EvalLaunch): string => {
     `sentence, state whether the step's requirements are met. Reply with only that sentence.`
   );
 };
+
+/**
+ * US-05: map a CaptureResult to a `screenshot` review block. ok → served URL src;
+ * failure → empty src (web renders placeholder) + the reason in the caption (never
+ * a silent empty / 原則④). Pure, so the ok/failure mapping is deterministically tested.
+ */
+export function screenshotBlockFrom(
+  result: CaptureResult,
+  urlBase: string,
+  file: string,
+): ReviewBlock {
+  return result.ok
+    ? {
+        type: "screenshot",
+        src: `${urlBase}/${file}` as Text,
+        caption: "verify-ui 実行画面(live)" as Text,
+      }
+    : {
+        type: "screenshot",
+        src: "" as Text, // empty → web ScreenshotFigure renders the placeholder
+        caption: `スクリーンショット取得失敗: ${result.reason}` as Text,
+      };
+}
 
 const DEFAULT_CLAUDE_BIN = "claude";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -70,6 +97,18 @@ export interface LiveClaudeOptions {
    * the one-sentence stubs. Omitted = stub prompts (deterministic tests, demos).
    */
   readonly composer?: PromptComposer;
+  /**
+   * US-05 verify-ui screenshot: when set (with verifyUrl), an evaluator run captures
+   * a real screenshot of the running app and emits it as a `screenshot` review block
+   * (real path on success / placeholder + reason on failure). Omitted = no capture.
+   */
+  readonly capturer?: ScreenshotCapturer;
+  /** URL the capturer screenshots (the running app = verify-ui subject). */
+  readonly verifyUrl?: string;
+  /** Dir the capturer writes pngs into (served by the screenshots HTTP route). */
+  readonly shotsDir?: string;
+  /** URL prefix the server serves shotsDir at (the review block's src base). */
+  readonly shotUrlBase?: string;
 }
 
 type SpawnedChild = ReturnType<typeof Bun.spawn>;
@@ -82,6 +121,10 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private readonly maxTurns: number | undefined;
   private readonly buildPrompt: (cmd: RunLaunch) => string;
   private readonly composer: PromptComposer | undefined;
+  private readonly capturer: ScreenshotCapturer | undefined;
+  private readonly verifyUrl: string | undefined;
+  private readonly shotsDir: string;
+  private readonly shotUrlBase: string;
   // Live child processes keyed by runId, so cancel() can kill an in-flight run.
   private readonly children = new Map<string, SpawnedChild>();
   // Each run's full context, kept so the post-review approval finalize (resume)
@@ -98,6 +141,37 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     this.maxTurns = opts.maxTurns;
     this.buildPrompt = opts.buildPrompt ?? defaultBuildPrompt;
     this.composer = opts.composer;
+    this.capturer = opts.capturer;
+    this.verifyUrl = opts.verifyUrl;
+    // Absolute default so a capturer injected without an explicit shotsDir still
+    // writes to a well-defined dir (not cwd-relative at call time).
+    this.shotsDir = opts.shotsDir ?? resolve(process.cwd(), ".verify-screenshots");
+    this.shotUrlBase = opts.shotUrlBase ?? "/api/screenshots";
+  }
+
+  /**
+   * US-05: capture a verify-ui screenshot for an evaluator run and return a
+   * `screenshot` review block. On success the block's src is the served URL of the
+   * real png; on failure it carries an empty src + the reason (placeholder, never a
+   * silent empty / 原則④). Returns undefined when capture isn't configured.
+   */
+  private async captureVerifyUi(runId: string): Promise<ReviewBlock | undefined> {
+    if (this.capturer === undefined || this.verifyUrl === undefined) return undefined;
+    const file = `${runId}.png`;
+    const outPath = join(this.shotsDir, file);
+    let result: CaptureResult;
+    try {
+      result = await this.capturer.capture({ url: this.verifyUrl, outPath });
+    } catch (err) {
+      result = { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
+    }
+    if (!result.ok) {
+      logError("LiveClaudeOrchestrator: verify-ui screenshot capture failed", {
+        runId,
+        reason: result.reason,
+      });
+    }
+    return screenshotBlockFrom(result, this.shotUrlBase, file);
   }
 
   /** Generator prompt: real composition when a composer is wired, else the stub. */
@@ -350,6 +424,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       // it — we log that completeness was expected-but-absent (the app then falls
       // back to visual_review, observably / 原則④).
       let completeness;
+      let shotBlock: ReviewBlock | undefined;
       if (parseCompleteness) {
         completeness = extractCompleteness(text);
         if (completeness === undefined) {
@@ -357,20 +432,20 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
             runId: ctx.runId as string,
           });
         }
+        // US-05: capture the verify-ui screenshot as visual evidence for the review.
+        shotBlock = await this.captureVerifyUi(ctx.runId as string);
       }
+      const blocks: ReviewBlock[] = [
+        { type: "summary", title: `${ctx.step as string} (live Claude)` as Text, body: text as Text },
+        ...(shotBlock ? [shotBlock] : []),
+      ];
       // SUCCESS: emit ONLY the review. Do NOT emit `done` — the run stays
       // `running` until the human approves the review (resume → done). This keeps
       // the live flow consistent with the scripted model's review→approve gate.
       await this.emit(ctx, {
         type: "ResultEmitted",
         runId: ctx.runId,
-        blocks: [
-          {
-            type: "summary",
-            title: `${ctx.step as string} (live Claude)`,
-            body: text,
-          },
-        ],
+        blocks,
         ...(completeness ? { completeness } : {}),
       });
     } catch (err) {
