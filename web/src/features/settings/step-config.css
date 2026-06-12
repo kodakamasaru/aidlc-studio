@@ -24,17 +24,23 @@
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
-  max-width: 60ch;
+  max-width: 64ch;
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--text-caption);
+  line-height: 1.7;
   color: var(--color-text-low);
   background: var(--color-surface-2);
   border-left: 2px solid var(--color-info);
   border-radius: var(--radius-md);
 }
-.step-config__snapshot-note > span {
+.step-config__snapshot-icon {
+  flex-shrink: 0;
   color: var(--color-info);
+}
+/* 各文は語中(「サイクル」等)で折り返さない。<wbr> を置いた文間でのみ改行する。 */
+.step-config__snapshot-line {
+  white-space: nowrap;
 }
 .step-config__list {
   display: flex;
