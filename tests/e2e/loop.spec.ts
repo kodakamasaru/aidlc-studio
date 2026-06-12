@@ -55,7 +55,9 @@ test("human runs one phase end-to-end through the Inbox loop", async ({
   await page.goto(cycleUrl);
   const pipeline = page.getByRole("region", { name: "Phase パイプライン" });
   await expect(pipeline).toBeVisible();
-  for (const label of ["要件", "画面", "UIデザイン", "設計", "技術仕様", "分割", "モデル", "実装"]) {
+  // v0.0.3 (US-02): v2 12-step canonical labels — S2.5 retired, S3 = "UIデザイン"
+  // (no more "設計"). Plain names, not code IDs (S3 scr-02 D-03).
+  for (const label of ["要件", "画面", "UIデザイン", "技術仕様", "分割", "モデル", "実装", "統合"]) {
     await expect(
       pipeline.locator(".pipeline__step-label", {
         hasText: new RegExp(`^${escapeRe(label)}$`),
