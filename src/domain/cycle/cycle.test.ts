@@ -1,7 +1,8 @@
 import { test, expect, describe } from "bun:test";
 import { unwrap, isErr } from "../shared/result";
 import { instant } from "../shared/primitives";
-import { Step } from "../shared/vocab";
+import { Step, SkillRef, sameStep } from "../shared/vocab";
+import type { StepDefSnapshot } from "../project/project";
 import { CycleId, ProjectId, PhaseId, RunId } from "../shared/ids";
 import {
   type Cycle,
@@ -62,6 +63,38 @@ describe("createCycle", () => {
     expect(c.phases.map((p) => p.step as string)).toEqual(["S5", "S6", "S7"]);
     expect(c.phases.map((p) => p.order)).toEqual([0, 1, 2]);
     expect(c.phases.every((p) => p.state === "pending")).toBe(true);
+  });
+
+  test("omitting stepDef leaves Phase.stepDef undefined (backward compatible / INV-S3)", () => {
+    const c = fresh();
+    expect(c.phases.every((p) => p.stepDef === undefined)).toBe(true);
+  });
+
+  test("pins the provided StepDef snapshot onto the matching Phase (INV-S1, copy-through)", () => {
+    const snapshot: StepDefSnapshot = {
+      label: "ドメインモデル",
+      order: 0,
+      skillRef: SkillRef("aidlc-s6-domain-model"),
+      contracts: { humanGate: { mode: "none" } },
+    };
+    const c = unwrap(
+      createCycle({
+        id: CycleId("cyc-2"),
+        projectId: ProjectId("prj-1"),
+        version: unwrap(version("v0.0.3")),
+        title: "snapshot cycle",
+        taskIds: [],
+        createdAt: at(0),
+        pipeline: [
+          { phaseId: PhaseId("ph-s6"), step: Step("S6"), stepDef: snapshot },
+          { phaseId: PhaseId("ph-s7"), step: Step("S7") },
+        ],
+      }),
+    );
+    const s6 = c.phases.find((p) => sameStep(p.step, Step("S6")));
+    const s7 = c.phases.find((p) => sameStep(p.step, Step("S7")));
+    expect(s6?.stepDef).toEqual(snapshot);
+    expect(s7?.stepDef).toBeUndefined();
   });
 
   test("rejects empty title and empty pipeline", () => {

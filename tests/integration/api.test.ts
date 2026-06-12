@@ -125,8 +125,8 @@ describe("projects", () => {
     expect(json.data).toHaveLength(1);
     expect(json.data[0].id).toBe(id);
     expect(json.data[0].repoPath).toBe(repoPath);
-    // pipeline defaulted from DEFAULT_STEPS (8 steps incl S2.5)
-    expect(json.data[0].pipelineDef).toHaveLength(8);
+    // pipeline defaulted from DEFAULT_STEPS (v2: 12 steps, S2.5 retired)
+    expect(json.data[0].pipelineDef).toHaveLength(12);
   });
 
   test("missing repoPath → 400", async () => {
@@ -190,7 +190,7 @@ describe("cycles create/list/get", () => {
     const cycle = await createCycle(h, projectId, "v1.2.3");
     expect(cycle.version).toBe("v1.2.3");
     expect(cycle.state).toBe("planned");
-    expect(cycle.phases).toHaveLength(8);
+    expect(cycle.phases).toHaveLength(12); // v2: 12 steps (S2.5 retired)
     const got = await get(h.app, `/api/cycles/${cycle.id}`);
     expect(got.status).toBe(200);
     expect(got.json.data.id).toBe(cycle.id);
@@ -409,17 +409,19 @@ describe("startPhase", () => {
     expect(json.error).toBe("StepNotInPipeline");
   });
 
-  test("S2.5 step segment decodes correctly", async () => {
+  test("dotted step segment (retired S2.5) decodes and is evaluated against the pipeline", async () => {
     const h = buildTestApp();
     const projectId = await createProject(h);
     const cycle = await createCycle(h, projectId);
-    // S2.5 is the 3rd default step; can't start before S1/S2 → 409 (not 400).
+    // A step id with a dot must decode through the route (not be mangled). S2.5 is
+    // retired from the v2 default pipeline, so the decoded id evaluates to
+    // StepNotInPipeline (400) — which still proves the dotted segment decoded.
     const { status, json } = await post(
       h.app,
       `/api/cycles/${cycle.id}/phases/S2.5/start`,
     );
-    expect(status).toBe(409);
-    expect(json.error).toBe("PrevPhaseNotDone");
+    expect(status).toBe(400);
+    expect(json.error).toBe("StepNotInPipeline");
   });
 });
 

@@ -7,7 +7,7 @@
 
 import { type Result, ok, err } from "../shared/result";
 import type { Instant, Text } from "../shared/primitives";
-import type { Step } from "../shared/vocab";
+import type { Step, SkillRef } from "../shared/vocab";
 import type { ProjectId } from "../shared/ids";
 import type { StepContracts, ExecMode } from "./step-contracts";
 
@@ -18,8 +18,12 @@ type Brand<T, B extends string> = T & { readonly [brand]: B };
 export type RepoPath = Brand<string, "RepoPath">;
 /** Vision(brief)への参照(内容は外部記憶側)。 */
 export type VisionRef = Brand<string, "VisionRef">;
-/** 対応する kit/skills(aidlc-sN)or PJ 独自スキルへの参照。 */
-export type SkillRef = Brand<string, "SkillRef">;
+/**
+ * 対応する kit/skills(実在 dir)or PJ 独自スキルへの参照。
+ * v0.0.3(S6 step-canonical-set D-01): 正本は `shared/vocab`(domain identity)へ移設。
+ * 既存 import 互換のためここで re-export する。
+ */
+export type { SkillRef } from "../shared/vocab";
 
 /** モデル名 / worktreeRoot / stall タイムアウト / 最大 attempt 等の横断設定(全集約が read)。 */
 export type EnvConfig = {
@@ -41,6 +45,20 @@ export type StepDef = {
   readonly skillRef: SkillRef;
   readonly contracts?: StepContracts;
   readonly execMode?: ExecMode;
+};
+
+/**
+ * StepDef のスナップショット(S6 phase-step-snapshot)。
+ * サイクル作成時に、その時点の default step 定義を Phase へピン留めコピーした不変の写し。
+ * id は Phase.step が保持するため重複させない(S6 D-03)。label は当時値の写し
+ * (正本 = web、写し = snapshot。役割が違うので二重定義ではない / S6 Q-01)。
+ * 解決(正本 + per-cycle 上書き)は app、ドメインは受領した snapshot を写すだけ(S6 D-02)。
+ */
+export type StepDefSnapshot = {
+  readonly label: Text;
+  readonly order: number;
+  readonly skillRef: SkillRef;
+  readonly contracts?: StepContracts;
 };
 
 export type Project = {

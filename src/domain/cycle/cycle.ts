@@ -14,6 +14,7 @@ import {
   nonEmptyText,
 } from "../shared/primitives";
 import { type Step, sameStep } from "../shared/vocab";
+import type { StepDefSnapshot } from "../project/project";
 import type { CycleId, ProjectId, PhaseId, RunId, TaskId } from "../shared/ids";
 
 // ── 状態列挙(S5 状態遷移のみ許可) ───────────────────────────────
@@ -57,6 +58,11 @@ export type Phase = {
   readonly order: number;
   readonly state: PhaseState;
   readonly runs: readonly Run[];
+  /**
+   * S6 phase-step-snapshot: 作成時にピン留めした step 定義の写し(label/skillRef/contracts)。
+   * optional = snapshot 導入前に作られた既存 Phase の後方互換(INV-S3)。作成後不変(INV-S2)。
+   */
+  readonly stepDef?: StepDefSnapshot;
 };
 
 export type Cycle = {
@@ -128,8 +134,16 @@ export type CreateCycleCmd = {
   readonly title: string;
   readonly taskIds: readonly TaskId[];
   readonly createdAt: Instant;
-  /** Project の pipelineDef から渡される工程列(順序順)。phase は pending で instantiate。 */
-  readonly pipeline: readonly { readonly phaseId: PhaseId; readonly step: Step }[];
+  /**
+   * Project の pipelineDef から渡される工程列(順序順)。phase は pending で instantiate。
+   * `stepDef` は S6 phase-step-snapshot: app(cycle-service)が正本 + per-cycle 上書きを
+   * 解決した写しを詰める。optional = 未指定なら従来動作(後方互換)。ドメインは写すだけ(S6 D-02)。
+   */
+  readonly pipeline: readonly {
+    readonly phaseId: PhaseId;
+    readonly step: Step;
+    readonly stepDef?: StepDefSnapshot;
+  }[];
 };
 
 /**
@@ -148,6 +162,8 @@ export const createCycle = (cmd: CreateCycleCmd): Result<Cycle, CycleError> => {
     order: index,
     state: "pending",
     runs: [],
+    // S6 INV-S1: 受領した snapshot をそのまま写す(解決は app / ドメインは判断しない)。
+    ...(s.stepDef ? { stepDef: s.stepDef } : {}),
   }));
 
   return ok({
