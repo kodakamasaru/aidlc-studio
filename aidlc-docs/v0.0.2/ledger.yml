@@ -100,7 +100,7 @@
   origin: v0.0.2/s9-validation.md
   decision: "US-08 AC『実 AI 使用の E2E で Q→回答→resume が pass』の常時実行化。現状 live-run.test.ts は bun test:live の環境ゲート付き加算層(real-ai-tests-additive 方針)で S9 決定的ゲート外。"
   state: carried
-  into: v0.0.x
+  into: v0.0.4   # ROADMAP: 実AI Q→回答→resume が実モデル化される版で常時 E2E 化
 
 # ── 次サイクル(v0.0.x / scope.md 明示除外)へ持ち越し(carried)──
 # S9 観察 O-01(scripted では verify-ui screenshot が実ファイル無く placeholder 描画)は
@@ -109,13 +109,13 @@
   origin: v0.0.2/s8-integration.md
   decision: "live evaluator が completeness(addressed)を emit する(stream-json パース)。現状 scripted のみが completeness を出し、live は completeness なし→visual_review fallback。"
   state: carried
-  into: v0.0.x
+  into: v0.0.3   # ROADMAP v0.0.3 ②「live を本物に」。v0.0.3 S1 が消し込む唯一の carry
 
 - id: S8-Q02
   origin: v0.0.2/s8-integration.md
   decision: "auto-rework(理由なし gap)の完全 silent 自動再生成。v0.0.2 は loud(eval run stalled+理由)で代替。Unit-05 の silent UX 最適化が残(新ドメイン再生成コマンド要)。"
   state: carried
-  into: v0.0.x
+  into: v0.0.6   # ROADMAP: self-host バー外の磨き込み(クリティカルパス外)
 
 # ── S10 却下(2026-06-11)→ S8 差し戻し。v0.0.2 を reopen し UI を S3 視覚契約へ。──
 # mock 突合を全 15 状態起点で実スクショ目視し直し、一致 2/15 の系統的乖離が判明。
