@@ -24,6 +24,7 @@ import type { DomainEvent } from "../../domain/events/events";
 import type { RunId } from "../../domain/shared/ids";
 import type { Step } from "../../domain/shared/vocab";
 import type { PromptComposer } from "../../app/services/prompt-composer";
+import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { logError } from "../log";
 import { existsSync } from "node:fs";
@@ -147,7 +148,12 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
           ...(cmd.verification ? { verification: cmd.verification } : {}),
         })
       : evalStubPrompt(cmd);
-    this.startAttempt(buildRunContext(cmd, cmd.runId), prompt, cmd.repoPath);
+    // US-04: evaluator runs parse a structured completeness verdict out of the
+    // result and emit it on ResultEmitted, so the SAME app gate (gap→descope) runs
+    // on the real model's output.
+    this.startAttempt(buildRunContext(cmd, cmd.runId), prompt, cmd.repoPath, {
+      completeness: true,
+    });
   }
 
   async retry(cmd: RetryLaunch): Promise<void> {
@@ -236,6 +242,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     ctx: RunContext,
     prompt: string,
     repoPath: string,
+    opts: { readonly completeness?: boolean } = {},
   ): void {
     // Defense in depth: refuse to spawn against a non-absolute / missing cwd.
     // Bun.spawn with a bad cwd can throw or behave oddly per-platform; failing
@@ -272,7 +279,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     // Detached: do NOT await. awaitAndEmit owns the rest of the lifecycle and is
     // total — it catches everything and always emits a terminal/result event — so
     // there is never an unhandled rejection. void marks the intentional detach.
-    void this.awaitAndEmit(ctx, child);
+    void this.awaitAndEmit(ctx, child, opts.completeness === true);
   }
 
   /**
@@ -287,6 +294,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private async awaitAndEmit(
     ctx: RunContext,
     child: SpawnedChild,
+    parseCompleteness = false,
   ): Promise<void> {
     let timedOut = false;
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined;
@@ -337,6 +345,19 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       if (text === undefined || text.trim().length === 0) {
         throw new Error("claude produced no assistant result text");
       }
+      // US-04: evaluator runs parse a structured completeness verdict so the SAME
+      // app gate runs on the real model output. A parse miss does NOT silently drop
+      // it — we log that completeness was expected-but-absent (the app then falls
+      // back to visual_review, observably / 原則④).
+      let completeness;
+      if (parseCompleteness) {
+        completeness = extractCompleteness(text);
+        if (completeness === undefined) {
+          logError("LiveClaudeOrchestrator: evaluator emitted no parseable completeness", {
+            runId: ctx.runId as string,
+          });
+        }
+      }
       // SUCCESS: emit ONLY the review. Do NOT emit `done` — the run stays
       // `running` until the human approves the review (resume → done). This keeps
       // the live flow consistent with the scripted model's review→approve gate.
@@ -346,10 +367,11 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         blocks: [
           {
             type: "summary",
-            title: `S${ctx.step as string} (live Claude)`,
+            title: `${ctx.step as string} (live Claude)`,
             body: text,
           },
         ],
+        ...(completeness ? { completeness } : {}),
       });
     } catch (err) {
       logError("LiveClaudeOrchestrator: run ended abnormally", err);

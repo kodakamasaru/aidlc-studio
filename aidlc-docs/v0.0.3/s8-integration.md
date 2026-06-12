@@ -29,7 +29,7 @@
 | U01 | (削除) 死蔵 repo/table 除去 | external-memory / ids / repos / composition / sys / db / migrations / tests | — | 既存回帰 | US-01 | **確定** |
 | U02 | DB/app 配線 snapshot + skillRef + ラベル正本 | cycle-service / project-service / vocab / web step-label / StepConfigPage | `createCycle` / `CANONICAL_STEPS` / `skillRefOf`/`labelOf` | api.test / shared.test / step-label-consistency | US-02 | **確定** |
 | U03 | app PromptComposer + Fs.read + live | prompt-composer.ts / sys.ts(Fs.read) / live.ts(composer 注入) / server.ts | `skillRefOf` | prompt-composer.test | US-03 | **確定(決定論)** / 実claude貫通=後述 |
-| U04 | infra live completeness parse | live.ts | (既存 events 型) | (予定) | US-04 | 予定 |
+| U04 | infra live completeness parse | completeness-parse.ts / live.ts(launchEval emit) / prompt-composer(JSON 指示) | (既存 `CompletenessBlock`) | completeness-parse.test | US-04 | **確定(決定論)** |
 | U05 | infra verify-ui screenshot | live/screenshot | (既存 ArtifactRef) | (予定) | US-05 | 予定 |
 
 ## 増分①: U01 — 死蔵モデル削除(Ledger / Conversation)
@@ -59,9 +59,16 @@
 - **検証(決定論)**: `prompt-composer.test`(5)= 本文埋め込み / evaluator 観点+addressed/gap / 本文不在で throw / 退役 S2.5 で throw / path。回帰 **243 pass / 0 fail**、typecheck src 0。
 - **実 claude 貫通**: 後段の安全な隔離 live テストで実施(composer の generator プロンプトは「成果物を生成せよ」のため、作業リポでなく **一時 repo + 最小 SKILL.md** で走らせ汚染回避)。
 
+## 増分③: U04 — live completeness emit(実 AI が completeness ゲートを駆動)
+- **parser 新設**(`completeness-parse.ts`): evaluator の result text から fenced `json` 検証ブロックを抽出 → **既存 `CompletenessBlock`**(requirements+addressed)へ。total/defensive(形不一致は `undefined`)。
+- **composer 強化**: evaluator プロンプトが「最後に `{requirements,addressed}` の JSON を 1 つ出せ / 未充足は addressed に入れるな = gap」と指示(機械可読化)。
+- **live.ts 配線**: `launchEval` の run は `{completeness:true}` で `awaitAndEmit` → result から parse → `ResultEmitted{completeness}` に載せ、**scripted と同じ app ゲート**(`evaluateCompleteness`→gap→descope)へ。parse 失敗は silent に落とさず **log + completeness 無しで emit**(visual_review fallback / 原則④)。
+- **検証(決定論)**: `completeness-parse.test`(5)= gap 算出 / 全充足 / 最後の verdict 採用 / fence 無し fallback / 形不一致で undefined。回帰 **248 pass / 0 fail**。
+
 ## 技術依存マップ
 - U03: `PromptComposer`(app)→ `Fs.read`(port)→ skill 本文。live adapter が composer を呼ぶ(infra→app 参照は注入経由 / 依存逆転なし)。
-- (U04-05 で live completeness parse / Playwright(`Bun.spawn`)screenshot を追記)
+- U04: live evaluator → `extractCompleteness`(infra)→ 既存 `CompletenessBlock` → app 既存ゲート(新型・新ゲートなし)。
+- (U05 で Playwright(`Bun.spawn`)screenshot を追記)
 
 ## mock 突合レビュー (S3 視覚契約 ↔ 実装画面)
 > 完全性ゲート: `ls aidlc-docs/v0.0.3/s3/screenshots/ | grep -v tokens | wc -l` = **3 状態**。下表は 3 行ちょうどで、`乖離`/`未実装` を残さず処理する(U05 完了後に埋める)。

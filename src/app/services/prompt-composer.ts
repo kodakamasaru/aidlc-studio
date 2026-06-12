@@ -80,7 +80,14 @@ export class PromptComposer {
         ? `次の観点を 1 つずつ検証せよ:\n${obs}`
         : "スキル本文の完了条件に照らして成果物を検証せよ。",
       "",
-      "対応済みの要件キーを addressed として列挙し、未充足は gap として残せ(黙って落とすな)。",
+      // US-04: the verdict must be machine-parseable so the SAME app completeness
+      // gate (gap = requirements − addressed) runs on the real model output.
+      "検証の最後に、次の形式の JSON を ```json コードブロックで 1 つだけ出力せよ",
+      "(requirements = 満たすべき要件の {key, text}、addressed = 対応済みの key 配列。",
+      "未充足は addressed に含めない = それが gap。黙って落とすな):",
+      '```json',
+      '{"requirements":[{"key":"r1","text":"…"}],"addressed":["r1"]}',
+      '```',
     ].join("\n");
   }
 }
