@@ -11,7 +11,6 @@ import type {
   QuestionId,
   FactId,
   ProposalId,
-  LedgerEntryId,
 } from "../../domain/shared/ids";
 import {
   ProjectId as makeProjectId,
@@ -22,7 +21,6 @@ import {
   QuestionId as makeQuestionId,
   FactId as makeFactId,
   ProposalId as makeProposalId,
-  LedgerEntryId as makeLedgerEntryId,
 } from "../../domain/shared/ids";
 
 export class UuidIdGen implements IdGen {
@@ -49,8 +47,5 @@ export class UuidIdGen implements IdGen {
   }
   proposalId(): ProposalId {
     return makeProposalId(crypto.randomUUID());
-  }
-  ledgerEntryId(): LedgerEntryId {
-    return makeLedgerEntryId(crypto.randomUUID());
   }
 }

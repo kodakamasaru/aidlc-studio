@@ -16,8 +16,6 @@ import type {
   ReviewRepo,
   ArtifactRepo,
   WikiRepo,
-  LedgerRepo,
-  ConversationRepo,
 } from "./repos";
 
 export interface Repos {
@@ -30,8 +28,6 @@ export interface Repos {
   readonly reviews: ReviewRepo;
   readonly artifacts: ArtifactRepo;
   readonly wiki: WikiRepo;
-  readonly ledger: LedgerRepo;
-  readonly conversations: ConversationRepo;
 }
 
 export interface Ports {

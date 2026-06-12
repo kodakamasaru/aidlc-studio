@@ -16,9 +16,6 @@
 //                   JSON `data` stays authoritative for the real null/value.
 //  - artifacts:     path (PK), cycleId.
 //  - wiki:          PRIMARY KEY(projectId, section).
-//  - ledger:        id (PK), cycleFrom. ledger.listByProject joins ledger→cycles
-//                   on cycleFrom (LedgerEntry has no projectId of its own).
-//  - conversations: runId (PK), projectId.
 //
 // migrate() is idempotent (CREATE TABLE IF NOT EXISTS) so openDb can call it on
 // every boot.
@@ -99,19 +96,5 @@ export function migrate(db: Database): void {
       data      TEXT NOT NULL,
       PRIMARY KEY (projectId, section)
     );
-
-    CREATE TABLE IF NOT EXISTS ledger (
-      id        TEXT PRIMARY KEY,
-      cycleFrom TEXT NOT NULL,
-      data      TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_ledger_cycle ON ledger (cycleFrom);
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      runId     TEXT PRIMARY KEY,
-      projectId TEXT NOT NULL,
-      data      TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations (projectId);
   `);
 }

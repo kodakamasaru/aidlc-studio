@@ -10,7 +10,6 @@ import type {
   QuestionId,
   FactId,
   ProposalId,
-  LedgerEntryId,
 } from "../../domain/shared/ids";
 
 /** Wall-clock abstraction. `now()` always returns a valid ISO-8601 Instant. */
@@ -37,5 +36,4 @@ export interface IdGen {
   questionId(): QuestionId;
   factId(): FactId;
   proposalId(): ProposalId;
-  ledgerEntryId(): LedgerEntryId;
 }

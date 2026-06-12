@@ -14,7 +14,6 @@ import type {
   QuestionId,
   FactId,
   ProposalId,
-  LedgerEntryId,
 } from "../../domain/shared/ids";
 import {
   ProjectId as makeProjectId,
@@ -25,7 +24,6 @@ import {
   QuestionId as makeQuestionId,
   FactId as makeFactId,
   ProposalId as makeProposalId,
-  LedgerEntryId as makeLedgerEntryId,
 } from "../../domain/shared/ids";
 
 const DEFAULT_INSTANT = "2026-01-01T00:00:00.000Z";
@@ -113,8 +111,5 @@ export class SeqIdGen implements IdGen {
   }
   proposalId(): ProposalId {
     return makeProposalId(this.next("proposal"));
-  }
-  ledgerEntryId(): LedgerEntryId {
-    return makeLedgerEntryId(this.next("ledger"));
   }
 }

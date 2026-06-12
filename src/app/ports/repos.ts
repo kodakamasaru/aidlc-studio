@@ -15,8 +15,6 @@ import type {
   ArtifactRef,
   WikiDoc,
   WikiSection,
-  LedgerEntry,
-  Conversation,
 } from "../../domain/external-memory/external-memory";
 import type {
   ProjectId,
@@ -53,7 +51,7 @@ export interface TaskRepo {
 
 export interface ProposalRepo {
   // projectId is a persistence-scope param (TaskProposal carries none), mirroring
-  // WikiRepo/ConversationRepo. Lets the inbox/backlog scope proposals per project.
+  // WikiRepo. Lets the inbox/backlog scope proposals per project.
   save(projectId: ProjectId, proposal: TaskProposal): void;
   findById(id: TaskProposal["id"]): TaskProposal | undefined;
   listByProject(projectId: ProjectId): readonly TaskProposal[];
@@ -90,15 +88,4 @@ export interface ArtifactRepo {
 export interface WikiRepo {
   save(projectId: ProjectId, doc: WikiDoc): void;
   find(projectId: ProjectId, section: WikiSection): WikiDoc | undefined;
-}
-
-export interface LedgerRepo {
-  save(entry: LedgerEntry): void;
-  listByCycle(cycleId: CycleId): readonly LedgerEntry[];
-  listByProject(projectId: ProjectId): readonly LedgerEntry[];
-}
-
-export interface ConversationRepo {
-  save(projectId: ProjectId, conversation: Conversation): void;
-  findByRun(runId: RunId): Conversation | undefined;
 }
