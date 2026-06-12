@@ -78,7 +78,7 @@
 ### 3.3 live prompt 合成契約 + PromptComposer 新設(①-c + ②-d / US-03)
 - **合成契約(operating-model に明文化)**: live prompt = `kit/skills/aidlc-sN`(手順本文)+ `StepDef.contracts`(DB snapshot)+ brief/前段成果物(`aidlc-docs`)。**所有と順序**を定義(v0.0.2 §11 の Core 常時 + Step Payload 遅延を実体化)。
 - **★ PromptComposer は現状コードに不在(net-new)**: v0.0.2 で設計だけされ未実装(`grep PromptComposer` = 0 件。`live.ts` は 1 文 `defaultBuildPrompt` のみ)。**app 層に新設する 1 Unit 規模の作業**。S5 はこれを「改訂」でなく「新設」として分割すること。
-  - スキル本文の読み出しは **`Fs` ポート経由**(infra 直読みしない / hexagonal 維持)。`StepDef.contracts` 組み立て + brief/artifact path 注入を行う。
+  - スキル本文の読み出しは **`Fs` ポート経由**(infra 直読みしない / hexagonal 維持)。`StepDef.contracts` 組み立て + brief/artifact path 注入を行う。**注: 現 `Fs`(`sys.ts:27`)は `exists` のみ → `Fs.read` 追加(or 新規 reader ポート)が U03 スコープ(S5 評価 AI)**。
 - **live 配線**: `live.ts` の `buildPrompt`(injectable / 現 `defaultBuildPrompt`)を PromptComposer 呼び出しへ差し替え。skillRef→実 dir 解決は §3.2 経由に限定。gen/eval で別 payload。
 - **不変条件**: スキル dir 不在は明示エラー(silent fallback 禁止)。`bun test:live` の実 AI 経路は加算層([[real-ai-tests-additive]])、決定的スイートは fixture で常時検証。
 
