@@ -65,11 +65,17 @@ export class FixedClock implements Clock {
  */
 export class FakeFs implements Fs {
   private readonly present: ReadonlySet<string> | undefined;
-  constructor(present?: readonly string[]) {
+  private readonly contents: ReadonlyMap<string, string>;
+  constructor(present?: readonly string[], contents?: Readonly<Record<string, string>>) {
     this.present = present ? new Set(present) : undefined;
+    this.contents = new Map(Object.entries(contents ?? {}));
   }
   exists(path: string): boolean {
     return this.present === undefined ? true : this.present.has(path);
+  }
+  // US-03: returns pinned content for a path, or undefined (= missing/unreadable).
+  read(path: string): string | undefined {
+    return this.contents.get(path);
   }
 }
 

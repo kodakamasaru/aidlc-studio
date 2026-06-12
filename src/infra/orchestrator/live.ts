@@ -23,6 +23,7 @@ import type {
 import type { DomainEvent } from "../../domain/events/events";
 import type { RunId } from "../../domain/shared/ids";
 import type { Step } from "../../domain/shared/vocab";
+import type { PromptComposer } from "../../app/services/prompt-composer";
 import { buildRunContext } from "./shared";
 import { logError } from "../log";
 import { existsSync } from "node:fs";
@@ -32,6 +33,16 @@ import { isAbsolute } from "node:path";
 const defaultBuildPrompt = (cmd: { readonly step: Step }): string =>
   `You are running AI-DLC step ${cmd.step as string}. In ONE sentence, state ` +
   `what this step produces. Reply with only that sentence.`;
+
+/** Evaluator stub (used only when no PromptComposer is wired). */
+const evalStubPrompt = (cmd: EvalLaunch): string => {
+  const obs = (cmd.verification ?? []).map((o) => `- ${o as string}`).join("\n");
+  return (
+    `You are the EVALUATOR for AI-DLC step ${cmd.step as string}. Verify the ` +
+    `generator's output${obs.length > 0 ? ` against:\n${obs}` : ""}\nIn ONE ` +
+    `sentence, state whether the step's requirements are met. Reply with only that sentence.`
+  );
+};
 
 const DEFAULT_CLAUDE_BIN = "claude";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -52,6 +63,12 @@ export interface LiveClaudeOptions {
    */
   readonly maxTurns?: number;
   readonly buildPrompt?: (cmd: RunLaunch) => string;
+  /**
+   * US-03 PromptComposer: when set, generator/evaluator prompts are composed from
+   * the real skill 本文 + step contracts (the single canonical source) instead of
+   * the one-sentence stubs. Omitted = stub prompts (deterministic tests, demos).
+   */
+  readonly composer?: PromptComposer;
 }
 
 type SpawnedChild = ReturnType<typeof Bun.spawn>;
@@ -63,6 +80,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private readonly timeoutMs: number;
   private readonly maxTurns: number | undefined;
   private readonly buildPrompt: (cmd: RunLaunch) => string;
+  private readonly composer: PromptComposer | undefined;
   // Live child processes keyed by runId, so cancel() can kill an in-flight run.
   private readonly children = new Map<string, SpawnedChild>();
   // Each run's full context, kept so the post-review approval finalize (resume)
@@ -78,6 +96,18 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxTurns = opts.maxTurns;
     this.buildPrompt = opts.buildPrompt ?? defaultBuildPrompt;
+    this.composer = opts.composer;
+  }
+
+  /** Generator prompt: real composition when a composer is wired, else the stub. */
+  private generatorPrompt(cmd: RunLaunch): string {
+    return this.composer
+      ? this.composer.compose({
+          role: "generator",
+          step: cmd.step,
+          repoPath: cmd.repoPath,
+        })
+      : this.buildPrompt(cmd);
   }
 
   // The OrchestratorPort contract says launch "Resolves once the run is started"
@@ -93,7 +123,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   async launch(cmd: RunLaunch): Promise<void> {
     this.startAttempt(
       buildRunContext(cmd, cmd.runId),
-      this.buildPrompt(cmd),
+      this.generatorPrompt(cmd),
       cmd.repoPath,
     );
   }
@@ -109,11 +139,14 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
    * completeness, so the live path still surfaces a reviewable card.
    */
   async launchEval(cmd: EvalLaunch): Promise<void> {
-    const obs = (cmd.verification ?? []).map((o) => `- ${o as string}`).join("\n");
-    const prompt =
-      `You are the EVALUATOR for AI-DLC step ${cmd.step as string}. Verify the ` +
-      `generator's output${obs.length > 0 ? ` against:\n${obs}` : ""}\nIn ONE ` +
-      `sentence, state whether the step's requirements are met. Reply with only that sentence.`;
+    const prompt = this.composer
+      ? this.composer.compose({
+          role: "evaluator",
+          step: cmd.step,
+          repoPath: cmd.repoPath,
+          ...(cmd.verification ? { verification: cmd.verification } : {}),
+        })
+      : evalStubPrompt(cmd);
     this.startAttempt(buildRunContext(cmd, cmd.runId), prompt, cmd.repoPath);
   }
 
@@ -130,7 +163,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     };
     this.startAttempt(
       buildRunContext(cmd, cmd.newRunId),
-      this.buildPrompt(launchLike),
+      this.generatorPrompt(launchLike),
       cmd.repoPath,
     );
   }

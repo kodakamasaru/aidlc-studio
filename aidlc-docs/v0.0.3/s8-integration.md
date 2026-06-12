@@ -28,7 +28,7 @@
 |---|------------|----------|------------------|----------|--------|------|
 | U01 | (削除) 死蔵 repo/table 除去 | external-memory / ids / repos / composition / sys / db / migrations / tests | — | 既存回帰 | US-01 | **確定** |
 | U02 | DB/app 配線 snapshot + skillRef + ラベル正本 | cycle-service / project-service / vocab / web step-label / StepConfigPage | `createCycle` / `CANONICAL_STEPS` / `skillRefOf`/`labelOf` | api.test / shared.test / step-label-consistency | US-02 | **確定** |
-| U03 | app PromptComposer + Fs.read + live | prompt-composer / sys ports / live.ts | (なし / app) | (予定) | US-03 | 予定 |
+| U03 | app PromptComposer + Fs.read + live | prompt-composer.ts / sys.ts(Fs.read) / live.ts(composer 注入) / server.ts | `skillRefOf` | prompt-composer.test | US-03 | **確定(決定論)** / 実claude貫通=後述 |
 | U04 | infra live completeness parse | live.ts | (既存 events 型) | (予定) | US-04 | 予定 |
 | U05 | infra verify-ui screenshot | live/screenshot | (既存 ArtifactRef) | (予定) | US-05 | 予定 |
 
@@ -52,8 +52,16 @@
 
 > **★ backtrack(D-02): S6「ラベルは web」は binding な US-02 と矛盾していた**。U02 実装中に発覚。US-02 AC/Q-01(確定)= 単一 constant が step×平易ラベル×skillRef を持つ機械可読正本 / web はそこから導出。よって S6 step-canonical-set D-01 / INV-C3 を US-02 に合わせ撤回し、ラベルを `CANONICAL_STEPS` へ同居(domain 正本 / web 派生)。[s6/step-canonical-set.md](./s6/step-canonical-set.md) D-01 に是正記録済。
 
+## 増分③: U03 — PromptComposer + Fs.read + live prompt 実合成
+- **Fs.read 追加**(`app/ports/sys.ts` + `nodeFs` + `FakeFs`): skill 本文を **ポート経由**で読む(app の hexagonal を保つ / infra 直読み禁止)。
+- **PromptComposer 新設**(`app/services/prompt-composer.ts`): `skillRefOf(step)` で実 dir skillRef を解決 → `{repoPath}/kit/skills/{skillRef}/SKILL.md` を Fs.read → **2 層プロンプト**(Core: role+step 同一性 / Payload: skill 本文 + evaluator は verification 観点 + addressed/gap 指示)。本文不在は **明示エラー**(silent fallback 禁止 / 原則④)。
+- **live.ts 配線**: `defaultBuildPrompt` 1 文スタブを composer 優先へ(`launch`/`retry`=generator, `launchEval`=evaluator)。composer 未注入なら従来スタブ(後方互換 / 決定論テスト)。`server.ts` が `PromptComposer(nodeFs)` を構築し live adapter に注入。
+- **検証(決定論)**: `prompt-composer.test`(5)= 本文埋め込み / evaluator 観点+addressed/gap / 本文不在で throw / 退役 S2.5 で throw / path。回帰 **243 pass / 0 fail**、typecheck src 0。
+- **実 claude 貫通**: 後段の安全な隔離 live テストで実施(composer の generator プロンプトは「成果物を生成せよ」のため、作業リポでなく **一時 repo + 最小 SKILL.md** で走らせ汚染回避)。
+
 ## 技術依存マップ
-- (U03-05 で live(`claude` CLI subprocess)/ Playwright(`Bun.spawn`)/ Fs read を追記)
+- U03: `PromptComposer`(app)→ `Fs.read`(port)→ skill 本文。live adapter が composer を呼ぶ(infra→app 参照は注入経由 / 依存逆転なし)。
+- (U04-05 で live completeness parse / Playwright(`Bun.spawn`)screenshot を追記)
 
 ## mock 突合レビュー (S3 視覚契約 ↔ 実装画面)
 > 完全性ゲート: `ls aidlc-docs/v0.0.3/s3/screenshots/ | grep -v tokens | wc -l` = **3 状態**。下表は 3 行ちょうどで、`乖離`/`未実装` を残さず処理する(U05 完了後に埋める)。

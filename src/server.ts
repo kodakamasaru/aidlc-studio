@@ -26,6 +26,7 @@ import {
   type ScriptedScenario,
 } from "./infra/orchestrator/scripted";
 import { LiveClaudeOrchestrator } from "./infra/orchestrator/live";
+import { PromptComposer } from "./app/services/prompt-composer";
 import type { Ports } from "./app/ports/composition";
 import type { OrchestratorPort, DomainEventSink } from "./app/ports/orchestrator";
 import type { NotifyPort } from "./app/ports/notify";
@@ -151,8 +152,13 @@ function buildOrchestrator(
     const mtRaw = process.env.AIDLC_MAX_TURNS?.trim();
     const mtParsed = mtRaw ? Number.parseInt(mtRaw, 10) : NaN;
     const maxTurns = Number.isInteger(mtParsed) && mtParsed > 0 ? mtParsed : undefined;
+    // US-03: compose real prompts from skill 本文 + contracts (single canonical
+    // source) instead of the one-sentence stub. The composer reads 本文 via the Fs
+    // port (nodeFs), keeping the live adapter's prompt build hexagonal.
+    const composer = new PromptComposer(nodeFs);
     return new LiveClaudeOrchestrator({
       sink,
+      composer,
       ...(model !== undefined ? { model } : {}),
       ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       ...(maxTurns !== undefined ? { maxTurns } : {}),
