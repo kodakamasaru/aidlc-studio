@@ -16,7 +16,7 @@
 
 ### 受け入れ条件 (AC)
 - 正本マップ(種別 × `truth` × `DB の役割`)が [aidlc-operating-model.md](../../../kit/rules/aidlc-operating-model.md) にルールとして 1 枚に記載されている(模範=artifact、統一原則=「file=truth / DB=index|state、DB は内容を複製しない」)。
-- `ledger` の DB テーブルと repo(`ledger-repo`)が**削除**され、参照していたコード(app 参照 0 を確認済)が無いことをテストで保証。正本は `aidlc-docs/{v}/ledger.yml`(規約 path)であることがマップに明記。
+- `ledger` の DB テーブルと repo(`ledger-repo`)、および**配線層の全波及点**(`app/ports` の LedgerRepo/Repos.ledger/IdGen.ledgerEntryId、`infra` の id-gen/fakes/store/migrations、tests)が**削除**され、`Ledger*` への参照が 0 になることをテストで保証。**業務フロー(services/orchestrator)参照は既に 0**(死蔵 / 削除は機能を壊さない)。正本は `aidlc-docs/{v}/ledger.yml`(規約 path)であることがマップに明記。
 - `conversation` の DB テーブルと関連コードが**削除**され、回帰が割れない。
 - `wiki` は本サイクルでは**方針のみ確定**(マップ上 `truth=file / DB=将来 index / 内容複製は是正対象` と記載)。実装の是正は Wiki サイクルへ送る旨が scope に残る。
 - 既存テスト(235 回帰 + E2E 6)が pass(後方互換 / 削除による参照切れ 0)。
