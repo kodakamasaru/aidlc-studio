@@ -51,7 +51,8 @@ export type StepDef = {
  * StepDef のスナップショット(S6 phase-step-snapshot)。
  * サイクル作成時に、その時点の default step 定義を Phase へピン留めコピーした不変の写し。
  * id は Phase.step が保持するため重複させない(S6 D-03)。label は当時値の写し
- * (正本 = web、写し = snapshot。役割が違うので二重定義ではない / S6 Q-01)。
+ * (平易ラベルの正本 = domain `CANONICAL_STEPS`(US-02)、snapshot はその作成時点の写し。
+ *  役割が違うので二重定義ではない / S6 Q-01)。
  * 解決(正本 + per-cycle 上書き)は app、ドメインは受領した snapshot を写すだけ(S6 D-02)。
  */
 export type StepDefSnapshot = {

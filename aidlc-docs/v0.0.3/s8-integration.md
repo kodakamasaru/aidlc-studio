@@ -27,7 +27,7 @@
 | # | アダプタ種別 | コードパス | 呼び出すドメイン関数 | テストパス | 対応 US | 状態 |
 |---|------------|----------|------------------|----------|--------|------|
 | U01 | (削除) 死蔵 repo/table 除去 | external-memory / ids / repos / composition / sys / db / migrations / tests | — | 既存回帰 | US-01 | **確定** |
-| U02 | DB/app 配線 snapshot + skillRef | cycle-service / project-service | `createCycle` / `skillRefOf` | (予定) | US-02 | 予定 |
+| U02 | DB/app 配線 snapshot + skillRef + ラベル正本 | cycle-service / project-service / vocab / web step-label / StepConfigPage | `createCycle` / `CANONICAL_STEPS` / `skillRefOf`/`labelOf` | api.test / shared.test / step-label-consistency | US-02 | **確定** |
 | U03 | app PromptComposer + Fs.read + live | prompt-composer / sys ports / live.ts | (なし / app) | (予定) | US-03 | 予定 |
 | U04 | infra live completeness parse | live.ts | (既存 events 型) | (予定) | US-04 | 予定 |
 | U05 | infra verify-ui screenshot | live/screenshot | (既存 ArtifactRef) | (予定) | US-05 | 予定 |
@@ -43,6 +43,15 @@
   - typecheck: `src` エラー 0。回帰: `bun test src tests/integration` → **234 pass / 0 fail**(削除前 240 → 6 test 削除 = 234)。SQLite store/migrations を `store.test.ts` が実走するため、削除の健全性は決定論ハーネス自体が担保。
   - **INV-P1 達成**: domain/app/infra/tests の `Ledger*`/`Conversation*`/`LedgerEntryId` 参照 0。**業務フロー参照は元から 0** のため機能無影響。
 
+## 増分②: U02 — snapshot 配線 + 実 skillRef + ラベル正本一元化
+- **実 skillRef / ラベル正本**: `project-service.defaultPipeline()` を `CANONICAL_STEPS` 由来へ(id+平易ラベル+実 dir skillRef)。偽 `aidlc-${step}` と `label="S1"` 死蔵を撤廃。
+- **snapshot 配線**: `cycle-service.createCycle` が各 phase に `stepDef:{label,order,skillRef,contracts?}` を pin。`cycle-repo` は `JSON.stringify(cycle)` 全体保存なので **DB 往復で snapshot 生存**(api.test が GET 後 `phases[0].stepDef.skillRef/label` を assert)。
+- **web 導出**: `web/src/lib/step-label.ts` を `CANONICAL_STEPS` へ整合(S3=UIデザイン統一 / S2.5 除去)。web は domain を import できないため手書きミラー + `tests/integration/step-label-consistency.test.ts` で一致を強制(drift ゼロ)。
+- **scr-02 バナー実装**: `StepConfigPage` に snapshot 注記(確定文言一致)+ `step-config.css`。**実アプリ撮影**(`aidlc-docs/v0.0.3/s8/screenshots/scr-02-step-config-snapshot.real.png`)で本物描画を確認(injection でない)。
+- **検証**: 回帰 **238 pass / 0 fail** / web build ✓ / 確定前 proactive 評価 AI(code-reviewer)8 項目 SOUND(0 CRITICAL/HIGH/MEDIUM)。LOW 3(backtrack で stale 化したコメント)は同コミットで一掃。
+
+> **★ backtrack(D-02): S6「ラベルは web」は binding な US-02 と矛盾していた**。U02 実装中に発覚。US-02 AC/Q-01(確定)= 単一 constant が step×平易ラベル×skillRef を持つ機械可読正本 / web はそこから導出。よって S6 step-canonical-set D-01 / INV-C3 を US-02 に合わせ撤回し、ラベルを `CANONICAL_STEPS` へ同居(domain 正本 / web 派生)。[s6/step-canonical-set.md](./s6/step-canonical-set.md) D-01 に是正記録済。
+
 ## 技術依存マップ
 - (U03-05 で live(`claude` CLI subprocess)/ Playwright(`Bun.spawn`)/ Fs read を追記)
 
@@ -53,7 +62,7 @@
 |---|---|---|---|---|---|---|
 | scr-01-review-evidence.default.png | (U05 後) | | | | 未記入 | |
 | scr-01-review-evidence.failed.png | (U05 後) | | | | 未記入 | |
-| scr-02-step-config-snapshot.default.png | (U02 後) | | | | 未記入 | |
+| scr-02-step-config-snapshot.default.png | `/settings/steps`(プロジェクト登録後) | snapshot 注記バナー + step カード(平易ラベル) | 確定文言と一致 / step は「S1 要件」等の平易名 | 開発者文字列の露出なし | **一致** | 実装済(実アプリ撮影 `s8/screenshots/scr-02-...real.png`)。U05 で 1 状態として再掲 |
 
 ## 質疑応答ログ
 
@@ -69,6 +78,11 @@
 
 ### D-01 — U01 は機械的削除を subagent に委譲し、結論(grep 0 / 234 green / 純粋削除 diff)を自分で独立裏取り
 - **理由**: 削除対象は S6 で全波及点を表に確定済。機械作業は委譲し、正しさは決定論ハーネス(SQLite store 実走 234 test)+ grep 0 + deletions-only diff で検証する方が確実([[dogfood-harness-principles-on-this-repo]] / 人間にはコードでなく結論)。
+- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **上書き内容**(上書き時のみ): 
+
+### D-02 — ラベルを `CANONICAL_STEPS`(domain)へ移し web を導出側にする(S6「ラベルは web」の backtrack)
+- **理由**: U02 実装中、S6 step-canonical-set D-01「ラベルは web」が **S1 で確定済(binding)の US-02 AC/Q-01 と矛盾**と発覚(US-02 = 単一 constant が step×平易ラベル×skillRef の機械可読正本 / web はそこから導出 / snapshot に平易ラベルが入って死蔵解消)。binding が勝つため US-02 に合わせ是正。web は別ビルドで domain を import 不可のため手書きミラー + drift-guard テストで一致強制。これは「内部コード判断」だが、根拠は確定済 US-02(ソース不要で読める binding 要件)なので人間裁定でなく US-02 準拠 + 評価 AI で確定([[ai-responsibility-contract]] / [[dogfood-harness-principles-on-this-repo]])。
 - **判断**(ユーザー記入): 承認 | 上書き | 保留
 - **上書き内容**(上書き時のみ): 
 

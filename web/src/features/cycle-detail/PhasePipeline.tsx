@@ -1,4 +1,4 @@
-// PhasePipeline (SCR-02) — the S1..S7 pipeline (8 nodes incl. S2.5). Each node is
+// PhasePipeline (SCR-02) — the v2 S1..S12 pipeline (12 nodes, S2.5 retired). Each node is
 // done (green ✓) / current (indigo, or running-spinner / stalled-amber !) /
 // upcoming (neutral number). Connectors go green across done spans. Nodes
 // re-entered after a backtrack carry a ↩ marker (amber) read by the legend.

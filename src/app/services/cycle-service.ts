@@ -119,9 +119,19 @@ export class CycleService {
     const ver = parseVersion(versionStr);
     if (isErr(ver)) throw fail(400, ver.error);
 
+    // US-02 / S6 phase-step-snapshot: pin the project's StepDef (label/skillRef/
+    // contracts/order) onto each phase at creation time. The project pipelineDef IS
+    // the resolved per-project default (+ any per-cycle override once that lands); the
+    // domain just copies the snapshot through. file の後変更は既存サイクルに波及しない。
     const pipeline = project.pipelineDef.map((sd) => ({
       phaseId: this.ports.ids.phaseId(),
       step: sd.id,
+      stepDef: {
+        label: sd.label,
+        order: sd.order,
+        skillRef: sd.skillRef,
+        ...(sd.contracts ? { contracts: sd.contracts } : {}),
+      },
     }));
 
     const taskIds = (input.taskIds ?? []).map(TaskId);

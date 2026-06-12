@@ -19,6 +19,23 @@
   color: var(--color-text-low);
   max-width: 60ch;
 }
+/* US-02 / S3 scr-02: snapshot 注記。作成時点に固定される旨を控えめに明示。 */
+.step-config__snapshot-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  max-width: 60ch;
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  background: var(--color-surface-2);
+  border-left: 2px solid var(--color-info);
+  border-radius: var(--radius-md);
+}
+.step-config__snapshot-note > span {
+  color: var(--color-info);
+}
 .step-config__list {
   display: flex;
   flex-direction: column;

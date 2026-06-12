@@ -6,6 +6,7 @@ import {
   DEFAULT_STEPS,
   CANONICAL_STEPS,
   skillRefOf,
+  labelOf,
   Step,
   sameStep,
 } from "./vocab";
@@ -100,6 +101,20 @@ describe("vocab", () => {
   test("skillRefOf returns undefined for an unknown step", () => {
     expect(skillRefOf(Step("S2.5"))).toBeUndefined();
     expect(skillRefOf(Step("BOGUS"))).toBeUndefined();
+  });
+
+  test("CANONICAL_STEPS carries the 平易ラベル as the machine-readable source (US-02)", () => {
+    // 単一 constant が step×平易ラベル×skillRef を持つ(web step-label はここから導出)。
+    expect(labelOf(Step("S1"))).toBe("要件");
+    expect(labelOf(Step("S6"))).toBe("モデル");
+    // S2.5 退役 → S3 の意味が v2「UIデザイン」に統一(US-02 AC)。
+    expect(labelOf(Step("S3"))).toBe("UIデザイン");
+    expect(CANONICAL_STEPS.every((c) => (c.label as string).length > 0)).toBe(true);
+  });
+
+  test("labelOf returns undefined for an unknown step", () => {
+    expect(labelOf(Step("S2.5"))).toBeUndefined();
+    expect(labelOf(Step("BOGUS"))).toBeUndefined();
   });
 
   test("sameStep compares by value", () => {

@@ -1,7 +1,7 @@
 // project-service — minimal project bootstrap (v0). Cycles require a projectId,
 // so this endpoint exists to create the workspace from a repo path + optional
 // model. Full project-config UI is v0.0.x; here we synthesize sane defaults for
-// the pipeline + env from the shared DEFAULT_STEPS.
+// the pipeline + env from the single canonical source CANONICAL_STEPS (US-02).
 import path from "node:path";
 import fs from "node:fs";
 import type { Ports } from "../ports/composition";
@@ -14,10 +14,9 @@ import {
   type StepDef,
   type EnvConfig,
   type VisionRef,
-  type SkillRef,
 } from "../../domain/project/project";
 import type { StepContracts } from "../../domain/project/step-contracts";
-import { DEFAULT_STEPS, Step, sameStep } from "../../domain/shared/vocab";
+import { CANONICAL_STEPS, Step, sameStep } from "../../domain/shared/vocab";
 import { ProjectId } from "../../domain/shared/ids";
 import { isErr } from "../../domain/shared/result";
 
@@ -35,13 +34,17 @@ export interface CreateProjectInput {
   readonly modelName?: string;
 }
 
-/** Build the default pipeline from DEFAULT_STEPS: skillRef = `aidlc-${step}`. */
+/**
+ * Build the default pipeline from the single canonical source (US-02): each StepDef
+ * derives id + 平易ラベル + 実 dir skillRef from CANONICAL_STEPS. No more fake
+ * `aidlc-${step}` skillRef and no `label = step` 死蔵.
+ */
 const defaultPipeline = (): readonly StepDef[] =>
-  DEFAULT_STEPS.map((step, index) => ({
-    id: step,
-    label: step as string,
+  CANONICAL_STEPS.map((c, index) => ({
+    id: c.id,
+    label: c.label,
     order: index,
-    skillRef: `aidlc-${step}` as unknown as SkillRef,
+    skillRef: c.skillRef,
   }));
 
 const buildEnv = (modelName: string): EnvConfig => ({

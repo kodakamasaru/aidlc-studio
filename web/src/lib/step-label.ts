@@ -1,14 +1,16 @@
 // Step → 平易な日本語ステップ名(S3 視覚契約 scr-02 D-03: パイプラインは内部の
 // 番号(S1/S2…)でなく「要件 / 画面 / モデル …」の平易名で表示する)。内部コード
-// を画面に直接出さないための単一の正本。未知の step はコード ID にフォールバック。
-// 注: 現行パイプラインは旧 8 ステップ(S1,S2,S2.5,S3..S7)。v0.0.2 mock 想定の
-// 6 ステップ構成への移行は [step-model-v2] の別作業(carried)。ここは現行ステップ
-// に一意な平易名を当てる(label の衝突を避ける)。S8〜 は v2 移行後の将来分。
+// を画面に直接出さないため。
+//
+// ★ 正本は domain `shared/vocab.ts` の CANONICAL_STEPS.label(US-02 / 単一機械可読正本)。
+//    web は別ビルドで domain を import できないため、この表は **その派生ミラー**。
+//    独自に値を作らない: tests/integration/step-label-consistency.test.ts が
+//    CANONICAL_STEPS と一致を強制(drift ゼロ)。v2 12 step・S2.5 退役・S3=UIデザイン統一。
+//    未知の step はコード ID にフォールバック。
 const STEP_LABEL: Readonly<Record<string, string>> = {
   S1: "要件",
   S2: "画面",
-  "S2.5": "UIデザイン",
-  S3: "設計",
+  S3: "UIデザイン",
   S4: "技術仕様",
   S5: "分割",
   S6: "モデル",
@@ -29,8 +31,7 @@ export function stepLabel(step: string): string {
 const STEP_DESC: Readonly<Record<string, string>> = {
   S1: "何を作るかを言葉で整理する",
   S2: "画面の構成と見た目の方針を決める",
-  "S2.5": "見た目の詳細(色・配置)を固める",
-  S3: "画面と中身のつながりを設計する",
+  S3: "見た目の詳細(色・配置)を固める",
   S4: "技術的な前提・制約を決める",
   S5: "作る順番と単位に分ける",
   S6: "扱うデータと業務ルールを整理する",

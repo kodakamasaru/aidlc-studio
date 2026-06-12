@@ -67,8 +67,9 @@
 
 ## この集約固有の AI が独自に決めたこと と 理由
 
-### D-01 — 正本セット(集合 + skillRef)は domain に置き、ラベルは web に置く
-- **理由**: 集合と skillRef は domain identity(branded `Step`/`SkillRef`)で domain が自然。ラベルは UI 関心事で web。層を汚さず二重定義を消す(S5 Unit-02 D-01 / S4 評価 AI 指摘の踏襲)。
+### D-01 — 正本セット(集合 + skillRef + 平易ラベル)は domain に置く【S8 U02 で是正】
+- **理由(当初)**: 集合と skillRef は domain identity で domain が自然。ラベルは UI 関心事で web。
+- **★是正(S8 U02 / 2026-06-12)**: 当初「ラベルは web」としたが、これは **S1 で確定済(binding)の [US-02](../s1/us-02-step-definition-canonical.md) AC / Q-01 と矛盾**していた(US-02 = 単一 constant が step×平易ラベル×skillRef を持つ機械可読正本 / web step-label はそこから導出 / snapshot に平易ラベルが入って `StepDef.label` 死蔵を解消)。S6 評価 AI は US-02 AC と突合せず見落とした。binding な US-02 に従い **ラベルも `CANONICAL_STEPS` に同居**させ、web を導出側(drift-guard テストで一致強制)に是正。INV-C3「ラベルは domain に入れない」も US-02 に合わせて撤回(平易ラベルは domain 正本 / 表示は web 派生)。
 - **判断**(ユーザー記入): 承認 | 上書き | 保留
 - **上書き内容**(上書き時のみ): 
 

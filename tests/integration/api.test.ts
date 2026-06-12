@@ -125,8 +125,14 @@ describe("projects", () => {
     expect(json.data).toHaveLength(1);
     expect(json.data[0].id).toBe(id);
     expect(json.data[0].repoPath).toBe(repoPath);
-    // pipeline defaulted from DEFAULT_STEPS (v2: 12 steps, S2.5 retired)
+    // pipeline defaulted from CANONICAL_STEPS (v2: 12 steps, S2.5 retired)
     expect(json.data[0].pipelineDef).toHaveLength(12);
+    // US-02: real dir skillRef + 平易ラベル from the single canonical source
+    // (no fake `aidlc-S1`, no `label = "S1"` 死蔵).
+    const s1 = json.data[0].pipelineDef[0];
+    expect(s1.id).toBe("S1");
+    expect(s1.skillRef).toBe("aidlc-s1-requirements");
+    expect(s1.label).toBe("要件");
   });
 
   test("missing repoPath → 400", async () => {
@@ -194,6 +200,12 @@ describe("cycles create/list/get", () => {
     const got = await get(h.app, `/api/cycles/${cycle.id}`);
     expect(got.status).toBe(200);
     expect(got.json.data.id).toBe(cycle.id);
+    // US-02 / S6 snapshot: each phase pins its StepDef (label/skillRef) at creation,
+    // and the snapshot survives the DB round trip (JSON.stringify(cycle)).
+    const s1Phase = got.json.data.phases[0];
+    expect(s1Phase.step).toBe("S1");
+    expect(s1Phase.stepDef.skillRef).toBe("aidlc-s1-requirements");
+    expect(s1Phase.stepDef.label).toBe("要件");
   });
 
   test("duplicate version → 409", async () => {
