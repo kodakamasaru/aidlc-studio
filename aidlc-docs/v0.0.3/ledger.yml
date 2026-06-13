@@ -40,3 +40,29 @@
   decision: "US-03 で 3rd source=brief は注入したが、『前段の各ステップ成果物(S1→S2→…の連鎖 = aidlc-docs/{v}/sN/*)を実際に集めて AI に渡す』フル文脈注入は未配線。PromptComposer.contextPaths という受け口はある(既定 brief のみ)が、サイクル文脈に応じて前段成果物 path を解決して渡す呼び出し側(live.ts/engine)が無い。実 AI が前工程を踏まえた本物の成果物を出すには、これが本命の文脈。S10 で人間が指摘。"
   state: carried
   into: v0.0.4   # 次サイクルで reconcile。①-c live prompt 合成契約の完成形。contextPaths に前段成果物を載せる解決ロジックを app/engine 側に追加。
+
+# ── S11 レトロスペクティブで確定した分析判断(done / cycle 内クローズ) ──
+- id: S11-D01-bt1-counted
+  origin: v0.0.3/s11-retrospective.md
+  decision: "S6→S8 のラベル所有矛盾を『ステップ内是正』でなくバックトラック(BT-1)として計上。根本原因=設計ステップが確定 binding を逆引きしない。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。再発防止は改善提案 #2(→ S12)。
+
+- id: S11-D02-bug-interpretation
+  origin: v0.0.3/s11-retrospective.md
+  decision: "バグメトリクス解釈=未解決 CRITICAL/HIGH 0、観察 O-01/02/04 はロールバックで解消、残存は O-03(既知 scripted placeholder)のみ。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。
+
+- id: S11-D03-timeline-by-backtrack
+  origin: v0.0.3/s11-retrospective.md
+  decision: "タイムラインを所要日数でなくバックトラック発生点+ステップ進行順で記録(全 Step が 6/12-13 に集中し日次粒度が出ないため)。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。
+
+# ── S11 改善提案のうち本サイクルで実施しないもの(carried) ──
+- id: S11-P04-evaluator-mechanical-gate
+  origin: v0.0.3/s11-retrospective.md
+  decision: "改善提案 #4: 内部ステップの確定前 evaluator 実行を hook/CI で機械強制。doc でなくインフラ実装ゆえ S12(テキスト根治)範疇外。①②のルールは commit 73249d3 で明文化済。"
+  state: carried
+  into: v0.0.4   # 次サイクルで reconcile。独立の実装タスク(ルールの仕組み担保)。改善提案 #1/#2/#3 は S12 で doc 焼き込み。
