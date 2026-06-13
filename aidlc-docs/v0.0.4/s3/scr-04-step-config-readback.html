@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-04: ステップ設定の確認・修正(全ステップ) — v0.0.4 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: このサイクル(要件決定後の最適化)— 実在ステップを名前で一覧 ── -->
+    <section data-state="default" data-screen="scr-04-step-config-readback">
+      <div class="scr-head">
+        <span class="title">ステップ設定</span>
+        <span class="spacer"></span>
+        <span class="pill done"><span class="dot"></span>設定済み</span>
+      </div>
+      <div class="scr-body">
+        <div class="scope-bar">
+          <span class="scope-tag cycle">サイクル v0.0.5 · 既定を継承</span>
+          <a href="#" class="scope-link">既定を編集 →</a>
+        </div>
+        <div class="scope-hint" style="margin-bottom:var(--sp-4)">要件が決まったので、このサイクル向けに調整できます。空欄は既定を継承します。各ステップ名をクリックすると AI への指示の全文(原文)を確認できます。</div>
+
+        <div class="steps-table">
+          <div class="steps-row head"><span class="c">ステップ</span><span class="c">設定(成果物 / 人の確認 / 行き詰まり時)</span><span class="c">範囲</span></div>
+          <div class="steps-row"><span class="sname">要件ヒアリング</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 要件一覧</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">画面要素</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 画面モック</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">UIデザイン</span><span class="vals"><span class="kv"><span class="k">成果物:</span> UI 設計</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→2回</span></span><span class="badge-scope override">このサイクルで調整</span></div>
+          <div class="steps-row"><span class="sname">技術仕様</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 技術メモ</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">作業分割</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 作業単位</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">ドメインモデル</span><span class="vals"><span class="kv"><span class="k">成果物:</span> モデル図</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">ドメインコード</span><span class="vals"><span class="kv"><span class="k">成果物:</span> コード</span><span class="kv"><span class="k">確認:</span> 自動チェックのみ</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">実装統合</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 動いた画面の証拠</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">シナリオ検証</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 検証結果 + 証拠</span><span class="kv"><span class="k">確認:</span> 実機で確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope override">このサイクルで調整</span></div>
+          <div class="steps-row"><span class="sname">受け入れ</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 受け入れ記録</span><span class="kv"><span class="k">確認:</span> 実機で確認</span><span class="kv"><span class="k">行き詰まり:</span> すぐ人間へ</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">振り返り</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 振り返り</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">改善提案</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 改善提案</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+        </div>
+
+        <div class="cfg-foot">
+          <button class="btn primary">会話で直す(再ヒアリング)→</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── global: グローバル既定 — 今後のサイクルの既定になる ──── -->
+    <section data-state="global" data-screen="scr-04-step-config-readback">
+      <div class="scr-head">
+        <span class="title">ステップ設定 — 既定</span>
+        <span class="spacer"></span>
+        <span class="pill done"><span class="dot"></span>設定済み</span>
+      </div>
+      <div class="scr-body">
+        <div class="scope-bar">
+          <span class="scope-tag global">全サイクル共通の既定</span>
+        </div>
+        <div class="scope-hint" style="margin-bottom:var(--sp-4)">ここの編集は、これから作るサイクルの既定になります(作成済みのサイクルは固定)。特定サイクル向けの調整は、各サイクルの画面から行います。各ステップ名をクリックすると指示の全文(原文)を確認できます。</div>
+
+        <div class="steps-table">
+          <div class="steps-row head"><span class="c">ステップ</span><span class="c">既定の設定(成果物 / 人の確認 / 行き詰まり時)</span><span class="c">範囲</span></div>
+          <div class="steps-row"><span class="sname">要件ヒアリング</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 要件一覧</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">画面要素</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 画面モック</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">UIデザイン</span><span class="vals"><span class="kv"><span class="k">成果物:</span> UI 設計</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">技術仕様</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 技術メモ</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">作業分割</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 作業単位</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span><span class="kv"><span class="k">行き詰まり:</span> 再試行→3回</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">ドメインモデル</span><span class="vals"><span class="kv"><span class="k">成果物:</span> モデル図</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">ドメインコード</span><span class="vals"><span class="kv"><span class="k">成果物:</span> コード</span><span class="kv"><span class="k">確認:</span> 自動チェックのみ</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">実装統合</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 動いた画面の証拠</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">シナリオ検証</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 検証結果 + 証拠</span><span class="kv"><span class="k">確認:</span> 実機で確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">受け入れ</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 受け入れ記録</span><span class="kv"><span class="k">確認:</span> 実機で確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">振り返り</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 振り返り</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">改善提案</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 改善提案</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+        </div>
+
+        <div class="cfg-foot">
+          <button class="btn primary">会話で直す(再ヒアリング)→</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── pre-us: 要件が決まる前 — このサイクル最適化はまだ ──── -->
+    <section data-state="pre-us" data-screen="scr-04-step-config-readback">
+      <div class="scr-head">
+        <span class="title">ステップ設定</span>
+        <span class="spacer"></span>
+        <span class="state-tag">このサイクル v0.0.5</span>
+      </div>
+      <div class="scr-body">
+        <div class="scope-bar">
+          <span class="scope-tag cycle">サイクル v0.0.5 · 既定を継承</span>
+          <a href="#" class="scope-link">既定を編集 →</a>
+        </div>
+        <div class="cfg-locked">
+          <span>🔒</span>
+          <span>要件が決まると、このサイクル向けの最適化ができます。それまでは全ステップがグローバル既定のまま動きます。</span>
+        </div>
+        <div class="steps-table">
+          <div class="steps-row head"><span class="c">ステップ</span><span class="c">いまの設定(すべて既定を継承)</span><span class="c">範囲</span></div>
+          <div class="steps-row"><span class="sname">要件ヒアリング</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 要件一覧</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">画面要素</span><span class="vals"><span class="kv"><span class="k">成果物:</span> 画面モック</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">UIデザイン</span><span class="vals"><span class="kv"><span class="k">成果物:</span> UI 設計</span><span class="kv"><span class="k">確認:</span> できあがりの確認</span></span><span class="badge-scope inherit">既定</span></div>
+          <div class="steps-row"><span class="sname">以降のステップ</span><span class="vals"><span class="kv">すべて既定を継承</span></span><span class="badge-scope inherit">既定</span></div>
+        </div>
+        <div class="cfg-foot">
+          <button class="btn" style="opacity:.5">会話で直す(要件決定後)→</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── loading: スケルトン ─────────────────────────────── -->
+    <section data-state="loading" data-screen="scr-04-step-config-readback">
+      <div class="scr-head">
+        <span class="title">ステップ設定</span>
+        <span class="spacer"></span>
+        <span class="state-tag">読み込み中</span>
+      </div>
+      <div class="scr-body">
+        <div class="skel line short" style="margin-bottom:16px"></div>
+        <div class="steps-table">
+          <div class="steps-row"><div class="skel line short"></div><div class="skel line med"></div><div class="skel line short" style="width:48px"></div></div>
+          <div class="steps-row"><div class="skel line short"></div><div class="skel line med"></div><div class="skel line short" style="width:48px"></div></div>
+          <div class="steps-row"><div class="skel line short"></div><div class="skel line med"></div><div class="skel line short" style="width:48px"></div></div>
+          <div class="steps-row"><div class="skel line short"></div><div class="skel line med"></div><div class="skel line short" style="width:48px"></div></div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

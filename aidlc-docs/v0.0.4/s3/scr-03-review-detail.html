@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-03: 成果物レビュー詳細 — v0.0.4 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: summary を md 描画(US-02 の核) ──────────── -->
+    <section data-state="default" data-screen="scr-03-review-detail">
+      <div class="scr-head">
+        <span class="crumb">Inbox › サイクル v0.0.5 ›</span>
+        <span class="title">画面要素レビュー</span>
+        <span class="spacer"></span>
+        <span class="rv-actions">
+          <button class="btn">差し戻し</button>
+          <button class="btn primary">承認して次フェーズへ</button>
+        </span>
+      </div>
+      <div class="scr-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <span class="badge review">◎ できあがりの確認</span>
+          <span style="font-size:var(--text-h2);font-weight:600">画面モック</span>
+        </div>
+
+        <!-- summary block: md 描画(見出し/箇条書き/コードフェンス/リンク) -->
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">概要</span></div>
+          <div class="block-body">
+            <div class="md">
+              <h2>画面構成</h2>
+              <p>この会話ループを 4 つの画面で構成します(該当する要件: <a href="#">要件 3〜6</a>)。</p>
+              <ul>
+                <li>一覧画面 — 質問 / できあがりの確認を一覧</li>
+                <li>会話画面 — 同じ画面で続けて回答</li>
+                <li>確認画面 — 概要を整形して表示</li>
+                <li>設定画面 — 個別フォームを廃止</li>
+              </ul>
+              <h2>処理の流れ</h2>
+              <pre><code>一覧 → 会話 → 再開 → 確認</code></pre>
+              <p>コードのまとまり(コードブロック)は崩さず等幅で表示します。図の自動描画は今回は対象外です。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 既存の型付きブロック群(非破壊) -->
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">受け入れ条件</span></div>
+          <div class="block-body">
+            <div class="ac-row">
+              <span class="ac"><span class="ok">条件1 ✓</span></span>
+              <span class="ac"><span class="ok">条件2 ✓</span></span>
+              <span class="ac"><span class="na">条件3 ―</span></span>
+            </div>
+          </div>
+        </div>
+        <!-- screenshot ブロックが複数 → キャプション付きグリッド(クリックで拡大) -->
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">画面の証拠</span><span class="shot-count">2 枚</span></div>
+          <div class="block-body">
+            <div class="shot-grid cols-2">
+              <figure class="shot-thumb"><div class="img">会話スレッド</div><figcaption class="cap">会話スレッド <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">レビュー詳細</div><figcaption class="cap">レビュー詳細 <span class="state">既定</span></figcaption></figure>
+            </div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">リスク</span></div>
+          <div class="block-body"><div class="risk-row"><span class="lv medium">中:</span> ポーリング間隔が長いと体感が鈍る</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── gallery: 視覚証拠が多数(S8/S9 verify-ui)→ グリッドで一覧 ──── -->
+    <section data-state="gallery" data-screen="scr-03-review-detail">
+      <div class="scr-head">
+        <span class="crumb">Inbox › サイクル v0.0.5 ›</span>
+        <span class="title">実装統合レビュー</span>
+        <span class="spacer"></span>
+        <span class="rv-actions">
+          <button class="btn">差し戻し</button>
+          <button class="btn primary">承認して次フェーズへ</button>
+        </span>
+      </div>
+      <div class="scr-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <span class="badge review">◎ できあがりの確認</span>
+          <span style="font-size:var(--text-h2);font-weight:600">実機に統合 — 動いた画面の証拠</span>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">概要</span></div>
+          <div class="block-body"><div class="md"><p>5 画面 × 状態の実際に動いた画面のスクリーンショットを証拠として添付。各サムネイルをクリックで拡大できます。</p></div></div>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">画面の証拠</span><span class="shot-count">8 枚</span></div>
+          <div class="block-body">
+            <div class="shot-grid">
+              <figure class="shot-thumb"><div class="img">Inbox 一覧</div><figcaption class="cap">Inbox <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">会話スレッド</div><figcaption class="cap">会話 <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">会話スレッド</div><figcaption class="cap">会話 <span class="state">行き詰まり</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">レビュー</div><figcaption class="cap">レビュー <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">設定確認</div><figcaption class="cap">設定 <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">進捗</div><figcaption class="cap">進捗 <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">進捗</div><figcaption class="cap">進捗 <span class="state">ステップ可変</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">進捗</div><figcaption class="cap">進捗 <span class="state">手戻り</span></figcaption></figure>
+            </div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">受け入れ条件</span></div>
+          <div class="block-body"><div class="ac-row"><span class="ac"><span class="ok">条件1 ✓</span></span><span class="ac"><span class="ok">条件2 ✓</span></span><span class="ac"><span class="ok">条件3 ✓</span></span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── enlarged: サムネをクリックで拡大(lightbox)— ‹ › で前後送り ── -->
+    <section data-state="enlarged" data-screen="scr-03-review-detail" class="lightbox-host">
+      <div class="scr-head">
+        <span class="crumb">Inbox › サイクル v0.0.5 ›</span>
+        <span class="title">実装統合レビュー</span>
+        <span class="spacer"></span>
+        <span class="rv-actions">
+          <button class="btn">差し戻し</button>
+          <button class="btn primary">承認して次フェーズへ</button>
+        </span>
+      </div>
+      <div class="scr-body">
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">画面の証拠</span><span class="shot-count">8 枚</span></div>
+          <div class="block-body">
+            <div class="shot-grid">
+              <figure class="shot-thumb"><div class="img">Inbox 一覧</div><figcaption class="cap">Inbox <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">会話スレッド</div><figcaption class="cap">会話 <span class="state">既定</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">会話スレッド</div><figcaption class="cap">会話 <span class="state">行き詰まり</span></figcaption></figure>
+              <figure class="shot-thumb"><div class="img">レビュー</div><figcaption class="cap">レビュー <span class="state">既定</span></figcaption></figure>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 拡大オーバーレイ -->
+      <div class="lightbox">
+        <button class="lightbox__close">✕</button>
+        <div class="lightbox__stage">会話スレッド — 行き詰まり(拡大表示)</div>
+        <div class="lightbox__bar">
+          <span class="nav">‹</span>
+          <span class="meta">会話スレッド <span class="state">行き詰まり</span></span>
+          <span class="nav">›</span>
+          <span class="count">3 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── loading: スケルトン ─────────────────────────────── -->
+    <section data-state="loading" data-screen="scr-03-review-detail">
+      <div class="scr-head">
+        <span class="crumb">Inbox › サイクル v0.0.5 ›</span>
+        <span class="title">画面要素レビュー</span>
+        <span class="spacer"></span>
+        <span class="state-tag">読み込み中</span>
+      </div>
+      <div class="scr-body">
+        <div class="skel line med" style="height:18px;margin-bottom:20px"></div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">概要</span></div>
+          <div class="block-body">
+            <div class="skel line med"></div>
+            <div class="skel line"></div>
+            <div class="skel line short"></div>
+          </div>
+        </div>
+        <div class="skel card" style="height:80px"></div>
+        <div class="skel card" style="height:80px"></div>
+      </div>
+    </section>
+
+    <!-- ── missing-context: 前段文脈が無い(US-01 footprint) ── -->
+    <section data-state="missing-context" data-screen="scr-03-review-detail">
+      <div class="scr-head">
+        <span class="crumb">Inbox › サイクル v0.0.5 ›</span>
+        <span class="title">画面要素レビュー</span>
+        <span class="spacer"></span>
+        <span class="rv-actions">
+          <button class="btn">差し戻し</button>
+          <button class="btn primary">承認して次フェーズへ</button>
+        </span>
+      </div>
+      <div class="scr-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <span class="badge review">◎ できあがりの確認</span>
+          <span style="font-size:var(--text-h2);font-weight:600">画面モック</span>
+        </div>
+        <div class="ctx-missing">
+          <span>⚠</span>
+          <span>※ 前段文脈が見つかりません — この成果物は前段(要件ヒアリング)の出力を踏まえずに生成された可能性があります。差し戻して再実行を検討してください。</span>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">概要</span></div>
+          <div class="block-body">
+            <div class="md">
+              <h2>画面構成</h2>
+              <p>(前段の出力を参照できなかったため、プロダクト概要のみから生成)</p>
+              <ul>
+                <li>画面 A</li>
+                <li>画面 B</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

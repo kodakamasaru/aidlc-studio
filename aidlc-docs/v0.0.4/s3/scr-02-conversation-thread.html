@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-02: 会話スレッド(統合対話ビュー / バッチ) — v0.0.4 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: 1 ターン複数質問。各質問に「選択肢+★おすすめ(理由)+自由入力」を毎回 ── -->
+    <section data-state="default" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI</div>
+            <div class="box">
+              <div class="q-line">
+                <span class="q-tag">【質問】</span>
+                <span class="q-text">この回で確認したいことが <strong>3 件</strong> あります。まとめてお答えください。</span>
+                <span class="q-count">3 件</span>
+              </div>
+
+              <!-- Q1 -->
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">1.</span><span class="q-text">対象ユーザーの範囲は?</span></div>
+                <div class="disclosure"><span class="chev">▸</span><span>【背景】 展開して全文を読む</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 社内のエンジニアのみ <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">一次ユーザーを社内に絞る</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> まず小さく検証でき、権限設計を後回しにできる</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">② 社外の利用者も含む</div>
+                      <div class="opt-desc">公開範囲が広がり、認証/権限の設計が前倒しになる</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">③ 限定パートナーまで</div>
+                      <div class="opt-desc">一部の外部に絞って共有</div>
+                    </div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。">まずは社内で小さく試す</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Q2 -->
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">2.</span><span class="q-text">同時編集の想定人数は?</span></div>
+                <div class="disclosure"><span class="chev">▸</span><span>【背景】 展開して全文を読む</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 2〜3 人 <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">小規模チームでの同時編集</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> 小さく試す規模として現実的で、同時編集の制御を簡素にできる</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">② 1 人(基本ひとり)</div>
+                      <div class="opt-desc">競合制御はほぼ不要</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">③ 4 人以上</div>
+                      <div class="opt-desc">本格的な同時編集。競合解決が要る</div>
+                    </div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Q3 -->
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">3.</span><span class="q-text">権限管理は必要ですか?(編集 / 閲覧の区別)</span></div>
+                <div class="disclosure"><span class="chev">▸</span><span>【背景】 展開して全文を読む</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 編集 / 閲覧を分ける <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">ロールを 2 段で持つ</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> 最小権限の原則に沿い、後から細分化するのも容易</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">② 不要(全員フル権限)</div>
+                      <div class="opt-desc">最小構成。あとで分ける場合は作り直し</div>
+                    </div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="batch-foot">
+                <span class="hint">未回答 0 / 3 — 全問に答えました</span>
+                <button class="btn primary">まとめて送信して再開 <span class="kbd">⌘⏎</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── appended: 送信→人間のまとめ回答→resume が次バッチを末尾追記(US-05) ── -->
+    <section data-state="appended" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line"><span class="q-tag" style="color:var(--color-violet)">【回答 3 件】</span></div>
+              <div class="ans-line"><span class="k">1.</span> ① 社内のエンジニアのみ(補足: まずは社内で小さく試す)</div>
+              <div class="ans-line"><span class="k">2.</span> ① 2〜3 人</div>
+              <div class="ans-line"><span class="k">3.</span> ① 編集 / 閲覧を分ける</div>
+            </div>
+          </div>
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI&nbsp;·&nbsp;<span style="color:var(--color-running)">新着</span></div>
+            <div class="box" style="box-shadow:0 0 0 2px var(--color-running-border); border-left-color:var(--color-running)">
+              <div class="q-line">
+                <span class="q-tag">【質問】</span>
+                <span class="q-text">続けて <strong>2 件</strong> 確認させてください。</span>
+                <span class="q-count">2 件</span>
+              </div>
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">1.</span><span class="q-text">想定する初回リリースの範囲は?</span></div>
+                <div class="disclosure"><span class="chev">▸</span><span>【背景】 展開して全文を読む</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 閲覧 + 編集の最小機能 <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">価値の核だけ</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> 最短で本当に要るかを検証でき、後から足せる</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">② 共有・コメントまで</div>
+                      <div class="opt-desc">協働の基本機能を含める</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body"><div class="opt-label">③ フル機能</div><div class="opt-desc">初回から広く作る</div></div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">2.</span><span class="q-text">既存データの移行は対象に含めますか?</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 含めない(新規のみ) <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">移行は別サイクル</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> スコープを絞り早く出せる。移行は要件が固まってから</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body"><div class="opt-label">② 含める</div><div class="opt-desc">既存データの取り込みを今回やる</div></div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="batch-foot">
+                <span class="hint">未回答 2 / 2</span>
+                <button class="btn primary">まとめて送信して再開 <span class="kbd">⌘⏎</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── running: まとめ回答送信直後、次 turn を resume 中 ─── -->
+    <section data-state="running" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line"><span class="q-tag" style="color:var(--color-violet)">【回答 3 件】</span></div>
+              <div class="ans-line"><span class="k">1.</span> ① 社内のエンジニアのみ &nbsp; <span class="k">2.</span> ① 2〜3 人 &nbsp; <span class="k">3.</span> ① 編集/閲覧を分ける</div>
+            </div>
+          </div>
+          <div class="running-row">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span>3 件の回答を受け取りました。AI が続きを考えています…</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── stall: resume 失敗/timeout。まとめ回答は保存済み・黙って失わない(US-04 AC) ── -->
+    <section data-state="stall" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill stalled"><span class="dot"></span>行き詰まり</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line"><span class="q-tag" style="color:var(--color-violet)">【回答 3 件】</span></div>
+              <div class="ans-line"><span class="k">1.</span> ① &nbsp; <span class="k">2.</span> ① 2〜3 人 &nbsp; <span class="k">3.</span> ①</div>
+            </div>
+          </div>
+          <div class="stall-box">
+            <div class="msg">
+              <div class="t">再開に失敗しました(時間切れ)</div>
+              <div class="d">3 件の回答は保存済みです。失われていません。もう一度再開できます。</div>
+            </div>
+            <button class="btn">再試行</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── hearing: 設定ヒアリングは「このサイクルの全ステップ」をまとめて(US-06)。1ステップ単位ではない ── -->
+    <section data-state="hearing" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ 設定</a>
+        <span class="title">ステップ設定ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5 / 全ステップ</span>
+        <span class="spacer"></span>
+        <span class="pill hearing"><span class="dot"></span>ヒアリング中</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI</div>
+            <div class="box">
+              <div class="q-line">
+                <span class="q-tag">【設定ヒアリング】</span>
+                <span class="q-text">このサイクルの <strong>全ステップ</strong> の設定をまとめて伺います。個別フォームの入力は不要です。基本は全ステップ共通で決め、例外だけ後で上げます。</span>
+                <span class="q-count">3 件</span>
+              </div>
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">1.</span><span class="q-text">全ステップ共通の「人の確認」は?</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① できあがりの確認(基本これ) <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">各ステップの成果物 / 画面を見て承認</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> コードを読まずに承認でき、ほとんどのステップに合う。例外は次の質問で指定</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body"><div class="opt-label">② 実機で確認(基本これ)</div><div class="opt-desc">全ステップ実機確認にする</div></div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">2.</span><span class="q-text">例外にしたいステップはありますか?(そのステップだけ上書き)</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① シナリオ検証は実機で確認に上げる <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">他は共通のまま、シナリオ検証だけ実機</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> 検証は実際の動作を見る価値が高い。要件(US)の内容からも妥当</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body"><div class="opt-label">② 例外なし(全ステップ共通)</div><div class="opt-desc">上書きしない</div></div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="例: S3 は行き詰まり時2回で人間へ、など">UIデザインは行き詰まり時 2 回で人間へ</textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="q-item">
+                <div class="q-line"><span class="q-tag">3.</span><span class="q-text">全ステップ共通の「行き詰まり時の対応」は?</span></div>
+                <div class="q-field">
+                  <div class="opt selected">
+                    <span class="radio"></span>
+                    <div class="opt-body">
+                      <div class="opt-label">① 再試行 → 3 回で人間へ <span class="rec">★ おすすめ</span></div>
+                      <div class="opt-desc">自動回復を試してから依頼</div>
+                      <div class="rec-reason"><span class="k">おすすめ理由:</span> 一時的な失敗は自動回復しつつ、無限ループは防げる</div>
+                    </div>
+                  </div>
+                  <div class="opt">
+                    <span class="radio"></span>
+                    <div class="opt-body"><div class="opt-label">② すぐ人間へ</div><div class="opt-desc">失敗したら即 Inbox に依頼</div></div>
+                  </div>
+                  <div class="free-field">
+                    <div class="label">自由入力 / 補足(任意)</div>
+                    <textarea placeholder="選択肢に無ければ自由に。補足もここへ。"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="batch-foot">
+                <span class="hint">未回答 0 / 3 — 全ステップ分をまとめて</span>
+                <button class="btn primary">まとめて送信して再開 <span class="kbd">⌘⏎</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── completed: 質問が尽き成果物完成→スレッド完了→Inbox に ◎(US-03/04 着地) ── -->
+    <section data-state="completed" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill done"><span class="dot"></span>完了</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line"><span class="q-tag" style="color:var(--color-violet)">【回答 2 件】</span></div>
+              <div class="ans-line"><span class="k">1.</span> ① 閲覧 + 編集の最小機能 &nbsp; <span class="k">2.</span> ① 含めない(新規のみ)</div>
+            </div>
+          </div>
+          <div class="done-box">
+            <div class="msg">
+              <div class="t">要件ヒアリングが完了しました</div>
+              <div class="d">成果物(要件一覧)ができあがり、Inbox に「◎ できあがりの確認」が立ちました。レビューで承認すると次フェーズへ進みます。</div>
+            </div>
+            <button class="btn primary">レビューを開く →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── empty: 着手直後、最初のバッチを待つ ───────────────── -->
+    <section data-state="empty" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">要件ヒアリング</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>起動中</span>
+      </div>
+      <div class="scr-body">
+        <div class="empty">
+          <div class="glyph">💬</div>
+          <div class="t">AI を起動しました</div>
+          <div class="d">最初の質問(まとめて数件)が届くとここに表示されます。各質問は選択肢 + おすすめ + 自由入力で、全部に答えて 1 回で送信すると会話が続きます。</div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

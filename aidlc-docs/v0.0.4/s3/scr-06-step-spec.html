@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-06: ステップの指示・全文(原文) — v0.0.4 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: 1 ステップの「指示・全文」= 契約の全項目 + AI への指示本文 ── -->
+    <section data-state="default" data-screen="scr-06-step-spec">
+      <div class="scr-head">
+        <a class="back" href="#">‹ ステップ設定</a>
+        <span class="title">「要件ヒアリング」の指示・全文</span>
+        <span class="spacer"></span>
+        <button class="btn ghost">ステップ設定で編集 →</button>
+      </div>
+      <div class="scr-body">
+        <div class="scope-hint" style="margin-bottom:var(--sp-4)">このステップで AI が受け取る指示の全文です(確認のみ)。内容を変えるには「ステップ設定」で会話して直します。</div>
+
+        <!-- 契約の全項目 -->
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">設定の全項目</span></div>
+          <div class="block-body">
+            <div class="spec-dl">
+              <div class="dt">ステップ</div><div class="dd">要件ヒアリング</div>
+              <div class="dt">検証の観点(AI がこれを点検)</div>
+              <div class="dd"><ul><li>対象ユーザーがプロダクト概要と一致しているか</li><li>要件が独立してテスト可能な単位になっているか</li></ul></div>
+              <div class="dt">成果物の種類</div><div class="dd">要件一覧</div>
+              <div class="dt">人の確認</div><div class="dd">できあがりの確認</div>
+              <div class="dt">行き詰まり時の対応</div><div class="dd">やり直す(最大 3 回)→ 人に相談する</div>
+            </div>
+            <p class="spec-note">※ 上は画面から設定できる項目です。下は、このステップで AI が受け取る指示の本文(全文)です。</p>
+          </div>
+        </div>
+
+        <!-- AI への指示(全文)= 原文 -->
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">AI への指示(全文)</span></div>
+          <div class="block-body">
+            <pre class="prose">あなたは要件ヒアリングの担当です。プロダクト概要と前段の出力をもとに、つくるものの要件を人と会話して固めます。
+
+進め方:
+1. プロダクト概要と前段の出力を読み、不明点を洗い出す。
+2. 確認したいことは、まとめて質問する(1 問ずつ小出しにしない)。
+   各質問には選択肢・おすすめ(理由つき)・自由入力欄を必ず付ける。
+3. 人の回答を受けて、要件一覧をつくる。
+   1 要件 = 独立してテスト可能な、縦の 1 まとまり。
+4. 要件の数は結果であって目標ではない。数に合わせて粒度を変えない。
+
+完了の条件:
+- 要件一覧ができ、人が「できあがりの確認」で承認している。</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── no-instruction: 指示本文が未登録のステップ ───────────── -->
+    <section data-state="no-instruction" data-screen="scr-06-step-spec">
+      <div class="scr-head">
+        <a class="back" href="#">‹ ステップ設定</a>
+        <span class="title">「技術仕様」の指示・全文</span>
+        <span class="spacer"></span>
+        <button class="btn ghost">ステップ設定で編集 →</button>
+      </div>
+      <div class="scr-body">
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">設定の全項目</span></div>
+          <div class="block-body">
+            <div class="spec-dl">
+              <div class="dt">ステップ</div><div class="dd">技術仕様</div>
+              <div class="dt">成果物の種類</div><div class="dd">技術メモ</div>
+              <div class="dt">人の確認</div><div class="dd">できあがりの確認</div>
+            </div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">AI への指示(全文)</span></div>
+          <div class="block-body">
+            <p class="empty" style="padding:var(--sp-6)"><span class="t">このステップには指示の本文がまだ登録されていません。</span></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── loading: スケルトン ─────────────────────────────── -->
+    <section data-state="loading" data-screen="scr-06-step-spec">
+      <div class="scr-head">
+        <a class="back" href="#">‹ ステップ設定</a>
+        <span class="title">指示・全文</span>
+        <span class="spacer"></span>
+        <span class="state-tag">読み込み中</span>
+      </div>
+      <div class="scr-body">
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">設定の全項目</span></div>
+          <div class="block-body">
+            <div class="skel line med"></div>
+            <div class="skel line"></div>
+            <div class="skel line short"></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><span class="marker"></span><span class="name">AI への指示(全文)</span></div>
+          <div class="block-body">
+            <div class="skel line"></div>
+            <div class="skel line"></div>
+            <div class="skel line med"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

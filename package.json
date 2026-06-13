@@ -6,6 +6,7 @@
   "scripts": {
     "s2.5:capture": "bun run scripts/s2.5-capture.ts",
     "s3:capture": "bun run scripts/s3-capture.ts",
+    "s3:capture:v004": "bun run scripts/s3-v004-capture.ts",
     "test": "bun test src tests/integration",
     "test:live": "bun test tests/e2e-live",
     "test:domain": "bun test src/domain",
