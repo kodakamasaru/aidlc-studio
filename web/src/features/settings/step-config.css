@@ -17,14 +17,14 @@
 .step-config__meta {
   font-size: var(--text-caption);
   color: var(--color-text-low);
-  max-width: 60ch;
+  /* 幅はコンテナ(.step-config = 860px)に委ねる。独自の半幅キャップは置かない
+     (カード列と揃わず不自然になるため)。 */
 }
 /* US-02 / S3 scr-02: snapshot 注記。作成時点に固定される旨を控えめに明示。 */
 .step-config__snapshot-note {
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
-  max-width: 64ch;
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--text-caption);
