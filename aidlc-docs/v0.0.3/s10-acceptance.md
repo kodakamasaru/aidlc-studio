@@ -5,7 +5,13 @@
 - PhaseGroup: Validation(最終工程)
 - 役割: プロダクトマネージャー(人間が主役)。AI は提示・記録担当。
 - バージョン: v0.0.3
-- ステータス: **却下 → S8 ロールバック中**(2026-06-13)
+- ステータス: **却下 → S8 ロールバック完了 → 再判定待ち**(2026-06-13 / commit 0d3934c)
+
+> **ロールバック完了(2026-06-13 / commit 0d3934c)**: 却下事由の partial を **AC 起点**で全消し込み。
+> - **US-03**: composer に 3rd source(brief/前段成果物)注入 + 3-source 含有テスト + 合成契約を operating-model へ doc 化(AC-1)。**AC 違反 解消**。
+> - **US-04/05**: `live-eval.test.ts` で **実 claude 評価 run が completeness + screenshot を貫通**(36s pass)= ユーザー明示「実 claude 貫通」を充足。v0.0.2 ledger `S8-live-completeness` を done 化(US-04 AC-5)、screenshot 保存先逸脱を D-03 記録(US-05 AC-2)。
+> - 確定前 **AC 起点レビュー**(pr-test-analyzer)で全 US の AC を 1 項目ずつ突合し、doc 義務 3 件も是正。回帰 252 pass。
+> - **下の各 US の「partial(honest)」記述は解消済**(履歴として残す)。再判定をお願いします。
 
 > **却下記録(2026-06-13)**: 人間判定 = **却下**。理由 = US-03/04/05 の partial が許容外。
 > - **US-03**: 3rd source(brief/前段成果物)未注入 = **AC 違反**(us-03 AC 行19-21 / S5 Unit-03 が 3 source を明記)。

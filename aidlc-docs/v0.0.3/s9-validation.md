@@ -41,6 +41,11 @@
 |---|-------|----|------|----------|
 | — | — | — | CRITICAL/HIGH バグ **0 件** | — |
 
+> **★ ロールバック後の更新(2026-06-13 / commit 0d3934c)**: S10 却下を受け S8 へ戻り、下記 **O-01 / O-02 / O-04 を解消**。
+> - O-04(US-03 brief 未注入)→ composer に 3rd source 注入 + 3-source 含有テスト。
+> - O-01(US-04 実 claude 評価貫通)/ O-02(US-05 実 claude run screenshot)→ `tests/e2e-live/live-eval.test.ts`(実 claude 評価 run が completeness + screenshot を貫通 / 36s pass)。
+> - 以降の O-01/O-02/O-04 の「partial / carry」記述は **解消済**(履歴として残す)。
+
 ### 観察(設計どおり / partial AC — honest 記録 / 原則#6)
 - **O-01 (MEDIUM / US-04 partial)**: `extractCompleteness` のパースと scripted と同一の app ゲート駆動は決定論で証明済。だが **「実 claude evaluator が `{requirements,addressed}` JSON を実際に出して gap ゲートが効く」end-to-end** は本サイクルで常時実行化していない(実 claude 貫通は U03 の generator 経路で実証)。composer の evaluator プロンプトは JSON を要求済・パーサは堅牢だが、実モデルの JSON 産出は確率的。→ ledger `S9-US04-live-eval-e2e` で carried(v0.0.4 の実 AI E2E と同梱)。
 - **O-02 (LOW / US-05 partial)**: 撮影機構(実 Playwright→png)・配信(200 image/png)・描画(ScreenshotFigure root-relative)・失敗 placeholder は実証済。視覚ゲートの `sc-01` は **実配信画像(`/api/screenshots/gate.png`)を review に注入**して撮った(実コンポーネント描画)。**実 claude evaluator run が走って screenshot block を emit する完全 end-to-end** は常時テスト化していない(verifyUrl=稼働 app が前提のため)。→ ledger `S9-US05-live-run-shot` で carried(O-01 と同じ v0.0.4 実 AI E2E で解消)。
