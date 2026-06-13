@@ -65,7 +65,7 @@
   origin: v0.0.3/s11-retrospective.md
   decision: "改善提案 #4: 内部ステップの確定前 evaluator 実行を hook/CI で機械強制。doc でなくインフラ実装ゆえ S12(テキスト根治)範疇外。①②のルールは commit 73249d3 で明文化済。"
   state: carried
-  into: v0.0.4   # 次サイクルで reconcile。独立の実装タスク(ルールの仕組み担保)。改善提案 #1/#2/#3 は S12 で doc 焼き込み。
+  into: v0.0.5   # 再 point 2026-06-13: roadmap cut=A で v0.0.4=live会話ループに確定。#4(evaluator 機械ゲート=hook/CI インフラ)は v0.0.5「受入+自走+git自動化」バンドルと同梱が自然ゆえ v0.0.4→v0.0.5 へ送る(黙って消さず理由つき再 point)。元 into=v0.0.4。出典: v0.0.4/scope.md / ユーザー承認 A。
 
 # ── S12 ワークフロー改善で確定した判断(done / サイクル CLOSED) ──
 - id: S12-D01-issue1-split-apply
