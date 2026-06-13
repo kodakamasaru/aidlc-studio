@@ -119,8 +119,13 @@ Construction 工程(S7 / S8)は **テスト方針** と **自動レビュー pip
 
 ### 自動レビュー pipeline(Phase 完了ごとに必ず実行)
 
-**並列起動する 7 エージェント**:
+> **★★ レビューの起点(最重要 / 全工程 binding)**: レビューは **「産物(書いたコード/doc)」起点でなく「仕様インベントリ」起点**で回す。仕様インベントリ = ① **その US/工程の AC を 1 項目ずつ** ② **ユーザーが会話で明示した指示(AC に無くても)**。各項目に対し「実装/テスト/doc がこれを満たすか」を 1 つずつ潰す。**産物起点だと、実装が落とした AC 項目(=産物に存在しないもの)は diff にも現れず構造的に検出不能**(v0.0.3 で US-03 の 3rd source 欠落を S9 まで見逃した実例 / [[completeness-checks-anchor-on-spec]])。AC が「doc に書け」「ledger を done にせよ」等の**非コード義務**を含むときも 1 項目として潰す。
+>
+> **内部ステップは例外なく確定前 evaluator**: S4-S9 の内部技術ステップ・各 Build 増分(Unit/U0N)は、ユーザーに提示/commit する**前に** AC 起点の評価 AI を必ず通す。決定論テストが green でも省略しない(v0.0.3 で U03/U04 を決定論テストだけで commit し AC 違反を見逃した実例)。
 
+**並列起動する エージェント(AC 起点の completeness 監査を必ず含む)**:
+
+0. **AC インベントリ監査(必須・最初に確定)** — `pr-test-analyzer` 等を **US AC + ユーザー明示指示の各項目起点**で起動し、未カバー/落とした項目(コード/テスト/doc/ledger 義務すべて)を洗い出す。**ここを産物起点で省くのが最大の漏れ穴**。
 1. `typescript-reviewer` — TS 型安全 / async / 命名 / idiomatic
 2. `type-design-analyzer` — 型の表現力 / 不変条件 / branded type 設計品質
 3. `silent-failure-hunter` — エラー握りつぶし / Result 型誤用 / 不適切な fallback
@@ -138,9 +143,10 @@ Construction 工程(S7 / S8)は **テスト方針** と **自動レビュー pip
 
 ### Phase 完了判定
 
+0. **AC インベントリ突合済**(最重要): その工程の **US AC の全項目 + ユーザー明示指示**を 1 つずつ「実装/テスト/doc/ledger が満たすか」で潰し、未達ゼロ(または honest に carry + ledger 化)。**産物起点でなく仕様起点**で確認したことを進行ログに残す。
 1. **全テスト pass**(`bun test` 全件 OK)
 2. **`tsc --noEmit` クリーン**(型エラー 0 件)
-3. **直近の 7 reviewer 再起動で CRITICAL = 0 + HIGH = 0**
+3. **直近の AC 起点監査 + 7 reviewer 再起動で CRITICAL = 0 + HIGH = 0**
 4. MEDIUM 残は進行ログの「次 Phase 繰越」セクションに転記済
 5. Phase 完了レポートが固定フォーマットで進行ログに追記済
 6. **`pnpm check:coverage` 緑**。S8 で画面・状態に触れた Phase は必須。S7 は対象外
