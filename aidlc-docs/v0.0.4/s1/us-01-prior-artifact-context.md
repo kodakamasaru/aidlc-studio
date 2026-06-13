@@ -3,7 +3,7 @@
 ## メタ
 - 親: [s1/index.md](./index.md)
 - 出典: carried #3 `S10-full-prior-artifact-context`(v0.0.3 ledger)
-- 対応 S2 画面 (確定後に追記):
+- 対応 S2 画面: **画面なし**(backend / prompt 合成。[s2 D-01](../s2/index.md) 参照。footprint は [SCR-03](../s2/scr-03-review-detail.md) での体感)
 - ステータス: 確定(2026-06-13)
 
 ## 3 視点

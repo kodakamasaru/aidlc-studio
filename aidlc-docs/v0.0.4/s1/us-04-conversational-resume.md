@@ -3,7 +3,7 @@
 ## メタ
 - 親: [s1/index.md](./index.md)
 - 出典: §I #1(2026-06-13)/ BACKLOG §A「実 AI 対話型ループ」/ carried #1 の継続側
-- 対応 S2 画面 (確定後に追記):
+- 対応 S2 画面: [SCR-02 会話スレッド](../s2/scr-02-conversation-thread.md)(完了の着地点は [SCR-03](../s2/scr-03-review-detail.md))
 - ステータス: 確定(2026-06-13)
 
 ## 3 視点

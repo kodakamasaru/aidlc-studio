@@ -3,7 +3,7 @@
 ## メタ
 - 親: [s1/index.md](./index.md)
 - 出典: carried #2 `S10-review-md-plaintext`(v0.0.3 ledger)
-- 対応 S2 画面 (確定後に追記):
+- 対応 S2 画面: [SCR-03 レビュー詳細](../s2/scr-03-review-detail.md)
 - ステータス: 確定(2026-06-13)
 
 ## 3 視点

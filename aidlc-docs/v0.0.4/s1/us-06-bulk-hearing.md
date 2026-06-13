@@ -3,7 +3,7 @@
 ## メタ
 - 親: [s1/index.md](./index.md)
 - 出典: §I #2(2026-06-13 実機 feedback)
-- 対応 S2 画面 (確定後に追記):
+- 対応 S2 画面: [SCR-02 会話スレッド](../s2/scr-02-conversation-thread.md)(ヒアリング)/ [SCR-04 設定の確認・修正](../s2/scr-04-step-config-readback.md)
 - ステータス: 確定(2026-06-13)
 
 ## 3 視点
