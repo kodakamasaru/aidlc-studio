@@ -66,3 +66,22 @@
   decision: "改善提案 #4: 内部ステップの確定前 evaluator 実行を hook/CI で機械強制。doc でなくインフラ実装ゆえ S12(テキスト根治)範疇外。①②のルールは commit 73249d3 で明文化済。"
   state: carried
   into: v0.0.4   # 次サイクルで reconcile。独立の実装タスク(ルールの仕組み担保)。改善提案 #1/#2/#3 は S12 で doc 焼き込み。
+
+# ── S12 ワークフロー改善で確定した判断(done / サイクル CLOSED) ──
+- id: S12-D01-issue1-split-apply
+  origin: v0.0.3/s12-improvement.md
+  decision: "改善 #1 を分解適用: レビュー突合側は commit 73249d3 で既出ゆえ参照のみ、未対応だった scope.md へのユーザー明示制約の記録義務だけを operating-model に新設。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。
+
+- id: S12-D02-issue2-two-tier
+  origin: v0.0.3/s12-improvement.md
+  decision: "改善 #2(設計ステップ binding 逆引きゲート)を二段で焼き込み: operating-model に横断ルール本体 + S3/S4/S6 SKILL.md 完了条件に 1 行参照(DRY + ローカリティ)。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。
+
+- id: S12-D03-carried-with-into
+  origin: v0.0.3/s12-improvement.md
+  decision: "carried 4 件(S10 発見 3 + #4)を into: v0.0.4 付きで残してサイクル CLOSE。本サイクル scope 外ゆえ done 化せず、次サイクル S1 reconcile ゲートに渡す(v0.0.2→v0.0.3 の established workflow)。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。v0.0.3 CLOSED。
