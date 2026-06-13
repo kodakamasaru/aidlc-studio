@@ -54,7 +54,7 @@
 
 ## 増分③: U03 — PromptComposer + Fs.read + live prompt 実合成
 - **Fs.read 追加**(`app/ports/sys.ts` + `nodeFs` + `FakeFs`): skill 本文を **ポート経由**で読む(app の hexagonal を保つ / infra 直読み禁止)。
-- **PromptComposer 新設**(`app/services/prompt-composer.ts`): `skillRefOf(step)` で実 dir skillRef を解決 → `{repoPath}/kit/skills/{skillRef}/SKILL.md` を Fs.read → **2 層プロンプト**(Core: role+step 同一性 / Payload: skill 本文 + evaluator は verification 観点 + addressed/gap 指示)。本文不在は **明示エラー**(silent fallback 禁止 / 原則④)。
+- **PromptComposer 新設**(`app/services/prompt-composer.ts`): `skillRefOf(step)` で実 dir skillRef を解決 → `{repoPath}/kit/skills/{skillRef}/SKILL.md` を Fs.read → **3 source プロンプト**(① Core: role+step 同一性 / ② skill 本文 / ③ 契約+前段の文脈 = StepDef.contracts(verification 観点・evaluator) + **brief/前段成果物**(`contextPaths` 既定 = `aidlc-docs/brief.md`))。本文不在は **明示エラー**、前段文脈不在は **可視マーカー**(silent fallback 禁止 / 原則④)。恒久契約は [operating-model.md](../../kit/rules/aidlc-operating-model.md)「live prompt 合成契約」へ doc 化(US-03 AC-1)。**※ S10 却下→ロールバックで 3rd source(brief)を追加(初版は 2 層で AC 違反だった)**。
 - **live.ts 配線**: `defaultBuildPrompt` 1 文スタブを composer 優先へ(`launch`/`retry`=generator, `launchEval`=evaluator)。composer 未注入なら従来スタブ(後方互換 / 決定論テスト)。`server.ts` が `PromptComposer(nodeFs)` を構築し live adapter に注入。
 - **検証(決定論)**: `prompt-composer.test`(5)= 本文埋め込み / evaluator 観点+addressed/gap / 本文不在で throw / 退役 S2.5 で throw / path。回帰 **243 pass / 0 fail**、typecheck src 0。
 - **実 claude 貫通**: 後段の安全な隔離 live テストで実施(composer の generator プロンプトは「成果物を生成せよ」のため、作業リポでなく **一時 repo + 最小 SKILL.md** で走らせ汚染回避)。
@@ -101,6 +101,11 @@
 
 ### D-01 — U01 は機械的削除を subagent に委譲し、結論(grep 0 / 234 green / 純粋削除 diff)を自分で独立裏取り
 - **理由**: 削除対象は S6 で全波及点を表に確定済。機械作業は委譲し、正しさは決定論ハーネス(SQLite store 実走 234 test)+ grep 0 + deletions-only diff で検証する方が確実([[dogfood-harness-principles-on-this-repo]] / 人間にはコードでなく結論)。
+- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **上書き内容**(上書き時のみ): 
+
+### D-03 — verify-ui screenshot の保存先は runtime dir(`.verify-screenshots/`)。US-05 AC の `aidlc-docs/{v}/…/screenshots/` から逸脱(理由付き)
+- **理由**: US-05 AC は保存先を `aidlc-docs/{v}/…/screenshots/` と規定したが、live run の verify-ui screenshot は **run ごとの揮発的証拠**(`{runId}.png`)で、版管理される `aidlc-docs` の契約/証拠 png(S3/S9/S10)に混ぜると bloat + 版管理ノイズになる。よって **gitignore された runtime dir `.verify-screenshots/`** に保存し `/api/screenshots/:file` で配信(path 索引 = AC の本旨「binary 非 DB / path 参照」は満たす)。**受け入れ用の durable な証拠**は別途 s9/s10 の screenshots に確定版として残す。AC の path 文字列から逸脱するが本旨(path 索引・非 DB)は遵守 → ここに明示記録(原則#6 / S10 AC レビュー指摘反映)。
 - **判断**(ユーザー記入): 承認 | 上書き | 保留
 - **上書き内容**(上書き時のみ): 
 

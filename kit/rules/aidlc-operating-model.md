@@ -86,6 +86,22 @@ Cycle (実行単位 ≒ 1 バージョン)
 - S7/S8 はゼロベースでネイティブ idiom で実装する。HTML から机上で移植しない。
 - トークン値(色 hex / spacing px / type rem)は **意図の言語化** として記録に残るが、S7/S8 で literal にコピーする義務はない — 実装側で同じ視覚アウトカムを自然に表現する。
 
+## live prompt 合成契約(US-03 / 恒久ルール)
+
+live(実 Claude headless)を起動するときのプロンプトは、**3 source を決まった順序・所有で合成**する(`app/services/prompt-composer.ts` = 唯一の合成器)。1 文スタブで起動しない。
+
+**3 source(順序 = 上から)**:
+1. **Core(常時)** — role(generator|evaluator)+ AI-DLC 工程の同一性。所有 = composer。
+2. **方法論 = スキル本文** — `kit/skills/{skillRef}/SKILL.md`。`skillRef` は US-02 の単一正本(`skillRefOf`)で実 dir 解決。所有 = `kit/skills`(file)。composer は Fs ポート経由で read。evaluator はこれを「検証の基準」として読む。
+3. **契約 + 前段の文脈**:
+   - **StepDef.contracts**(検証観点 = `verification`)。所有 = DB(per-cycle snapshot)。evaluator のみ。
+   - **brief / 前段成果物**(`aidlc-docs/brief.md` ほか `contextPaths`)。所有 = file(`aidlc-docs`)。composer 既定で brief を注入。
+
+**不変条件**:
+- スキル本文不在は **明示エラー**(silent fallback 禁止 / 原則④)。前段文脈不在は **可視マーカー**(黙って落とさない)。
+- evaluator は末尾に `{requirements, addressed}` の JSON を 1 つ出す(US-04 completeness gate が機械的に読む)。未充足は addressed に入れない = gap。
+- 決定的スイートは合成結果の **3 source 含有**を fixture で常時検証。`bun test:live` は実 AI 加算層。
+
 ## S7/S8 Construction の進行方針(テスト + レビュー自動化)
 
 Construction 工程(S7 / S8)は **テスト方針** と **自動レビュー pipeline** を必ず以下のように回す。**本プロジェクト全バージョン** で適用。新サイクル開始時に再質問しない。
