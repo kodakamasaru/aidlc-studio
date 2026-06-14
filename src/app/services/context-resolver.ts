@@ -5,10 +5,10 @@
 //
 // NEW: composeStructuredContext — builds the §C7.1 named, ordered sections
 // (3=brief, 4=requirements, 5=prior artifacts, 6=decisions/ledger, 7=dialog state,
-// 8=output contract) from 3 sources:
+// 8=output contract, 9=backtrack feedback) from 3 sources:
 //   • docs (Fs port) — sections 3 / 4 / 5
 //   • file (ledger.yml via Fs port) — section 6
-//   • DB (repos port) — sections 7 (answers) / 8 (StepContracts) [optional]
+//   • DB (repos port) — sections 7 (answers) / 8 (StepContracts) / 9 (backtrack) [optional]
 //
 // Sections 1 (role/identity) and 2 (skill body) are handled by PromptComposer.
 //
@@ -19,11 +19,17 @@
 //   • Missing sections are visible markers (原則④), never silent.
 //   • Degradation: directly-prior = detail, older = index; invariant/requirements/
 //     decisions sections are NOT degraded.
+//   • Section 9 (backtrack feedback): present only when a visual_review was rejected
+//     with a reason in this cycle — injected after section 4 (requirements) so the
+//     AI sees the rejection reason prominently before prior artifacts. Absent when
+//     no rejection exists (normal first-run launch). 原則④: if rejected but reason
+//     is missing (should not happen given domain invariants), emit visible marker.
 import { join } from "node:path";
 import type { Cycle } from "../../domain/cycle/cycle";
 import type { Step } from "../../domain/shared/vocab";
 import type { Fs } from "../ports/sys";
-import type { QuestionRepo, CycleRepo } from "../ports/repos";
+import type { QuestionRepo, CycleRepo, FactRepo } from "../ports/repos";
+import { effectiveRevision } from "../../domain/facts/facts";
 import type { CycleId, RunId } from "../../domain/shared/ids";
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -58,13 +64,20 @@ export interface ContextSection {
 
 /**
  * Structured context produced by composeStructuredContext.
- * Sections 1+2 are composed by PromptComposer; this covers 3-8.
+ * Sections 1+2 are composed by PromptComposer; this covers 3-9.
  */
 export interface StructuredContext {
   /** Section 3: brief body (always present). */
   readonly productInvariant: ContextSection;
   /** Section 4: confirmed requirements (S1 index). Present when S1 is done. */
   readonly requirements?: ContextSection;
+  /**
+   * Section 9: backtrack feedback — the rejection reason from the most recent
+   * visual_review rejection in this cycle. Present only on backtrack-relaunches;
+   * absent on normal first-run launches. Rendered immediately after section 4
+   * (requirements) so the AI sees WHY it was rejected before any prior artifacts.
+   */
+  readonly backtrackFeedback?: ContextSection;
   /** Section 5: prior-step artifacts per granularity table. Empty when no prior. */
   readonly priorArtifacts?: ContextSection;
   /** Section 6: decisions + ledger carried items. */
@@ -75,13 +88,19 @@ export interface StructuredContext {
   readonly outputContract?: ContextSection;
 }
 
-/** Optional DB deps for sections 7+8. Pass to enable DB-sourced sections. */
+/** Optional DB deps for sections 7+8+9. Pass to enable DB-sourced sections. */
 export interface StructuredContextDeps {
   readonly fs: Fs;
   /** For section 7: confirmed answers from current run/cycle. */
   readonly questions?: QuestionRepo;
   /** For section 8: cycle state to look up step contracts. */
   readonly cycles?: CycleRepo;
+  /**
+   * For section 9 (backtrack feedback): facts from the current cycle, used to
+   * find the rejection reason on the most recent visual_review reject.
+   * When absent, section 9 is skipped (backward compat).
+   */
+  readonly facts?: FactRepo;
   /** For section 7: the run being launched (to filter answered questions). */
   readonly runId?: RunId;
   /** For section 8: the cycle id. */
@@ -467,6 +486,85 @@ export function composeStructuredContext(
     };
   }
 
+  // ── Section 9: 差し戻しフィードバック(backtrack feedback) ────────────────
+  // Present only when a visual_review was rejected with a reason in this cycle.
+  // Injected here (after section 4) so the AI sees WHY before reading prior artifacts.
+  // Source: questions.listByCycle → visual_review+answered → facts.listByCycle → reject±reason.
+  // We pick the most recent rejection by confirmedAt (latest backtrack = most relevant).
+  // Design: query by cycleId (not runId) so history across runs is captured; the
+  // human-provided reason is what matters regardless of which run raised the question.
+  //
+  // Logic:
+  //  1. Collect all answered visual_review question IDs for this cycle.
+  //  2. Find facts for those question IDs. Keep only facts with verdict=reject.
+  //  3. If any reject fact has a reason → emit section 9 with the latest reason.
+  //  4. If reject fact exists but has NO reason (should not happen per domain
+  //     invariant INV-4, but guard defensively) → emit visible marker (原則④).
+  //  5. No reject facts at all (approve, or no visual_review) → section 9 absent.
+  let backtrackFeedback: ContextSection | undefined;
+  if (deps.questions && deps.facts && deps.cycleId) {
+    const cycleQuestions = deps.questions.listByCycle(deps.cycleId);
+    const answeredReviewIds = new Set(
+      cycleQuestions
+        .filter((q) => q.kind === "visual_review" && q.state === "answered")
+        .map((q) => q.id as string),
+    );
+
+    if (answeredReviewIds.size > 0) {
+      const cycleFacts = deps.facts.listByCycle(deps.cycleId);
+      // Narrow to facts for answered visual_review questions with verdict=reject.
+      const factsWithRevs = cycleFacts
+        .filter((f) => answeredReviewIds.has(f.questionId as string))
+        .map((f) => ({ fact: f, rev: effectiveRevision(f) }))
+        .filter(({ rev }) => rev.verdict === "reject");
+
+      if (factsWithRevs.length > 0) {
+        // Partition: reject+reason (normal backtrack) vs reject+no-reason (defensive).
+        const withReason = factsWithRevs
+          .filter(({ rev }) => rev.reason !== undefined && rev.reason.trim().length > 0)
+          .sort((a, b) =>
+            // Descending by confirmedAt (ISO string lex = chronological order).
+            b.fact.confirmedAt > a.fact.confirmedAt ? 1 : b.fact.confirmedAt < a.fact.confirmedAt ? -1 : 0,
+          );
+
+        const latestReject = withReason.length > 0 ? withReason[0] : undefined;
+        if (latestReject !== undefined) {
+          // Normal path: most recent rejection with reason.
+          const rev = latestReject.rev;
+          const q = cycleQuestions.find(
+            (q) => (q.id as string) === (latestReject.fact.questionId as string),
+          );
+          const stepCtx =
+            q?.payload.kind === "visual_review"
+              ? `このステップ(${currentStepId})の前回成果物`
+              : "前回の成果物";
+
+          backtrackFeedback = {
+            id: "section-9-backtrack-feedback",
+            label: "【重要】差し戻し理由(前回却下の理由を必ず反映せよ)",
+            content: [
+              "【差し戻し理由】",
+              `${stepCtx}は人間レビューで却下されました。以下の理由を踏まえて今回の成果物を修正せよ。`,
+              "",
+              `却下理由: ${rev.reason as string}`,
+            ].join("\n"),
+          };
+        } else {
+          // Defensive: reject facts exist but all lack a reason (domain invariant violation).
+          // Emit visible marker so the AI knows a rejection occurred (原則④).
+          backtrackFeedback = {
+            id: "section-9-backtrack-feedback",
+            label: "【重要】差し戻し理由(前回却下の理由を必ず反映せよ)",
+            content:
+              "【差し戻し理由】※ 差し戻し記録が存在しますが却下理由が取得できませんでした。慎重に前回との差異を分析せよ。",
+            missing: true,
+          };
+        }
+      }
+      // No reject facts → all answered visual_reviews were approved → section 9 absent.
+    }
+  }
+
   // ── Section 5: 前段の成果物(per-step granularity table / §C7.3) ───────────
   const currentPhase = cycle.phases.find((p) => (p.step as string) === currentStepId);
   const currentOrder = currentPhase?.order ?? Infinity;
@@ -574,6 +672,7 @@ export function composeStructuredContext(
   return {
     productInvariant,
     ...(requirements !== undefined ? { requirements } : {}),
+    ...(backtrackFeedback !== undefined ? { backtrackFeedback } : {}),
     ...(priorArtifacts !== undefined ? { priorArtifacts } : {}),
     ...(decisionsLedger !== undefined ? { decisionsLedger } : {}),
     ...(dialogState !== undefined ? { dialogState } : {}),
@@ -583,12 +682,18 @@ export function composeStructuredContext(
 
 /**
  * Render a StructuredContext to a flat string for prompt injection.
- * Sections are rendered in §C7.1 order (3→8).
+ * Sections are rendered in order: 3 (brief) → 4 (requirements) →
+ * 9 (backtrack feedback, if present) → 5 (prior artifacts) →
+ * 6 (decisions/ledger) → 7 (dialog state) → 8 (output contract).
+ *
+ * Section 9 is placed immediately after requirements so the AI sees
+ * the rejection reason prominently before reading prior artifacts.
  */
 export function renderStructuredContext(ctx: StructuredContext): string {
   const sections: ContextSection[] = [
     ctx.productInvariant,
     ...(ctx.requirements !== undefined ? [ctx.requirements] : []),
+    ...(ctx.backtrackFeedback !== undefined ? [ctx.backtrackFeedback] : []),
     ...(ctx.priorArtifacts !== undefined ? [ctx.priorArtifacts] : []),
     ...(ctx.decisionsLedger !== undefined ? [ctx.decisionsLedger] : []),
     ...(ctx.dialogState !== undefined ? [ctx.dialogState] : []),

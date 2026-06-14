@@ -18,3 +18,4 @@ tests/e2e/.report/
 
 # US-05 runtime verify-ui screenshots (served, not committed)
 .verify-screenshots/
+.claude/worktrees/

@@ -17,6 +17,13 @@
 //   9. Section 7 dialog-state is populated from DB (QuestionRepo) answered questions.
 //  10. renderStructuredContext produces named section headers in §C7.1 order.
 //  11. Missing brief → visible marker in productInvariant (never silent / 原則④).
+//
+// F-5 invariants (backtrack feedback — section 9):
+//  12. backtrack(reject+reason) → section 9 present with reason text.
+//  13. Normal launch (no rejection in cycle) → section 9 absent.
+//  14. Rejection exists but Fact has no reason → section 9 emits visible marker (原則④).
+//  15. renderStructuredContext: section 9 appears between section 4 and section 5.
+//  16. Section 4 (requirements) is still present on a backtrack relaunch (S1 done).
 import { describe, test, expect } from "bun:test";
 import {
   resolveContextPaths,
@@ -32,9 +39,10 @@ import {
 import { Step } from "../../domain/shared/vocab";
 import type { Cycle, Phase } from "../../domain/cycle/cycle";
 import { FakeFs } from "../../infra/sys/fakes";
-import type { QuestionRepo } from "../ports/repos";
+import type { QuestionRepo, FactRepo } from "../ports/repos";
 import type { Question } from "../../domain/question/question";
-import type { CycleId, PhaseId, RunId, ProjectId, QuestionId } from "../../domain/shared/ids";
+import type { Fact } from "../../domain/facts/facts";
+import type { CycleId, PhaseId, RunId, ProjectId, QuestionId, FactId } from "../../domain/shared/ids";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -531,5 +539,318 @@ describe("composeStructuredContext — BU-1", () => {
 
   test("ledgerPath returns canonical aidlc-docs/{version}/ledger.yml path", () => {
     expect(ledgerPath(REPO, "v0.0.4")).toBe("/repo/aidlc-docs/v0.0.4/ledger.yml");
+  });
+});
+
+// ── F-5: backtrack feedback (section 9) ──────────────────────────────────────
+//
+// Helpers for section-9 tests.
+
+/** Minimal FactRepo stub. */
+function makeFactRepo(facts: readonly Fact[]): FactRepo {
+  return {
+    save: () => {},
+    findById: () => undefined,
+    listByCycle: () => facts,
+  };
+}
+
+/** A synthetic Fact representing a visual_review rejection with a reason. */
+function makeRejectFact(
+  questionId: QuestionId,
+  reason: string,
+  opts: { confirmedAt?: string } = {},
+): Fact {
+  return {
+    id: `fact-${questionId as string}` as FactId,
+    questionId,
+    cycleId: "cyc-1" as CycleId,
+    source: "human",
+    confirmedAt: (opts.confirmedAt ?? "2026-01-01T00:00:00Z") as never,
+    currentVersion: 1,
+    revisions: [
+      {
+        version: 1,
+        verdict: "reject",
+        statement: `visual_review:reject — ${reason}` as never,
+        reason: reason as never,
+        editedBy: "human",
+        at: (opts.confirmedAt ?? "2026-01-01T00:00:00Z") as never,
+      },
+    ],
+  };
+}
+
+/** A synthetic answered visual_review Question (the reject case). */
+function makeRejectedVisualReviewQuestion(id: QuestionId, runId: RunId): Question {
+  return {
+    id,
+    runId,
+    cycleId: "cyc-1" as CycleId,
+    taskId: null,
+    kind: "visual_review",
+    state: "answered",
+    payload: {
+      kind: "visual_review",
+      review: {
+        runId,
+        cycleId: "cyc-1" as CycleId,
+        step: Step("S8"),
+        taskId: null,
+        blocks: [{ type: "summary", title: "前回成果物" as never, body: "内容" as never }],
+        producedAt: "2026-01-01T00:00:00Z" as never,
+      },
+    },
+    createdAt: "2026-01-01T00:00:00Z" as never,
+  };
+}
+
+describe("composeStructuredContext — F-5 backtrack feedback (section 9)", () => {
+  const RUN_ID = "run-s8-1" as RunId;
+  const Q_ID = "q-review-1" as QuestionId;
+  const CYCLE_ID = "cyc-1" as CycleId;
+  const REJECT_REASON = "ヘッダーの文字色がモックと異なる。修正せよ。";
+
+  // ── invariant 12: reject+reason → section 9 present ───────────────────────
+
+  test("section 9 (backtrack feedback) is present when a visual_review was rejected with reason", () => {
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S1", "done", 0),
+      makePhase("S8", "running", 1),
+    ]);
+    const fs = makeFsWithBrief();
+    const q = makeRejectedVisualReviewQuestion(Q_ID, RUN_ID);
+    const fact = makeRejectFact(Q_ID, REJECT_REASON);
+    const questions = makeQuestionRepo([q]);
+    const facts = makeFactRepo([fact]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    expect(ctx.backtrackFeedback).toBeDefined();
+    expect(ctx.backtrackFeedback?.content).toContain(REJECT_REASON);
+    expect(ctx.backtrackFeedback?.missing).toBeUndefined();
+  });
+
+  // ── invariant 13: no rejection → section 9 absent ─────────────────────────
+
+  test("section 9 (backtrack feedback) is absent on a normal (first-run) launch", () => {
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S1", "done", 0),
+      makePhase("S8", "running", 1),
+    ]);
+    const fs = makeFsWithBrief();
+    // No questions in cycle → no rejection history.
+    const questions = makeQuestionRepo([]);
+    const facts = makeFactRepo([]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    expect(ctx.backtrackFeedback).toBeUndefined();
+  });
+
+  test("section 9 is absent when questions+facts repos are not provided (no backtrack deps)", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S8", "running", 0)]);
+    const fs = makeFsWithBrief();
+    // No repos at all → backward compat.
+    const ctx = composeStructuredContext({ cycle, step: Step("S8"), repoPath: REPO }, { fs });
+
+    expect(ctx.backtrackFeedback).toBeUndefined();
+  });
+
+  // ── invariant 14: answered visual_review that was APPROVED → no section 9 ──
+  //
+  // Only rejections trigger backtrack feedback. An approved visual_review means
+  // the run passed — no reason to inject feedback on the next run.
+
+  test("section 9 is absent when the visual_review was approved (not rejected)", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S8", "running", 0)]);
+    const fs = makeFsWithBrief();
+    // Answered visual_review where the human approved.
+    const approvedQ: Question = {
+      id: Q_ID,
+      runId: RUN_ID,
+      cycleId: CYCLE_ID,
+      taskId: null,
+      kind: "visual_review",
+      state: "answered",
+      payload: {
+        kind: "visual_review",
+        review: {
+          runId: RUN_ID,
+          cycleId: CYCLE_ID,
+          step: Step("S8"),
+          taskId: null,
+          blocks: [],
+          producedAt: "2026-01-01T00:00:00Z" as never,
+        },
+      },
+      createdAt: "2026-01-01T00:00:00Z" as never,
+    };
+    // Corresponding fact has approve verdict — no reason (approve doesn't require one).
+    const approveFact: Fact = {
+      id: `fact-${Q_ID as string}` as FactId,
+      questionId: Q_ID,
+      cycleId: CYCLE_ID,
+      source: "human",
+      confirmedAt: "2026-01-01T00:00:00Z" as never,
+      currentVersion: 1,
+      revisions: [
+        {
+          version: 1,
+          verdict: "approve",
+          statement: "visual_review:approve" as never,
+          editedBy: "human",
+          at: "2026-01-01T00:00:00Z" as never,
+        },
+      ],
+    };
+    const questions = makeQuestionRepo([approvedQ]);
+    const facts = makeFactRepo([approveFact]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    // Approve verdict → no backtrack feedback.
+    expect(ctx.backtrackFeedback).toBeUndefined();
+  });
+
+  test("section 9 emits visible marker when rejection fact is present but has no reason (原則④)", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S8", "running", 0)]);
+    const fs = makeFsWithBrief();
+    const q = makeRejectedVisualReviewQuestion(Q_ID, RUN_ID);
+    // A reject fact with an empty reason — domain normally forbids this but guard defensively.
+    const rejectFactNoReason: Fact = {
+      id: `fact-${Q_ID as string}` as FactId,
+      questionId: Q_ID,
+      cycleId: CYCLE_ID,
+      source: "human",
+      confirmedAt: "2026-01-01T00:00:00Z" as never,
+      currentVersion: 1,
+      revisions: [
+        {
+          version: 1,
+          verdict: "reject",
+          statement: "visual_review:reject" as never,
+          // reason intentionally omitted (or empty) — domain prevents this in practice
+          editedBy: "human",
+          at: "2026-01-01T00:00:00Z" as never,
+        },
+      ],
+    };
+    const questions = makeQuestionRepo([q]);
+    const facts = makeFactRepo([rejectFactNoReason]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    // Reject exists but no reason → visible marker (原則④).
+    expect(ctx.backtrackFeedback).toBeDefined();
+    expect(ctx.backtrackFeedback?.missing).toBe(true);
+    expect(ctx.backtrackFeedback?.content).toContain("取得できませんでした");
+  });
+
+  test("section 9 picks the MOST RECENT rejection when multiple rejections exist", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S8", "running", 0)]);
+    const fs = makeFsWithBrief();
+
+    const Q_ID_OLD = "q-review-old" as QuestionId;
+    const Q_ID_NEW = "q-review-new" as QuestionId;
+    const OLD_REASON = "古い差し戻し理由";
+    const NEW_REASON = "最新の差し戻し理由";
+
+    const qOld = makeRejectedVisualReviewQuestion(Q_ID_OLD, RUN_ID);
+    const qNew = makeRejectedVisualReviewQuestion(Q_ID_NEW, RUN_ID);
+    const factOld = makeRejectFact(Q_ID_OLD, OLD_REASON, { confirmedAt: "2026-01-01T00:00:00Z" });
+    const factNew = makeRejectFact(Q_ID_NEW, NEW_REASON, { confirmedAt: "2026-06-01T00:00:00Z" });
+
+    const questions = makeQuestionRepo([qOld, qNew]);
+    const facts = makeFactRepo([factOld, factNew]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    expect(ctx.backtrackFeedback?.content).toContain(NEW_REASON);
+    expect(ctx.backtrackFeedback?.content).not.toContain(OLD_REASON);
+  });
+
+  // ── invariant 15: renderStructuredContext ordering ─────────────────────────
+
+  test("renderStructuredContext places section 9 between section 4 (requirements) and section 5 (prior artifacts)", () => {
+    const s1IndexPath = `/repo/aidlc-docs/v0.0.4/s1/index.md`;
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S1", "done", 0),
+      makePhase("S8", "running", 1),
+    ]);
+    const fs = makeFsWithBrief({ [s1IndexPath]: "# S1 requirements" });
+    const q = makeRejectedVisualReviewQuestion(Q_ID, RUN_ID);
+    const fact = makeRejectFact(Q_ID, REJECT_REASON);
+    const questions = makeQuestionRepo([q]);
+    const facts = makeFactRepo([fact]);
+    const deps: StructuredContextDeps = {
+      fs,
+      questions,
+      facts,
+      cycleId: CYCLE_ID,
+    };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+    const rendered = renderStructuredContext(ctx);
+
+    const sec4Idx = rendered.indexOf("このサイクルの要件");
+    const sec9Idx = rendered.indexOf("差し戻し理由");
+    const sec5Idx = rendered.indexOf("前段の成果物");
+
+    // Section 9 must exist and be between section 4 and section 5.
+    expect(sec9Idx).toBeGreaterThan(-1);
+    expect(sec4Idx).toBeLessThan(sec9Idx);
+    expect(sec9Idx).toBeLessThan(sec5Idx);
+  });
+
+  // ── invariant 16: section 4 (requirements) is still present on backtrack ───
+
+  test("section 4 (requirements) is present on a backtrack relaunch when S1 is done", () => {
+    const s1IndexPath = `/repo/aidlc-docs/v0.0.4/s1/index.md`;
+    const S1_CONTENT = "# S1 index\n\nUS-01: バックトラック後も要件が見える";
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S1", "done", 0),
+      makePhase("S8", "running", 1),
+    ]);
+    const fs = makeFsWithBrief({ [s1IndexPath]: S1_CONTENT });
+    const q = makeRejectedVisualReviewQuestion(Q_ID, RUN_ID);
+    const fact = makeRejectFact(Q_ID, REJECT_REASON);
+    const questions = makeQuestionRepo([q]);
+    const facts = makeFactRepo([fact]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S8"), repoPath: REPO },
+      deps,
+    );
+
+    // Both section 4 (requirements) and section 9 (backtrack feedback) must be present.
+    expect(ctx.requirements).toBeDefined();
+    expect(ctx.requirements?.content).toContain("US-01");
+    expect(ctx.backtrackFeedback).toBeDefined();
+    expect(ctx.backtrackFeedback?.content).toContain(REJECT_REASON);
   });
 });

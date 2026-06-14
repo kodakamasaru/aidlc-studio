@@ -299,17 +299,20 @@ export class CycleService {
       repoPath: project.repoPath,
     });
 
-    // BU-1 構造化コンテキスト: build §C7.1 named sections (3-8) from 3 sources
+    // BU-1 構造化コンテキスト: build §C7.1 named sections (3-9) from 3 sources
     // (docs via Fs / ledger file / DB repos). Live.ts uses composeWithStructuredContext()
     // when this is present. Scripted/legacy adapters ignore it (backward compat).
     // Section 7 (dialog Q&A): uses the current runId — a fresh run has no answered
     // questions yet, so the section is empty at launch time (populated in resume turns).
+    // Section 9 (backtrack feedback): uses facts repo to find the most recent
+    // visual_review rejection reason in this cycle (F-5: AI が却下理由を知らない問題の修正).
     const structuredContext = composeStructuredContext(
       { cycle: next, step, repoPath: project.repoPath },
       {
         fs: this.ports.fs,
         questions: this.ports.repos.questions,
         cycles: this.ports.repos.cycles,
+        facts: this.ports.repos.facts,
         runId,
         cycleId,
       },

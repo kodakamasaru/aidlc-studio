@@ -890,7 +890,7 @@ test("SCR-05 cycle-progress.backtrack: full loop with ↩ BacktrackIcon on compl
 }) => {
   // Contract: PhasePipeline shows ↩ on a phase that was done, then backtracks,
   // then re-run and completed again (runs.length > 1 && phase.state === "done").
-  // Full loop: start → Q → answer → review → reject (backtrack) → relaunch →
+  // Full loop: start → Q → answer → review → reject (backtrack) → [F-4 auto-relaunch] →
   //            Q → answer → review → approve → ↩ BacktrackIcon visible on pill.
   await page.goto(`${HAPPY}/`);
   await ensureProject(page);
@@ -934,19 +934,12 @@ test("SCR-05 cycle-progress.backtrack: full loop with ↩ BacktrackIcon on compl
   await page.locator(".modal-body textarea").fill("再確認が必要です");
   await page.getByRole("button", { name: /から再開する/ }).click();
 
-  // Rewound state: cycle detail shows re-run CTA in the RunPanel.
+  // ── Loop 2: 差し戻し → AI が自動再実行(F-4) → Q → Answer → Review → Approve ──
+  // F-4: backtrack auto-relaunches the target phase (no manual 再実行 click). After
+  // the rollback the app returns to cycle detail and the scripted happy run raises a
+  // fresh Q automatically (phase is "running" with a live run, not a rewound CTA).
   await expect(page).toHaveURL(/\/cycles\/[^/]+$/);
-  // Use the RunPanel region to avoid matching the topbar button (strict mode).
-  const rerunPanel = page.getByRole("region", { name: /再実行が必要/ });
-  await expect(rerunPanel).toBeVisible({ timeout: 8000 });
-  const rerunBtn = rerunPanel.getByRole("button", { name: /再実行/ });
-  await expect(rerunBtn).toBeVisible({ timeout: 5000 });
-
-  // ── Loop 2: Relaunch → Q → Answer → Review → Approve ──
-  await rerunBtn.click();
-
-  // After relaunch, AI asks another Q (scripted happy path).
-  await expect(page.getByRole("region", { name: "あなたの対応待ち" })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("region", { name: "あなたの対応待ち" })).toBeVisible({ timeout: 12000 });
   await page.locator("a.nav-item", { hasText: "受信箱" }).click();
   const qCard2 = page.getByRole("listitem").filter({ hasText: "質問" }).first();
   await expect(qCard2).toBeVisible({ timeout: 8000 });

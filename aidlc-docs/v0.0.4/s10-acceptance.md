@@ -121,7 +121,15 @@
 - **検証**: integration 4 件(自動 run 付与 / launch 引数 / 失敗補償 / approve は余分起動なし)+ **独立 curl 再現(差し戻し単独→ /relaunch 不要で新 run #2 running + 新 question)**。決定論 597 green。
 - **判定**: 修正済。
 
-> F-1/F-2/F-4 修正済 + F-3 unblock 済(UI gap は v0.0.5)。US 判定を再開する。
+### F-5 (実機 / 修正済): 差し戻し理由・要件が再実行のコンテキストに届かない
+- **現象**: 差し戻し後の自動再実行(F-4)で、AI に**差し戻し理由が渡らず**「なぜ却下されたか」を知らずに作り直す疑い。
+- **根本原因**: 再実行 run の構造化コンテキスト(§C7.1)に **差し戻し理由のセクションが無かった**。section 7(対話Q&A)は新 runId 基準で起動時は空。理由は却下 review の Fact(verdict=reject + reason)に保存されるが、コンテキスト合成が参照していなかった。
+- **修正**: `context-resolver.composeStructuredContext` に **section 9「【重要】差し戻し理由(前回却下の理由を必ず反映せよ)」を追加**。cycle 単位で最新の「answered + verdict=reject + reason」の Fact を引き、要件(section 4)の直後・前段成果物の前に配置(AI が成果物を見る前に修正方針を立てられる順序)。approve のみで終わったサイクルでは出さない。reason 欠落時は可視マーカー(原則④)。**要件(section 4)は S1 done のため再実行でも present** を確認。
+- **検証**: unit 8 件(reject+reason→section present / normal→absent / approve→absent / 最新採用 / 描画順 sec4<sec9<sec5 / 再実行で要件 present 等)。決定論 **605** green。
+- **F-4 由来の回帰修正**: 差し戻しが自動再実行になったため、scr-05.backtrack の E2E が「手動 再実行 ボタン」を待って失敗していた → auto-relaunch フローに修正(手動クリック除去)。↩ BacktrackIcon の実機撮影が再び green(35 e2e)。
+- **判定**: 修正済。
+
+> F-1/F-2/F-4/F-5 修正済 + F-3 unblock 済(UI gap は v0.0.5)。US 判定を再開する。
 
 ## サイクル全体の成果物サマリー (確定時に記入)
 - (全 US 判定が揃ったら記入)
