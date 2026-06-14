@@ -7,7 +7,7 @@
  */
 
 import type { RunState } from "../cycle/cycle";
-import type { QuestionKind, QuestionPayload } from "../question/question";
+import type { QuestionKind, QuestionPayload, QuestionTarget } from "../question/question";
 import type { ReviewBlock } from "../review/review";
 import type { CompletenessBlock } from "../review/brief";
 import type {
@@ -16,6 +16,16 @@ import type {
   DocPath,
 } from "../external-memory/external-memory";
 import type { RunId, TaskId } from "../shared/ids";
+
+/**
+ * BU-2: A decision carried from the aidlc-result envelope (§C7.4).
+ * Additive optional type — absent on pre-BU-2 emissions (backward-compatible).
+ */
+export type ResultDecision = {
+  readonly id: string;
+  readonly decision: string;
+  readonly reason: string;
+};
 
 /** Run の進捗・終了・stall 検知 → Cycle.advanceRun。 */
 export type RunStateChanged = {
@@ -33,6 +43,13 @@ export type QuestionRaised = {
   readonly taskId?: TaskId;
   readonly kind: QuestionKind;
   readonly payload: QuestionPayload;
+  /**
+   * BU-3 config-hearing: optional write target. When present on a "question"
+   * event, the EventApplier threads it onto the raised Question so the
+   * inbox-service can apply the answer to StepContracts (§C7.6).
+   * Absent on all other question kinds and normal hearing questions.
+   */
+  readonly target?: QuestionTarget;
 };
 
 /** レビュー成果の描画データ(Task 単位。S3 名: ReviewBlocksEmitted)→ Review を構築。 */
@@ -47,6 +64,16 @@ export type ResultEmitted = {
    * requirements のみ(addressed 空)、evaluator が addressed を埋める。欠落 = 従来動作。
    */
   readonly completeness?: CompletenessBlock;
+  /**
+   * BU-2 (v0.0.4 / 後方互換 optional): aidlc-result エンベロープから搬送する
+   * 成果物パス一覧(aidlc-docs 相対パス)。欠落 = 従来動作(non-envelope 実行路)。
+   */
+  readonly artifacts?: readonly string[];
+  /**
+   * BU-2 (v0.0.4 / 後方互換 optional): aidlc-result エンベロープから搬送する
+   * AI が独自に決めた事項(D-NN)一覧。欠落 = 従来動作。
+   */
+  readonly decisions?: readonly ResultDecision[];
 };
 
 /** aidlc-docs に成果物が書かれた → ArtifactRef を索引化(v0.0.x)。 */

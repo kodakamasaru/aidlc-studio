@@ -26,6 +26,12 @@ export type AidlcQuestion = {
   readonly background?: string;
   readonly options: readonly AidlcOption[];
   readonly answerKind: AidlcAnswerKind;
+  /**
+   * BU-3: config-hearing target. When present, the answer handler writes the
+   * human's choice directly into StepContracts (deterministic write / §C7.6).
+   * Absent on normal hearing questions (backward-compatible).
+   */
+  readonly target?: AidlcTarget;
 };
 
 export type AidlcAnswer = {
@@ -38,6 +44,42 @@ export type WireError = {
   readonly code: "no-block" | "bad-json" | "schema";
   readonly detail: string;
 };
+
+/**
+ * BU-3: config-hearing target. When a config-hearing run emits questions, each
+ * question may carry a `target` that tells the answer handler WHICH StepContracts
+ * field to write the answer into deterministically (§C7.6 / s4-tech-spec.md).
+ *
+ * `step` — the step id (e.g. "S1", "S8").
+ * `field` — a StepContracts dotted path:
+ *   "output.profileKind" | "output.artifactGlob" |
+ *   "humanGate.mode" |
+ *   "escalation.onStall" | "escalation.maxRetry" |
+ *   "verification.observations"
+ *
+ * Absence of `target` means the question is a normal hearing question (no
+ * contract write on answer — backward-compatible).
+ */
+export type AidlcTarget = {
+  readonly step: string;
+  readonly field: string;
+  /**
+   * Write destination scope: "global" (project.pipelineDef) or "cycle:{id}"
+   * (phase snapshot). When absent in wire, the answer-handler infers the scope
+   * from the question's cycleId (i.e. "cycle:{question.cycleId}").
+   */
+  readonly scope?: string;
+};
+
+/** Allowed StepContracts dotted-path fields for config-hearing targets. */
+export const ALLOWED_TARGET_FIELDS: ReadonlySet<string> = new Set([
+  "output.profileKind",
+  "output.artifactGlob",
+  "humanGate.mode",
+  "escalation.onStall",
+  "escalation.maxRetry",
+  "verification.observations",
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -169,12 +211,43 @@ export const validateAidlcQuestion = (q: unknown): Result<AidlcQuestion, WireErr
     return err({ code: "schema", detail: "question.background must be a string when present" });
   }
 
+  // target — optional BU-3 config-hearing write target
+  let target: AidlcTarget | undefined;
+  if (raw["target"] !== undefined) {
+    if (typeof raw["target"] !== "object" || raw["target"] === null) {
+      return err({ code: "schema", detail: "question.target must be an object when present" });
+    }
+    const t = raw["target"] as Record<string, unknown>;
+    if (typeof t["step"] !== "string" || t["step"].length === 0) {
+      return err({ code: "schema", detail: "question.target.step must be a non-empty string" });
+    }
+    if (typeof t["field"] !== "string" || t["field"].length === 0) {
+      return err({ code: "schema", detail: "question.target.field must be a non-empty string" });
+    }
+    if (!ALLOWED_TARGET_FIELDS.has(t["field"])) {
+      return err({
+        code: "schema",
+        detail: `question.target.field "${t["field"]}" is not an allowed contract field. Allowed: ${[...ALLOWED_TARGET_FIELDS].join(", ")}`,
+      });
+    }
+    // scope is optional; when present must be a string
+    if (t["scope"] !== undefined && typeof t["scope"] !== "string") {
+      return err({ code: "schema", detail: "question.target.scope must be a string when present" });
+    }
+    target = {
+      step: t["step"] as string,
+      field: t["field"] as string,
+      ...(t["scope"] !== undefined ? { scope: t["scope"] as string } : {}),
+    };
+  }
+
   return ok({
     id: raw["id"] as string,
     prompt: raw["prompt"] as string,
     answerKind: raw["answerKind"] as AidlcAnswerKind,
     options: validatedOptions,
     ...(raw["background"] !== undefined ? { background: raw["background"] as string } : {}),
+    ...(target !== undefined ? { target } : {}),
   });
 };
 

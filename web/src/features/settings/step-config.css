@@ -180,6 +180,48 @@
   padding: 16px 18px;
 }
 
+/* SCR-06: 空の指示本文ブロック(no-instruction 状態)。 */
+.step-spec__no-instruction {
+  text-align: center;
+  padding: var(--sp-6, 24px) var(--sp-4, 16px);
+  color: var(--color-text-low, #6c6c7a);
+}
+
+/* SCR-06 loading skeleton ブロック。skel-line は step-config-readback.css と共有。 */
+.step-spec__skel-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 12px);
+  padding: var(--sp-4, 16px) 0;
+}
+/* skel-line--long / skel-line--full: step-config-readback.css 未定義分の補完 */
+.skel-line--long {
+  height: 14px;
+  width: 75%;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-2, #16161c);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.skel-line--full {
+  height: 14px;
+  width: 100%;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-2, #16161c);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-line--long,
+  .skel-line--full {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* US-06 対話式編集（scr-01.settings の AI 相談）。 */
 .step-dialog {
   margin-top: 6px;

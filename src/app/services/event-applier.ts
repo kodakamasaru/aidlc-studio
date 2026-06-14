@@ -99,6 +99,9 @@ export class EventApplier {
           ...(event.taskId !== undefined ? { taskId: event.taskId } : {}),
           payload: event.payload,
           createdAt: clock.now(),
+          // BU-3: thread config-hearing target so inbox-service can write
+          // the answer into StepContracts after the human responds (§C7.6).
+          ...(event.target !== undefined ? { target: event.target } : {}),
         });
         repos.questions.save(q);
         raised.push(q);

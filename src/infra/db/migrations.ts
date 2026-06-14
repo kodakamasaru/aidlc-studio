@@ -96,5 +96,10 @@ export function migrate(db: Database): void {
       data      TEXT NOT NULL,
       PRIMARY KEY (projectId, section)
     );
+
+    CREATE TABLE IF NOT EXISTS run_sessions (
+      runId     TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL
+    );
   `);
 }

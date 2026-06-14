@@ -20,19 +20,83 @@ import type {
   DomainEventSink,
   RunContext,
 } from "../../app/ports/orchestrator";
-import type { DomainEvent } from "../../domain/events/events";
+import type { DomainEvent, QuestionRaised } from "../../domain/events/events";
 import type { RunId } from "../../domain/shared/ids";
 import type { Step } from "../../domain/shared/vocab";
 import type { PromptComposer } from "../../app/services/prompt-composer";
 import type { ScreenshotCapturer, CaptureResult } from "../../app/ports/screenshot";
 import type { ReviewBlock } from "../../domain/review/review";
 import type { Text } from "../../domain/shared/primitives";
+import type { QuestionOption } from "../../domain/question/question";
+import type { SessionRepo } from "../../app/ports/repos";
 import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { join, resolve } from "node:path";
 import { logError } from "../log";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { parseQuestionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
+import { parseAidlcResultBlock, type AidlcResult } from "../../wire/aidlc-result";
+
+/**
+ * Unit-04: cap on resume turns per hearing. Exceeding this emits `stalled`
+ * (retriable) so the run doesn't loop infinitely. Value 10 is a provisional
+ * operational ceiling (S4 non-functional requirement / unit-04-resume-turn.md).
+ */
+export const MAX_HEARING_TURNS = 10;
+
+/**
+ * BU-2: Pure mapper — translate a validated AidlcResult envelope into the
+ * sequence of DomainEvents to emit. This is the testable core of the new path.
+ *
+ * Routing (§C7.4 s4-tech-spec):
+ *   - questions[] non-empty → one QuestionRaised per question (questions win
+ *     over status; the AI is asking for clarification before proceeding)
+ *   - status="needs_human" (no questions) → ResultEmitted carrying completeness
+ *     + artifacts + decisions (human visual_review path)
+ *   - status="done"    → RunStateChanged done  (no human gate)
+ *   - status="stalled" → RunStateChanged stalled (retriable)
+ *
+ * Pure: no I/O, no side effects. Exported for direct unit testing.
+ */
+export function aidlcResultToEvents(runId: RunId, result: AidlcResult): DomainEvent[] {
+  // questions[] non-empty: emit one QuestionRaised per question (highest priority).
+  if (result.questions.length > 0) {
+    return result.questions.map((q) => aidlcQuestionToEvent(runId, q));
+  }
+
+  if (result.status === "needs_human") {
+    // Build a ResultEmitted that carries completeness + artifacts + decisions
+    // from the envelope (§C7.4). blocks starts empty — the review text is in
+    // aidlc-docs md files (path refs in artifacts); the ReviewDetail renderer
+    // uses artifacts + completeness directly (Unit-05 alignment).
+    const event: DomainEvent = {
+      type: "ResultEmitted",
+      runId,
+      blocks: [],
+      completeness: result.completeness,
+      ...(result.artifacts.length > 0 ? { artifacts: result.artifacts } : {}),
+      ...(result.decisions.length > 0 ? { decisions: result.decisions } : {}),
+    };
+    return [event];
+  }
+
+  if (result.status === "done") {
+    return [{
+      type: "RunStateChanged",
+      runId,
+      to: "done",
+    }];
+  }
+
+  // status === "stalled"
+  return [{
+    type: "RunStateChanged",
+    runId,
+    to: "stalled",
+    reason: "AI がスタックを報告しました(aidlc-result status=stalled)。Inbox から retry してください。",
+  }];
+}
 
 /** Default bounded prompt: one sentence, no tools needed, fully deterministic shape. */
 const defaultBuildPrompt = (cmd: { readonly step: Step }): string =>
@@ -72,6 +136,65 @@ export function screenshotBlockFrom(
       };
 }
 
+/**
+ * Unit-03: Extract the session_id from the stream-json init line.
+ * Pure, standalone, exported so Unit-04 can import without touching the drain loop.
+ *
+ * Looks for `{"type":"system","subtype":"init","session_id":"..."}` in the JSONL.
+ * Returns the session_id string when found and non-empty; null otherwise.
+ * Absence is NOT silently swallowed — callers must surface it (resume-impossible / 原則④).
+ */
+export function extractSessionId(stdout: string): string | null {
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    let evt: unknown;
+    try {
+      evt = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (typeof evt !== "object" || evt === null) continue;
+    const e = evt as Record<string, unknown>;
+    if (e["type"] === "system" && e["subtype"] === "init") {
+      const sid = e["session_id"];
+      if (typeof sid === "string" && sid.length > 0) return sid;
+      // init found but session_id is missing/empty/wrong type → null (unusable).
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Unit-03: Map one wire AidlcQuestion to a domain QuestionRaised event.
+ * Pure, standalone, exported for direct unit testing.
+ *
+ * Wire `background` has no domain field; when present it is merged into the prompt
+ * (appended after a separator) so the human sees full context. Wire `answerKind`
+ * is not exposed on the domain payload (the domain uses kind="question" uniformly).
+ * Options are mapped 1-to-1: id/label/hint/recommended preserved as-is.
+ */
+export function aidlcQuestionToEvent(runId: RunId, q: AidlcQuestion): QuestionRaised {
+  const prompt: Text = q.background !== undefined
+    ? `${q.prompt}\n\n背景: ${q.background}`
+    : q.prompt;
+
+  const options: readonly QuestionOption[] = q.options.map((o) => ({
+    id: o.id,
+    label: o.label as Text,
+    ...(o.hint !== undefined ? { hint: o.hint as Text } : {}),
+    ...(o.recommended === true ? { recommended: true } : {}),
+  }));
+
+  return {
+    type: "QuestionRaised",
+    runId,
+    kind: "question",
+    payload: { kind: "question", prompt, options },
+  };
+}
+
 const DEFAULT_CLAUDE_BIN = "claude";
 const DEFAULT_TIMEOUT_MS = 120_000;
 /** Grace period after SIGTERM before SIGKILL, so a process ignoring TERM still dies. */
@@ -109,6 +232,12 @@ export interface LiveClaudeOptions {
   readonly shotsDir?: string;
   /** URL prefix the server serves shotsDir at (the review block's src base). */
   readonly shotUrlBase?: string;
+  /**
+   * Unit-04: session_id store for persisting the claude session captured from
+   * stream-json init, keyed by runId. When omitted (legacy / tests that don't
+   * need resume), session persistence is skipped silently.
+   */
+  readonly sessionRepo?: SessionRepo;
 }
 
 type SpawnedChild = ReturnType<typeof Bun.spawn>;
@@ -125,6 +254,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   private readonly verifyUrl: string | undefined;
   private readonly shotsDir: string;
   private readonly shotUrlBase: string;
+  private readonly sessionRepo: SessionRepo | undefined;
   // Live child processes keyed by runId, so cancel() can kill an in-flight run.
   private readonly children = new Map<string, SpawnedChild>();
   // Each run's full context, kept so the post-review approval finalize (resume)
@@ -132,6 +262,9 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   // locate + advance the Cycle. Populated at startAttempt; never evicted in v0
   // (one run per launch; bounded by process lifetime).
   private readonly contexts = new Map<string, RunContext>();
+  // Unit-04: count resume turns per runId (turns in one hearing). When this
+  // exceeds MAX_HEARING_TURNS the run is stalled so the human decides next steps.
+  private readonly resumeCounts = new Map<string, number>();
 
   constructor(opts: LiveClaudeOptions) {
     this.sink = opts.sink;
@@ -147,6 +280,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     // writes to a well-defined dir (not cwd-relative at call time).
     this.shotsDir = opts.shotsDir ?? resolve(process.cwd(), ".verify-screenshots");
     this.shotUrlBase = opts.shotUrlBase ?? "/api/screenshots";
+    this.sessionRepo = opts.sessionRepo;
   }
 
   /**
@@ -176,13 +310,23 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
 
   /** Generator prompt: real composition when a composer is wired, else the stub. */
   private generatorPrompt(cmd: RunLaunch): string {
-    return this.composer
-      ? this.composer.compose({
-          role: "generator",
-          step: cmd.step,
-          repoPath: cmd.repoPath,
-        })
-      : this.buildPrompt(cmd);
+    if (!this.composer) return this.buildPrompt(cmd);
+    // BU-1: prefer structured path when structuredContext is present (§C7.1-C7.4 sections).
+    // Legacy path (contextPaths) is kept as fallback for scripted / backward-compat cases.
+    if (cmd.structuredContext !== undefined) {
+      return this.composer.composeWithStructuredContext(
+        { role: "generator", step: cmd.step, repoPath: cmd.repoPath },
+        cmd.structuredContext,
+      );
+    }
+    return this.composer.compose({
+      role: "generator",
+      step: cmd.step,
+      repoPath: cmd.repoPath,
+      // Unit-02 前段文脈注入: forward resolved contextPaths from the launch context so
+      // the composer injects prior-step artifacts instead of its brief.md default.
+      ...(cmd.contextPaths !== undefined ? { contextPaths: cmd.contextPaths } : {}),
+    });
   }
 
   // The OrchestratorPort contract says launch "Resolves once the run is started"
@@ -249,38 +393,111 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   }
 
   /**
-   * In live v0 the ONLY resume is the post-review approval finalize. A live run
-   * does NOT emit `done` on completion — it emits only `ResultEmitted`, so the
-   * run stays `running` and surfaces as a `visual_review` card ("レビュー待ち").
-   * When the human approves that review, the inbox service dispatches resume —
-   * which here simply emits the terminal `RunStateChanged done`. No `claude`
-   * re-spawn is needed: headless `claude -p` already ran to completion at launch.
+   * Unit-04: two-path resume.
    *
-   * RunStateChanged carries only a runId, so resume can emit `done` without the
-   * cycle/phase/step context a Question/Review needs. If the run already failed,
-   * advanceRun(done) is an illegal transition — that's fine; the sink logs it and
-   * the run stays terminal-failed.
+   * PATH A — turn continuation (`body` present):
+   *   Re-spawn `claude --resume <sessionId> -p <body>` to run the next turn.
+   *   The resumed turn drains through `awaitAndEmit`, which emits:
+   *     - `QuestionRaised`  when the AI asks another question
+   *     - `ResultEmitted`   when the AI produces a visual_review result
+   *   If `sessionId` is absent the run cannot be resumed → emit `stalled` so
+   *   the human can retry from the Inbox (never silently lost / 原則④).
+   *   Turn cap: exceeding MAX_HEARING_TURNS emits `stalled` (US-04 AC).
    *
-   * Mid-run interactive Q→answer→resume against the real model is still a v0.0.x
-   * enhancement (S7-C1): headless `claude -p` has no mid-run pause, so there is no
-   * live session to inject an answer into. The v0 review-approval finalize below
-   * is the only resume the live adapter supports.
+   * PATH B — finalize approval (`body` absent):
+   *   The human approved a `visual_review` → emit terminal `RunStateChanged done`.
+   *   No `claude` re-spawn is needed (the run already completed its last turn).
+   *
+   * Context requirement (paths A + B): ctx must be in this.contexts. If it is
+   * missing (server restart / not launched by this instance) the run is stuck.
+   * Throw so the caller's compensation surfaces a 502 instead of silent failure.
    */
   async resume(cmd: ResumeRun): Promise<void> {
     const ctx = this.contexts.get(cmd.runId);
     if (!ctx) {
       // Context lost (server restart / not launched by this instance).
-      // Throw so the caller's compensation can surface the error to the user
-      // instead of silently failing and leaving the run stuck in "running".
       throw new Error(
         `LiveClaudeOrchestrator.resume: context not found for run ${cmd.runId}`,
       );
     }
-    await this.emit(ctx, {
-      type: "RunStateChanged",
-      runId: cmd.runId,
-      to: "done",
+
+    // PATH B — finalize approval (no body → done, no re-spawn).
+    if (cmd.body === undefined) {
+      await this.emit(ctx, {
+        type: "RunStateChanged",
+        runId: cmd.runId,
+        to: "done",
+      });
+      return;
+    }
+
+    // PATH A — turn continuation.
+    // Turn cap: count how many resume turns this run has had in this hearing.
+    const turns = (this.resumeCounts.get(cmd.runId) ?? 0) + 1;
+    this.resumeCounts.set(cmd.runId, turns);
+    if (turns > MAX_HEARING_TURNS) {
+      logError(
+        `LiveClaudeOrchestrator.resume: MAX_HEARING_TURNS (${MAX_HEARING_TURNS}) exceeded`,
+        { runId: cmd.runId },
+      );
+      await this.emit(ctx, {
+        type: "RunStateChanged",
+        runId: cmd.runId,
+        to: "stalled",
+        reason: `ヒアリング turn 数が上限(${MAX_HEARING_TURNS})を超えました。Inbox から retry してください。`,
+      });
+      return;
+    }
+
+    // sessionId is required for --resume. Missing → stalled (not silent / 原則④).
+    if (!cmd.sessionId) {
+      logError(
+        "LiveClaudeOrchestrator.resume: sessionId missing — cannot --resume without it",
+        { runId: cmd.runId },
+      );
+      await this.emit(ctx, {
+        type: "RunStateChanged",
+        runId: cmd.runId,
+        to: "stalled",
+        reason: "セッション ID が見つかりません。run を retry してください。",
+      });
+      return;
+    }
+
+    // Spawn `claude --resume <sessionId> -p <body>` to run the next turn.
+    // Uses the same non-blocking spawn+detach model as launch/retry: the
+    // resume call returns as soon as the child is tracked; awaitAndEmit drains
+    // in the background and emits QuestionRaised or ResultEmitted.
+    this.startResumeTurn(ctx, cmd.sessionId, cmd.body as string);
+  }
+
+  /**
+   * Unit-04: spawn a resumed turn (`claude --resume <sessionId> -p <body>`) and
+   * detach. Uses the same awaitAndEmit drain as launch/retry. Non-blocking so the
+   * inbox-service POST resolves quickly. Throws synchronously only when the spawn
+   * itself is impossible (bad binary) so the caller's compensation can react.
+   */
+  private startResumeTurn(ctx: RunContext, sessionId: string, body: string): void {
+    const args = [
+      "--resume",
+      sessionId,
+      "-p",
+      body,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...(this.maxTurns !== undefined ? ["--max-turns", String(this.maxTurns)] : []),
+      ...(this.model !== undefined ? ["--model", this.model] : []),
+    ];
+
+    const child = Bun.spawn([this.claudeBin, ...args], {
+      cwd: process.cwd(), // resumed session has no repoPath context; use cwd
+      stdout: "pipe",
+      stderr: "pipe",
     });
+    this.children.set(ctx.runId, child);
+
+    void this.awaitAndEmit(ctx, child, false);
   }
 
   async cancel(cmd: { readonly runId: RunId }): Promise<void> {
@@ -415,10 +632,71 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
             : `claude exited ${exitCode}(診断出力なし — claude CLI のログを確認してください)`,
         );
       }
+      // Unit-03: parse session_id from the init line (enables --resume in Unit-04).
+      // Absence is NOT silently swallowed — log it so the operator knows resume
+      // is not available for this run (原則④).
+      const sessionId = extractSessionId(stdout);
+      if (sessionId === null) {
+        logError("LiveClaudeOrchestrator: stream-json init line missing — session_id unavailable (--resume disabled for this run)", {
+          runId: ctx.runId as string,
+        });
+      } else {
+        // Unit-04: persist the captured session_id so a later resume turn can
+        // pass `--resume <sessionId>`. Writing is best-effort: a failure here
+        // does NOT abort the run — we log it and continue (the run's result is
+        // still valid; only the resume path becomes unavailable for this run).
+        try {
+          this.sessionRepo?.save(ctx.runId, sessionId);
+        } catch (saveErr) {
+          logError("LiveClaudeOrchestrator: failed to persist session_id (resume disabled for this run)", saveErr);
+        }
+      }
+
       const text = extractResultText(stdout);
       if (text === undefined || text.trim().length === 0) {
         throw new Error("claude produced no assistant result text");
       }
+
+      // BU-2: FIRST try aidlc-result envelope (§C7.4). Present → drive events
+      // from the envelope (questions → QuestionRaised; needs_human → ResultEmitted;
+      // done/stalled → RunStateChanged). Parse error → log (原則④) + fall through
+      // to the legacy path below (safe fallback: never silently drop output).
+      // Absent (ok null) → proceed to the existing paths below, unchanged.
+      const resultParseResult = parseAidlcResultBlock(text);
+      if (!resultParseResult.ok) {
+        logError(
+          "LiveClaudeOrchestrator: aidlc-result block parse error — falling back to legacy path",
+          { runId: ctx.runId as string, code: resultParseResult.error.code, detail: resultParseResult.error.detail },
+        );
+        // Fall through to legacy path (aidlc-question then ResultEmitted).
+      } else if (resultParseResult.value !== null) {
+        // Envelope found and validated → emit events derived from it.
+        const events = aidlcResultToEvents(ctx.runId, resultParseResult.value);
+        for (const event of events) {
+          await this.emit(ctx, event);
+        }
+        return;
+      }
+
+      // Unit-03: check for an aidlc-question block. Present → emit QuestionRaised
+      // cards (one per question). Absent → fall through to the existing
+      // ResultEmitted→visual_review path. Parse error → log (原則④) + fall through
+      // (safe side: never silently misclassify a parse failure as a clean result).
+      const questionParseResult = parseQuestionBlock(text);
+      if (!questionParseResult.ok) {
+        logError(
+          "LiveClaudeOrchestrator: aidlc-question block parse error — falling back to ResultEmitted",
+          { runId: ctx.runId as string, code: questionParseResult.error.code, detail: questionParseResult.error.detail },
+        );
+      } else if (questionParseResult.value !== null) {
+        // Block found and parsed → emit one QuestionRaised per question (US-03 AC).
+        for (const q of questionParseResult.value) {
+          await this.emit(ctx, aidlcQuestionToEvent(ctx.runId, q));
+        }
+        // Questions emitted — do NOT also emit ResultEmitted for this run.
+        return;
+      }
+
       // US-04: evaluator runs parse a structured completeness verdict so the SAME
       // app gate runs on the real model output. A parse miss does NOT silently drop
       // it — we log that completeness was expected-but-absent (the app then falls

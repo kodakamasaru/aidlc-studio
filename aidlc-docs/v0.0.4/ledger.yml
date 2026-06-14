@@ -1,0 +1,55 @@
+# v0.0.4 引き継ぎ台帳(ledger / 正本 = file)。
+# 規約: D/確定項目に state: carried|done|dropped。carried は into: 必須、dropped は reason: 必須。
+# 次サイクル S1 は前バージョン ledger の未 reconcile(carried で into が当該サイクル)をゼロにするまで進めない。
+#
+# ── 本サイクル内の手戻り(S8 実機レビューで発覚 / S8→S4 backtrack)──
+# into: v0.0.4(自サイクル)= 「このサイクルを閉じる前に v0.0.4 内で消し込む義務」。
+# 次サイクル(v0.0.5)の reconcile 対象ではない(into が v0.0.5 を指さないため)。
+# S4 をやり直して S5→S8 までカスケード再実装し、消し込んだら done + closed_in に更新する。
+
+- id: BT-01-context-io-design
+  origin: v0.0.4/s8-integration.md   # S8 実機レビュー(2026-06-14)で人間が発覚
+  decision: >
+    US-01 前段文脈注入は「機構(前段 index.md のパス連結)」だけで、AIへの入力コンテキストと
+    出力フォーマットの「設計」が無い。具体: ①コンテキストを DB(questions/answers・StepContracts・
+    run/cycle 状態)から正規に読まずファイル(aidlc-docs)だけ参照 ②brief が S2 以降で落ちる疑い
+    ③ユビキタス言語・決定(D-NN)・引き継ぎ ledger を設計コンテキストとして渡していない
+    ④前段成果物が index 粒度のみ(詳細が要る工程に詳細が渡らない)⑤入出力が自由 md + 埋め込み
+    block の best-effort parse で、質問など構造化出力を確実に受け取れない。
+    発生源 = S4(技術仕様)が transport だけで「入力コンテキスト設計 + 出力フォーマット設計」を
+    first-class 成果物にしなかったため。S5 Unit-02 も「機構」止まり。
+  state: carried
+  into: v0.0.4   # 自サイクル内 backtrack。S4 で コンテキスト/IO 契約(構造化セクション / DB+docs 統合 / 完全フォーマット化 protocol)を設計し直し、S5→S8 で実装して done 化する。
+
+- id: BT-02-config-hearing-flow
+  origin: v0.0.4/s8-integration.md   # S8 実機レビュー(2026-06-14)で人間が発覚(ヒアリング画面→サイクル画面 bounce)
+  decision: >
+    US-06「設定が個別フォームでなく AI ヒアリングで埋まる(2層: グローバル既定 + サイクル単位)」の
+    機能フローが未配線。読み返し画面(scr-04)と会話スレッド器は実装済だが、①「会話で直す」が設定
+    ヒアリング run を起動しない(cosmetic ラベルのみ)②回答→StepContracts 書き込み経路が backend に
+    無い(設定書込は今も個別フォーム PATCH のみ=US-06 が廃止すべきもの)③グローバル「会話で直す」は
+    存在しないルート /settings/thread へ飛び サイクル一覧へ bounce。
+    発生源 = S4(機構未設計)+ S5(Unit 未分割)。S2 にも 2層モデルとの文言不整合(「ステップ着手で」)。
+  state: carried
+  into: v0.0.4   # 自サイクル内 backtrack。
+  progress: >
+    2026-06-14 部分消化: §C7.6 で書込機構 pin(構造化質問→直接書込 / target:{step,field})。
+    BU-3 backend done(hearing-service.applyHearingAnswerToContracts + wire/domain target + 回答ルーティング
+    + scripted config-hearing シナリオ + 統合テスト end-to-end / 501 green)。BU-3 web 部分: グローバル
+    dead route(/settings/thread bounce)を解消し /settings/hearing 新設、cycle スコープは
+    POST /api/hearing/launch → 設定質問 → 回答→contracts 書込 まで配線完了。
+    残り: グローバルスコープの「サイクル非依存 run」モデル(Question/Run が cycleId 必須のため、
+    synthetic global cycle か null-cycleId run の導入が必要)。これが入るとグローバル設定も会話で埋まる。
+
+- id: BT-03-recurrence-prevention
+  origin: v0.0.4/s8-integration.md
+  decision: >
+    再発防止(道具では直らない層 / skill 本文 + operating-model に焼く)。
+    ①S4: 技術仕様は「AIへの入力コンテキスト設計 + 出力フォーマット設計」を first-class 成果物として
+    必須化(transport/機構だけで完了にしない)。②S8: 完全性ゲートを US-AC 機能フロー貫通で回す
+    (画面 mock 一致は必要条件であって十分条件でない / 画面起点でなく US-AC インベントリ起点)。
+  state: done
+  closed_in: >
+    2026-06-14 / kit/rules/aidlc-operating-model.md「再発防止ゲート(BT-03 恒久ルール)」に Rule A/B を
+    DRY 定義 + kit/skills/aidlc-s4-tech-spec/SKILL.md 完了条件(7) + kit/skills/aidlc-s8-integration/SKILL.md
+    完了条件(6)・進め方・US-AC 機能フロー突合表 を追記(各 skill は参照のみ)。

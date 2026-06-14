@@ -1,0 +1,254 @@
+/* SCR-04 — ステップ設定 読み取り専用一覧(全ステップ × 範囲バッジ)
+ * 4 states: default / global / pre-us / loading (skeleton)
+ */
+
+.cfg-rb {
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/* ── Scope bar ───────────────────────────────────────────────── */
+.cfg-rb__scope-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.cfg-rb__scope-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+.cfg-rb__scope-tag--cycle {
+  color: var(--color-running);
+  background: var(--color-running-soft);
+  border-color: var(--color-running-border);
+}
+.cfg-rb__scope-tag--global {
+  color: var(--color-idle);
+  background: var(--color-idle-soft);
+  border-color: var(--color-idle-border);
+}
+.cfg-rb__scope-link {
+  font-size: var(--text-caption);
+  color: var(--color-primary);
+  margin-left: auto;
+}
+.cfg-rb__scope-link:hover {
+  text-decoration: underline;
+}
+.cfg-rb__scope-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Hint text ───────────────────────────────────────────────── */
+.cfg-rb__hint {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  line-height: var(--leading-body);
+  margin: 0;
+}
+
+/* ── Pre-US lock banner ──────────────────────────────────────── */
+.cfg-rb__lock {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--color-stalled-soft);
+  border: 1px solid var(--color-stalled-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  line-height: var(--leading-body);
+}
+
+/* ── Steps table ─────────────────────────────────────────────── */
+.cfg-rb__table {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.cfg-rb__row {
+  display: grid;
+  grid-template-columns: 160px 1fr 160px;
+  border-bottom: 1px solid var(--color-line);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.cfg-rb__row:last-child {
+  border-bottom: none;
+}
+.cfg-rb__row--head {
+  background: var(--color-surface-2);
+}
+.cfg-rb__row:not(.cfg-rb__row--head):hover {
+  background: var(--color-surface-2);
+}
+
+.cfg-rb__cell {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-caption);
+  display: flex;
+  align-items: center;
+}
+.cfg-rb__row--head .cfg-rb__cell {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-low);
+  text-transform: uppercase;
+}
+.cfg-rb__cell--vals {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  border-left: 1px solid var(--color-line);
+  border-right: 1px solid var(--color-line);
+}
+
+/* Step name with drill arrow */
+.cfg-rb__sname {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.cfg-rb__sname:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.cfg-rb__sname:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.cfg-rb__sname-drill {
+  color: var(--color-text-low);
+  margin-left: var(--sp-1);
+  font-size: var(--text-caption);
+}
+.cfg-rb__sname--dim {
+  font-size: var(--text-body);
+  color: var(--color-text-low);
+}
+
+/* Key-value pairs */
+.cfg-rb__kv {
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  white-space: nowrap;
+}
+.cfg-rb__kv--empty {
+  color: var(--color-text-low);
+  font-style: italic;
+}
+.cfg-rb__k {
+  font-weight: 600;
+  color: var(--color-text-low);
+}
+
+/* Range badge */
+.cfg-rb__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.cfg-rb__badge--inherit {
+  color: var(--color-text-low);
+  background: var(--color-idle-soft);
+  border-color: var(--color-idle-border);
+}
+.cfg-rb__badge--override {
+  color: var(--color-running);
+  background: var(--color-running-soft);
+  border-color: var(--color-running-border);
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.cfg-rb__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--sp-2);
+}
+
+/* ── Loading skeleton (SCR-04 loading state) ─────────────────── */
+.cfg-rb__skel-scope {
+  height: 28px;
+  border-radius: var(--radius-full);
+  width: 200px;
+  background: var(--color-surface-2);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.cfg-rb__skel-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 160px;
+  border-bottom: 1px solid var(--color-line);
+}
+.skel-line {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+  margin: var(--sp-3) var(--sp-4);
+}
+.skel-line--short {
+  width: 80px;
+}
+.skel-line--med {
+  width: 200px;
+  max-width: 100%;
+}
+.skel-line--xs {
+  width: 48px;
+}
+
+@keyframes skel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cfg-rb__skel-scope,
+  .skel-line {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Responsive: narrow screens */
+@media (max-width: 640px) {
+  .cfg-rb__row {
+    grid-template-columns: 1fr;
+  }
+  .cfg-rb__cell--vals {
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--color-line);
+  }
+}

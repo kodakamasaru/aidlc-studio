@@ -7,6 +7,7 @@ import {
   type AidlcQuestion,
   type AidlcAnswer,
   type AidlcOption,
+  ALLOWED_TARGET_FIELDS,
 } from "./aidlc-wire";
 
 // ---------------------------------------------------------------------------
@@ -765,6 +766,104 @@ describe("parseAnswersBlock — unclosed fence detection (FIX 3)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("no-block");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BU-3: AidlcQuestion.target field validation
+// ---------------------------------------------------------------------------
+
+describe("validateAidlcQuestion — BU-3 target field (config-hearing)", () => {
+  const baseQ = {
+    id: "q1",
+    prompt: "Which mode?",
+    answerKind: "single",
+    options: [
+      { id: "a", label: "Option A", recommended: true },
+      { id: "b", label: "Option B" },
+    ],
+  };
+
+  test("question without target -> ok (backward-compat, target is optional)", () => {
+    const result = validateAidlcQuestion(baseQ);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.target).toBeUndefined();
+  });
+
+  test("valid target with step + field -> ok, target is carried through", () => {
+    const q = { ...baseQ, target: { step: "S1", field: "humanGate.mode" } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.target?.step).toBe("S1");
+      expect(result.value.target?.field).toBe("humanGate.mode");
+    }
+  });
+
+  test("valid target with scope -> ok, scope is carried through", () => {
+    const q = { ...baseQ, target: { step: "S1", field: "humanGate.mode", scope: "cycle:c-1" } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.target?.scope).toBe("cycle:c-1");
+  });
+
+  test("all ALLOWED_TARGET_FIELDS pass validation", () => {
+    for (const field of ALLOWED_TARGET_FIELDS) {
+      const q = { ...baseQ, target: { step: "S1", field } };
+      const result = validateAidlcQuestion(q);
+      expect(result.ok).toBe(true);
+    }
+  });
+
+  test("target with non-allowed field -> err schema", () => {
+    const q = { ...baseQ, target: { step: "S1", field: "output.unknownField" } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("schema");
+  });
+
+  test("target with empty step -> err schema", () => {
+    const q = { ...baseQ, target: { step: "", field: "humanGate.mode" } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("schema");
+  });
+
+  test("target with empty field -> err schema", () => {
+    const q = { ...baseQ, target: { step: "S1", field: "" } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("schema");
+  });
+
+  test("target that is not an object -> err schema", () => {
+    const q = { ...baseQ, target: "not-an-object" };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("schema");
+  });
+
+  test("target scope that is not a string -> err schema", () => {
+    const q = { ...baseQ, target: { step: "S1", field: "humanGate.mode", scope: 42 } };
+    const result = validateAidlcQuestion(q);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("schema");
+  });
+
+  test("question target round-trips through parseQuestionBlock", () => {
+    const qWithTarget = {
+      ...baseQ,
+      target: { step: "S1", field: "escalation.onStall", scope: "global" },
+    };
+    const text = "```aidlc-question\n" + JSON.stringify({ questions: [qWithTarget] }) + "\n```";
+    const result = parseQuestionBlock(text);
+    expect(result.ok).toBe(true);
+    if (result.ok && result.value) {
+      const parsed = result.value[0];
+      expect(parsed?.target?.step).toBe("S1");
+      expect(parsed?.target?.field).toBe("escalation.onStall");
+      expect(parsed?.target?.scope).toBe("global");
     }
   });
 });

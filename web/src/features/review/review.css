@@ -45,9 +45,168 @@
   line-height: var(--leading-body);
 }
 
-.block-summary strong {
+.block-summary__title strong {
   color: var(--color-text-hi);
   font-weight: 600;
+}
+
+/* ── Markdown prose (summary block body) ────────────────────
+   md-body wraps the react-markdown output. Inherits --color-text-mid
+   from .block-card__body. Minimal tokens — no hardcoded palette. */
+.md-body {
+  line-height: var(--leading-body);
+}
+
+/* Paragraphs */
+.md-p {
+  margin: 0 0 var(--sp-3);
+}
+.md-p:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings (##/### in prose md map to h2/h3 — SCR-03 a11y) */
+.md-h1,
+.md-h2 {
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+.md-h1:first-child,
+.md-h2:first-child {
+  margin-top: 0;
+}
+.md-h3,
+.md-h4 {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-hi);
+  margin: var(--sp-4) 0 var(--sp-2);
+}
+
+/* Lists */
+.md-ul,
+.md-ol {
+  margin: 0 0 var(--sp-3);
+  padding-left: var(--sp-6);
+}
+.md-ul:last-child,
+.md-ol:last-child {
+  margin-bottom: 0;
+}
+.md-li {
+  margin-bottom: var(--sp-1);
+}
+
+/* Inline code */
+.md-code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--sp-1);
+  color: var(--color-violet);
+}
+
+/* Code fence (pre > code — SCR-03 a11y §コードフェンス) */
+.md-pre {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  overflow-x: auto;
+  margin: 0 0 var(--sp-3);
+  white-space: pre;
+}
+.md-pre:last-child {
+  margin-bottom: 0;
+}
+.md-pre .md-code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+}
+
+/* Blockquote */
+.md-blockquote {
+  border-left: 3px solid var(--color-primary-border);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--color-text-mid);
+}
+.md-blockquote:last-child {
+  margin-bottom: 0;
+}
+
+/* Table (remark-gfm) */
+.md-table-wrap {
+  overflow-x: auto;
+  margin-bottom: var(--sp-3);
+}
+.md-table-wrap:last-child {
+  margin-bottom: 0;
+}
+.md-table {
+  border-collapse: collapse;
+  font-size: var(--text-caption);
+  width: 100%;
+}
+.md-table th,
+.md-table td {
+  border: 1px solid var(--color-line-strong);
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+}
+.md-table th {
+  color: var(--color-text-hi);
+  font-weight: 600;
+  background: var(--color-surface-2);
+}
+
+/* Links (SCR-03 §md内リンク) */
+.md-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  outline: none;
+}
+.md-link:hover {
+  color: var(--color-primary-hover);
+}
+.md-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.md-link--unsafe {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Strong / em */
+.md-strong {
+  color: var(--color-text-hi);
+  font-weight: 600;
+}
+.md-em {
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.md-hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: var(--sp-4) 0;
+}
+
+/* Fallback plain-text state */
+.md-body--fallback {
+  color: inherit;
 }
 
 /* ac-map */
@@ -311,4 +470,335 @@
 }
 .block-skip code {
   color: var(--color-text-mid);
+}
+
+/* ── ac-map: ✓ list (受け入れ条件) ──────────────────────────── */
+.ac-map__check {
+  flex: 0 0 auto;
+  color: var(--color-done);
+  font-weight: 700;
+  min-width: 1.2em;
+}
+
+/* ── block-card count badge (e.g. "画面の証拠  8 枚") ─────────── */
+.block-card__count {
+  font-weight: 400;
+  color: var(--color-text-low);
+  margin-left: var(--sp-3);
+  font-size: var(--text-micro);
+}
+
+/* ── Screenshot gallery grid (D-03: 2+ consecutive screenshot blocks) ─ */
+.screenshot-gallery {
+  display: grid;
+  /* Responsive: up to --gallery-cols columns, each min 160px */
+  grid-template-columns: repeat(
+    var(--gallery-cols, 4),
+    minmax(0, 1fr)
+  );
+  gap: var(--sp-4);
+}
+
+@media (max-width: 700px) {
+  .screenshot-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Gallery thumbnail */
+.gallery-thumb {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.gallery-thumb:hover,
+.gallery-thumb:focus-visible {
+  transform: translateY(-2px);
+}
+.gallery-thumb:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.gallery-thumb__img-wrap {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  background: var(--color-bg);
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gallery-thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-thumb__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 100%;
+  color: var(--color-text-low);
+  font-size: var(--text-caption);
+  text-align: center;
+  padding: var(--sp-3);
+}
+.gallery-thumb__placeholder-icon {
+  font-size: 1.25rem;
+  color: var(--color-text-mid);
+}
+
+.gallery-thumb__cap {
+  margin-top: var(--sp-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  line-height: 1.4;
+}
+
+/* ── Lightbox ──────────────────────────────────────────────────── */
+/* Backdrop covers the whole viewport. Clicks on the backdrop close the lightbox. */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  gap: var(--sp-5);
+}
+
+/* The dialog card — white border box holding the image. */
+.lightbox {
+  position: relative;
+  max-width: min(900px, calc(100vw - var(--sp-9)));
+  max-height: calc(100vh - 160px);
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-popover);
+}
+
+.lightbox__close {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-line-strong);
+  color: var(--color-text-hi);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.lightbox__close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-hi);
+}
+.lightbox__close:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.lightbox__img-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.lightbox__img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  object-fit: contain;
+  background: var(--color-bg);
+}
+
+.lightbox__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  color: var(--color-text-low);
+  font-size: var(--text-caption);
+  padding: var(--sp-9);
+  min-height: 300px;
+}
+
+/* Bottom nav bar: ‹ caption › N/M */
+.lightbox__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  flex-wrap: nowrap;
+}
+
+.lightbox__nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-line-strong);
+  color: var(--color-text-hi);
+  font-size: 1.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.lightbox__nav-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.lightbox__nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lightbox__nav-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.lightbox__nav-label {
+  font-size: var(--text-body);
+  color: var(--color-text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.lightbox__counter {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  white-space: nowrap;
+  min-width: 3em;
+  text-align: right;
+}
+
+/* ── missing-context banner (SCR-03 a11y: role="alert" / assertive) ─ */
+/* Compact 1-row amber warning. No developer strings; pure Japanese. */
+.missing-context-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--color-stalled-soft);
+  border: 1px solid var(--color-stalled-border);
+  border-radius: var(--radius-md);
+  animation: fade-slide-up 180ms var(--ease-out) backwards;
+}
+
+.missing-context-banner__icon {
+  flex: 0 0 auto;
+  color: var(--color-stalled);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.missing-context-banner__msg {
+  font-size: var(--text-caption);
+  color: var(--color-stalled);
+  line-height: var(--leading-body);
+}
+
+/* ── Skeleton loading (SCR-03 loading state) ──────────────────── */
+/* Matches the mock: 概要 block with text lines + 画面の証拠 + リスク */
+.block-card--skel {
+  cursor: default;
+}
+
+.review-skel-label {
+  /* Same visual weight as .block-card__kind but no pulsing on the label */
+  color: var(--color-violet);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--sp-3);
+  opacity: 0.5;
+}
+
+.review-skel-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.review-skel-line {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  animation: review-skel-pulse 1.4s ease-in-out infinite;
+}
+.review-skel-line--full {
+  width: 100%;
+}
+.review-skel-line--med {
+  width: 60%;
+}
+
+.review-skel-img-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+.review-skel-img {
+  display: block;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  animation: review-skel-pulse 1.4s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+@keyframes review-skel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ── reduced-motion overrides ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .review-skel-line,
+  .review-skel-img {
+    animation: none;
+    opacity: 0.6;
+  }
 }

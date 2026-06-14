@@ -89,3 +89,16 @@ export interface WikiRepo {
   save(projectId: ProjectId, doc: WikiDoc): void;
   find(projectId: ProjectId, section: WikiSection): WikiDoc | undefined;
 }
+
+/**
+ * Unit-04: persists the claude session_id (captured from the stream-json init
+ * line) keyed to the RunId that produced it. Used to pass --resume <sessionId>
+ * when re-spawning for the next turn. session_id never lives on the domain Run
+ * (S6 D-02 / cycle-run-aggregate.md R-01).
+ */
+export interface SessionRepo {
+  /** Upsert: later turns for the same runId overwrite (all turns in one hearing share one row). */
+  save(runId: RunId, sessionId: string): void;
+  /** Returns null when no session has been captured for this run yet. */
+  find(runId: RunId): string | null;
+}

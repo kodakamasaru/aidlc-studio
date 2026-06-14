@@ -36,6 +36,7 @@ S7 ドメインコード + S8 統合コードが、**ユーザーストーリー
    - `aidlc-docs/{version}/s3/` の画面 screenshot を確認し、期待される UI 状態を把握。
    - `aidlc-docs/{version}/s9-validation.md` が既にあれば「前サイクルからの引き継ぎ」を最優先で反映。
    - 無ければ下のテンプレで進行ログを新規作成。**以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
+   - **headless(live)実行で人間への質問が必要なとき(視覚レビュー確認など)**: [operating-model「人間確認の構造化 emit / 回答突合」](../../../kit/rules/aidlc-operating-model.md#人間確認の構造化-emit--回答突合live-headless-実行時の共通契約)に従って `aidlc-question` ブロックを emit し、`aidlc-answers` で突合して再開する。
 
 1. **シナリオテストマトリクス** を最初に作る。US × 状態 × 画面 の組み合わせを洗い出し、どのシナリオをテストするかを md に記録。全受け入れ基準が少なくとも1つのシナリオでカバーされることを確認。
 

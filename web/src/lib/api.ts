@@ -28,6 +28,20 @@ export interface Phase {
   readonly order: number;
   readonly state: PhaseState;
   readonly runs: readonly Run[];
+  /**
+   * S6 phase-step-snapshot: the step config pinned onto this phase at cycle
+   * creation (a copy of the global StepDef taken then). A cycle's settings are
+   * THIS snapshot — fixed at creation — not the live project.pipelineDef.
+   */
+  readonly stepDef?: StepDefSnapshot;
+}
+
+/** Mirror of the domain StepDefSnapshot (pinned at cycle creation). */
+export interface StepDefSnapshot {
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  readonly contracts?: StepContracts;
 }
 
 export interface Cycle {
@@ -210,6 +224,20 @@ export interface CreateProjectBody {
   readonly modelName?: string;
 }
 
+/**
+ * BU-3: Result returned by POST /api/hearing/launch.
+ * cycle-scope: {scope, cycleId, runId, step} — web navigates to cycle thread.
+ * global-scope: {scope:"global"} — web renders the /settings/hearing placeholder.
+ */
+export type HearingLaunchResult =
+  | { readonly scope: "global" }
+  | {
+      readonly scope: string;
+      readonly cycleId: string;
+      readonly runId: string;
+      readonly step: string;
+    };
+
 // ── Error ────────────────────────────────────────────────────
 export class ApiError extends Error {
   constructor(
@@ -318,6 +346,12 @@ export const api = {
     step: string,
   ): Promise<{ readonly skill: string | null; readonly content: string }> =>
     request(`/steps/${encodeURIComponent(step)}/skill`),
+
+  // BU-3: config-hearing run launcher. scope="global" | "cycle:{id}".
+  // cycle-scope: returns {scope, cycleId, runId, step}; web navigates to thread.
+  // global-scope: returns {scope:"global"}; web renders the /settings/hearing page.
+  launchHearing: (scope: string): Promise<HearingLaunchResult> =>
+    request("/hearing/launch", jsonBody({ scope })),
 
   // US-06 対話式編集: 要望から契約の提案を取得(適用はしない / 承認時に updateStepContracts)。
   proposeStepContracts: (

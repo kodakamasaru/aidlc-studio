@@ -23,6 +23,7 @@ import type { RunRole } from "../../domain/cycle/cycle";
 import { Step, sameStep } from "../../domain/shared/vocab";
 import { ProjectId, CycleId, TaskId, RunId } from "../../domain/shared/ids";
 import { isErr } from "../../domain/shared/result";
+import { resolveContextPaths, composeStructuredContext } from "./context-resolver";
 
 export interface CreateCycleInput {
   readonly title: string;
@@ -70,6 +71,13 @@ const isUniqueConstraintError = (err: unknown): boolean => {
   const message = (err as { message?: unknown }).message;
   return typeof message === "string" && message.includes("UNIQUE constraint failed");
 };
+
+/** Result returned from a successful hearing launch. */
+export interface HearingLaunchResult {
+  readonly cycleId: string;
+  readonly runId: string;
+  readonly step: string;
+}
 
 export class CycleService {
   constructor(private readonly ports: Ports) {}
@@ -266,6 +274,31 @@ export class CycleService {
     const phase = next.phases.find((p) => sameStep(p.step, step));
     if (!phase) throw fail(400, "StepNotInPipeline");
 
+    // Unit-02 前段文脈注入: resolve prior-step artifact paths for the prompt composer.
+    // The resolved paths are passed as contextPaths so the composer injects the current
+    // cycle's done-step artifacts instead of defaulting to brief.md only (US-01 AC).
+    const contextPaths = resolveContextPaths({
+      cycle: next,
+      step,
+      repoPath: project.repoPath,
+    });
+
+    // BU-1 構造化コンテキスト: build §C7.1 named sections (3-8) from 3 sources
+    // (docs via Fs / ledger file / DB repos). Live.ts uses composeWithStructuredContext()
+    // when this is present. Scripted/legacy adapters ignore it (backward compat).
+    // Section 7 (dialog Q&A): uses the current runId — a fresh run has no answered
+    // questions yet, so the section is empty at launch time (populated in resume turns).
+    const structuredContext = composeStructuredContext(
+      { cycle: next, step, repoPath: project.repoPath },
+      {
+        fs: this.ports.fs,
+        questions: this.ports.repos.questions,
+        cycles: this.ports.repos.cycles,
+        runId,
+        cycleId,
+      },
+    );
+
     try {
       await this.ports.orchestrator.launch({
         runId,
@@ -275,6 +308,8 @@ export class CycleService {
         step,
         repoPath: project.repoPath,
         ...(role !== undefined ? { role } : {}),
+        ...(contextPaths.length > 0 ? { contextPaths } : {}),
+        structuredContext,
       });
     } catch (err) {
       compensateRun(
@@ -288,6 +323,30 @@ export class CycleService {
     }
 
     return next;
+  }
+
+  /**
+   * BU-3: launch a config-hearing run against a cycle.
+   * Finds the first pending phase and starts it so the orchestrator (running in
+   * config-hearing scenario) can emit config-hearing questions.
+   * Returns the cycleId, the fresh runId, and the step so the web can navigate to
+   * /cycles/:cycleId/thread?hearing=1.
+   *
+   * Restriction: there must be at least one PENDING phase in the cycle. If all
+   * phases are already running or done, throws 409 HearingNoPendingPhase.
+   */
+  async launchConfigHearing(cycleIdRaw: string): Promise<HearingLaunchResult> {
+    const cycle = this.loadCycle(CycleId(cycleIdRaw));
+    const pendingPhase = cycle.phases
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .find((p) => p.state === "pending");
+    if (!pendingPhase) throw fail(409, "HearingNoPendingPhase");
+    const updated = await this.startPhase(cycleIdRaw, pendingPhase.step as string);
+    const started = updated.phases.find((p) => p.step === pendingPhase.step);
+    const run = started?.runs.slice().sort((a, b) => b.attempt - a.attempt)[0];
+    if (!run) throw fail(500, "HearingRunNotFound");
+    return { cycleId: cycleIdRaw, runId: run.id, step: pendingPhase.step as string };
   }
 
   async retryRun(cycleIdRaw: string, runIdRaw: string): Promise<Cycle> {

@@ -1,17 +1,29 @@
-// US-03 PromptComposer — deterministic checks that the composed prompt carries the
-// 3 canonical sources (skill 本文 + step identity + verification observations) and
-// fails LOUDLY on a missing 本文 (no silent fallback / 原則④). The real-AI path is
-// the additive live test; this pins the composition shape with a FakeFs fixture.
+// US-03 / BU-1 PromptComposer — deterministic checks that:
+//   [Legacy] compose(): carries the 3 canonical sources (skill 本文 + step identity +
+//     verification observations) and fails LOUDLY on a missing 本文 (no silent fallback / 原則④).
+//   [Structured] composeWithStructuredContext(): renders §C7.1 named sections, brief
+//     always present, output-contract instruction present (§C7.4).
+//
+// The real-AI path is the additive live test; this pins the composition shape with a FakeFs fixture.
 import { test, expect, describe } from "bun:test";
 import { FakeFs } from "../../src/infra/sys/fakes";
 import {
   PromptComposer,
   PromptComposerError,
+  OUTPUT_CONTRACT_INSTRUCTION,
   skillBodyPath,
   briefBodyPath,
 } from "../../src/app/services/prompt-composer";
+import {
+  composeStructuredContext,
+  briefPath,
+  type StructuredContextInput,
+  type StructuredContextDeps,
+} from "../../src/app/services/context-resolver";
 import { Step, skillRefOf } from "../../src/domain/shared/vocab";
 import type { Text } from "../../src/domain/shared/primitives";
+import type { Cycle, Phase } from "../../src/domain/cycle/cycle";
+import type { CycleId, PhaseId, RunId, ProjectId } from "../../src/domain/shared/ids";
 
 const REPO = "/repo";
 const S1_BODY = "# AI-DLC S1: 要件\n\nあなたは要件ヒアリング担当。完了条件: US が展開済み。";
@@ -91,5 +103,144 @@ describe("PromptComposer (US-03)", () => {
     expect(skillBodyPath(REPO, skillRefOf(Step("S6"))!)).toBe(
       "/repo/kit/skills/aidlc-s6-domain-model/SKILL.md",
     );
+  });
+});
+
+// ── BU-1: composeWithStructuredContext (§C7.1-C7.4) ──────────────────────────
+
+/** Helper: build a minimal Cycle with a single running phase. */
+function makeCycle(version: string, phases: Phase[]): Cycle {
+  return {
+    id: "cyc-1" as CycleId,
+    projectId: "proj-1" as ProjectId,
+    version: version as never,
+    title: "テスト" as never,
+    taskIds: [],
+    state: "active",
+    createdAt: "2026-01-01T00:00:00Z" as never,
+    phases,
+  };
+}
+
+function makePhase(step: string, state: Phase["state"], order: number): Phase {
+  return {
+    id: `ph-${step}` as PhaseId,
+    step: Step(step),
+    order,
+    state,
+    runs: [],
+  };
+}
+
+const BRIEF_CONTENT_BU1 = "# brief\n\nBU1-VISION-TOKEN テスト用ビジョン";
+
+/** Build FakeFs with skill 本文 + brief + optional extras. */
+function makeStructuredFs(extra: Record<string, string> = {}): FakeFs {
+  const skillP = skillBodyPath(REPO, skillRefOf(Step("S1"))!);
+  return new FakeFs(undefined, {
+    [skillP]: S1_BODY,
+    [briefPath(REPO)]: BRIEF_CONTENT_BU1,
+    ...extra,
+  });
+}
+
+describe("PromptComposer.composeWithStructuredContext (BU-1 §C7.1-C7.4)", () => {
+  test("output-contract instruction is present in structured generator prompt (§C7.4)", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S1", "running", 0)]);
+    const fs = makeStructuredFs();
+    const ctxInput: StructuredContextInput = { cycle, step: Step("S1"), repoPath: REPO };
+    const ctx = composeStructuredContext(ctxInput, { fs });
+    const composer = new PromptComposer(fs);
+    const out = composer.composeWithStructuredContext(
+      { role: "generator", step: Step("S1"), repoPath: REPO },
+      ctx,
+    );
+
+    expect(out).toContain("aidlc-result");
+    expect(out).toContain("出力契約");
+    expect(out).toContain("needs_human");
+    expect(out).toContain("artifacts");
+  });
+
+  test("output-contract instruction is present in structured evaluator prompt (§C7.4)", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S1", "running", 0)]);
+    const fs = makeStructuredFs();
+    const ctxInput: StructuredContextInput = { cycle, step: Step("S1"), repoPath: REPO };
+    const ctx = composeStructuredContext(ctxInput, { fs });
+    const composer = new PromptComposer(fs);
+    const out = composer.composeWithStructuredContext(
+      { role: "evaluator", step: Step("S1"), repoPath: REPO, verification: ["AC 一覧が表示される" as Text] },
+      ctx,
+    );
+
+    expect(out).toContain("aidlc-result");
+    expect(out).toContain("出力契約");
+    expect(out).toContain("AC 一覧が表示される"); // verification obs still present
+  });
+
+  test("brief (section 3) is ALWAYS present in the structured output for S2+ steps (BT-01 ②)", () => {
+    // Build a cycle where S1 is done and S2 is the current step.
+    // The composer is called for S1 (since we have S1 skill body pinned) to
+    // verify the structured context carries the brief even when prior steps exist.
+    // We use S1 as the compose step so the skill body is available in the FakeFs.
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S1", "done", 0),
+      makePhase("S2", "running", 1),
+    ]);
+    const s1IndexPath = `/repo/aidlc-docs/v0.0.4/s1/index.md`;
+    // We compose for S2 context but run the composer for S1 (where we have the skill body)
+    // to isolate the "brief always present" invariant from skill-body availability.
+    // The S1 skill body is in makeStructuredFs; S2 context is built from the cycle.
+    const fs = makeStructuredFs({ [s1IndexPath]: "# S1 index — US-01 確定" });
+    // Context: what S2 would see (S1 is done prior)
+    const ctxInput: StructuredContextInput = { cycle, step: Step("S2"), repoPath: REPO };
+    const ctx = composeStructuredContext(ctxInput, { fs });
+
+    // The structured context must have brief (section 3)
+    expect(ctx.productInvariant.content).toContain("BU1-VISION-TOKEN");
+    // And prior artifacts from S1 (section 5)
+    expect(ctx.priorArtifacts?.content).toContain("S1 index");
+
+    // Now compose with S1 step (where we have skill body) using S2's context
+    // to confirm the composer renders both brief AND prior artifacts.
+    const composer = new PromptComposer(fs);
+    const out = composer.composeWithStructuredContext(
+      { role: "generator", step: Step("S1"), repoPath: REPO },
+      ctx,
+    );
+
+    // Brief must appear even though S1 is a done prior step
+    expect(out).toContain("BU1-VISION-TOKEN");
+    // "プロダクト不変" section header
+    expect(out).toContain("プロダクト不変");
+    // Prior artifact section also present (S1 index was in the context)
+    expect(out).toContain("前段の成果物");
+    // Output-contract instruction present
+    expect(out).toContain("aidlc-result");
+  });
+
+  test("throws PromptComposerError when skill 本文 is missing in structured path", () => {
+    const cycle = makeCycle("v0.0.4", [makePhase("S1", "running", 0)]);
+    const fs = new FakeFs(undefined, { [briefPath(REPO)]: BRIEF_CONTENT_BU1 }); // no skill body
+    const ctxInput: StructuredContextInput = { cycle, step: Step("S1"), repoPath: REPO };
+    const ctx = composeStructuredContext(ctxInput, { fs });
+    const composer = new PromptComposer(fs);
+
+    expect(() =>
+      composer.composeWithStructuredContext(
+        { role: "generator", step: Step("S1"), repoPath: REPO },
+        ctx,
+      ),
+    ).toThrow(PromptComposerError);
+  });
+
+  test("OUTPUT_CONTRACT_INSTRUCTION export contains required aidlc-result schema markers", () => {
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("aidlc-result");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("artifacts");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("questions");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("decisions");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("completeness");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("status");
+    expect(OUTPUT_CONTRACT_INSTRUCTION).toContain("needs_human");
   });
 });

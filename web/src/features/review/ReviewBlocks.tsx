@@ -1,45 +1,351 @@
-// ReviewBlocks (SCR-04 block-stream) — renders ReviewBlock[] as a card stream.
-// MVP renders summary / ac-map / mermaid / screenshot; risk is rendered too (it
-// is light). Unknown / heavy block types degrade gracefully to a labelled
-// placeholder (forward-compat contract). Mermaid is shown as a labelled source
-// panel (deterministic — no async diagram renderer).
-import { useEffect, useState } from "react";
+// ReviewBlocks (SCR-03 block-stream) — renders ReviewBlock[] as a card stream.
+// Consecutive screenshot blocks are grouped into a gallery grid (D-03).
+// Single screenshot renders as a plain figure; 2+ render as a responsive grid
+// with lightbox on click (‹ › prev/next, n/total counter, Esc to close).
+// missing-context blocks render as a clean Japanese warning banner (role="alert").
+// Unknown / heavy block types degrade gracefully to a labelled placeholder.
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewBlock, CompletenessBlock } from "../../lib/api";
+import { Markdown } from "../../components/ui/Markdown";
 
 // Screenshot src is model-produced. Only allow safe, renderable schemes:
 // https/http URLs, root-relative paths, blob: object URLs, and data:image/*.
 // Anything else (javascript:, data:text/html, …) is treated as not-renderable.
 const SAFE_IMG_SRC_RE = /^(https?:\/\/|\/|blob:|data:image\/)/i;
 
-// 平易な日本語ラベル(S3 scr-04 用語方針: 内部語・英語を出さず、振る舞いで示す)。
+// 平易な日本語ラベル(S3 scr-03 用語方針: 内部語・英語を出さず、振る舞いで示す)。
 const KIND_LABEL: Record<string, string> = {
-  summary: "まとめ",
-  "ac-map": "対応マップ",
+  summary: "概要",
+  "ac-map": "受け入れ条件",
   mermaid: "依存関係の図",
-  screenshot: "実際に動いた証拠",
-  risk: "変わったところ · 影響",
+  screenshot: "画面の証拠",
+  risk: "リスク",
   test: "テスト結果",
   coverage: "カバレッジ",
   diff: "変更点",
   video: "操作の動画",
 };
 
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+// Accessible lightbox: role="dialog" + aria-modal, focus trapped to close btn
+// on open, Esc closes, ‹ › navigate, n/M counter announced via aria-live.
+interface LightboxProps {
+  readonly images: readonly { src: string; caption: string }[];
+  readonly initialIndex: number;
+  readonly onClose: () => void;
+}
+
+function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
+  const [idx, setIdx] = useState(initialIndex);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const current = images[idx];
+
+  // Focus close button when opened.
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+
+  // Keyboard: Esc → close, ArrowLeft → prev, ArrowRight → next.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowLeft") {
+        setIdx((i) => (i > 0 ? i - 1 : images.length - 1));
+      } else if (e.key === "ArrowRight") {
+        setIdx((i) => (i < images.length - 1 ? i + 1 : 0));
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [images.length, onClose]);
+
+  const prev = useCallback(() => setIdx((i) => (i > 0 ? i - 1 : images.length - 1)), [images.length]);
+  const next = useCallback(() => setIdx((i) => (i < images.length - 1 ? i + 1 : 0)), [images.length]);
+
+  const isSafe = SAFE_IMG_SRC_RE.test((current?.src ?? "").trim());
+  const counter = `${idx + 1} / ${images.length}`;
+
+  return (
+    // Backdrop: clicking outside the dialog closes the lightbox.
+    <div
+      className="lightbox-backdrop"
+      onClick={onClose}
+    >
+      {/* Dialog (stop propagation so clicks inside don't close) */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`画像を拡大表示: ${current?.caption ?? ""}`}
+        className="lightbox"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close */}
+        <button
+          ref={closeRef}
+          type="button"
+          className="lightbox__close"
+          aria-label="閉じる"
+          onClick={onClose}
+        >
+          ×
+        </button>
+
+        {/* Image area */}
+        <div className="lightbox__img-wrap">
+          {isSafe ? (
+            <img
+              className="lightbox__img"
+              src={current?.src}
+              alt={current?.caption ?? ""}
+            />
+          ) : (
+            <div className="lightbox__placeholder" role="img" aria-label={current?.caption ?? ""}>
+              <span aria-hidden="true">▦</span>
+              <span>画像を表示できません</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom nav bar (outside dialog, below backdrop center) */}
+      <div className="lightbox__nav" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="lightbox__nav-btn"
+          aria-label="前の画像"
+          onClick={prev}
+          disabled={images.length <= 1}
+        >
+          ‹
+        </button>
+        <span className="lightbox__nav-label">
+          {current?.caption}
+        </span>
+        <button
+          type="button"
+          className="lightbox__nav-btn"
+          aria-label="次の画像"
+          onClick={next}
+          disabled={images.length <= 1}
+        >
+          ›
+        </button>
+        <span className="lightbox__counter" aria-live="polite" aria-atomic="true">
+          {counter}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Screenshot grid ───────────────────────────────────────────────────────────
+// Used when 2+ consecutive screenshot blocks are grouped.
+interface ScreenshotGridProps {
+  readonly images: readonly { src: string; caption: string }[];
+  readonly blockLabel: string;
+}
+
+function ScreenshotGrid({ images, blockLabel }: ScreenshotGridProps) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+
+  const openLightbox = useCallback((i: number) => setLightboxIdx(i), []);
+  const closeLightbox = useCallback(() => setLightboxIdx(null), []);
+
+  return (
+    <article className="block-card surface-card">
+      <p className="block-card__kind" aria-label={`ブロック種別: ${blockLabel}`}>
+        {blockLabel}
+        <span className="block-card__count">{images.length} 枚</span>
+      </p>
+      <div
+        className="screenshot-gallery"
+        style={{ "--gallery-cols": Math.min(images.length, 4) } as React.CSSProperties}
+      >
+        {images.map((img, i) => (
+          <ScreenshotThumb
+            key={i}
+            src={img.src}
+            caption={img.caption}
+            index={i}
+            onOpen={openLightbox}
+          />
+        ))}
+      </div>
+      {lightboxIdx !== null && (
+        <Lightbox
+          images={images}
+          initialIndex={lightboxIdx}
+          onClose={closeLightbox}
+        />
+      )}
+    </article>
+  );
+}
+
+// Single thumbnail in the gallery grid.
+interface ScreenshotThumbProps {
+  readonly src: string;
+  readonly caption: string;
+  readonly index: number;
+  readonly onOpen: (index: number) => void;
+}
+
+function ScreenshotThumb({ src, caption, index, onOpen }: ScreenshotThumbProps) {
+  const safe = SAFE_IMG_SRC_RE.test(src.trim());
+  const [failed, setFailed] = useState(!safe);
+  useEffect(() => {
+    setFailed(!SAFE_IMG_SRC_RE.test(src.trim()));
+  }, [src]);
+
+  const resolvedSrc = safe && !failed ? src : null;
+
+  const handleClick = useCallback(() => onOpen(index), [index, onOpen]);
+  const handleKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onOpen(index);
+      }
+    },
+    [index, onOpen],
+  );
+
+  return (
+    <figure
+      className="gallery-thumb"
+      role="button"
+      tabIndex={0}
+      aria-label={`${caption} のスクリーンショット (クリックで拡大)`}
+      onClick={handleClick}
+      onKeyDown={handleKey}
+    >
+      <div className="gallery-thumb__img-wrap">
+        {resolvedSrc ? (
+          <img
+            className="gallery-thumb__img"
+            src={resolvedSrc}
+            alt={`${caption} のスクリーンショット`}
+            loading="lazy"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <div
+            className="gallery-thumb__placeholder"
+            role="img"
+            aria-label={`${caption} のスクリーンショット (未取得)`}
+          >
+            <span className="gallery-thumb__placeholder-icon" aria-hidden="true">▦</span>
+            <span>実際に撮った画面</span>
+          </div>
+        )}
+      </div>
+      <figcaption className="gallery-thumb__cap">{caption}</figcaption>
+    </figure>
+  );
+}
+
+// ── ReviewBlocks ──────────────────────────────────────────────────────────────
 interface ReviewBlocksProps {
   readonly blocks: readonly ReviewBlock[];
 }
 
+// Group consecutive screenshot blocks into runs, then render each run as
+// either a single ScreenshotFigure (1 image) or a ScreenshotGrid (2+).
+// Non-screenshot blocks are rendered individually as BlockCards.
 export function ReviewBlocks({ blocks }: ReviewBlocksProps) {
+  // Build a list of "segments": either a single non-screenshot block, or
+  // a consecutive run of screenshot blocks.
+  type Segment =
+    | { kind: "block"; block: ReviewBlock; origIndex: number }
+    | { kind: "shots"; images: readonly { src: string; caption: string }[] };
+
+  const segments: Segment[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const b = blocks[i]!;
+    if (b.type === "screenshot") {
+      // Collect consecutive screenshot blocks.
+      const shots: { src: string; caption: string }[] = [];
+      while (i < blocks.length) {
+        const cur = blocks[i]!;
+        if (cur.type !== "screenshot") break;
+        const s = cur as { type: "screenshot"; src: string; caption: string };
+        shots.push({ src: readString(s, "src"), caption: readString(s, "caption") });
+        i++;
+      }
+      segments.push({ kind: "shots", images: shots });
+    } else {
+      segments.push({ kind: "block", block: b, origIndex: i });
+      i++;
+    }
+  }
+
   return (
     <div className="block-stream">
-      {blocks.map((block, i) => (
-        <BlockCard key={`${block.type}-${i}`} block={block} index={i} />
-      ))}
+      {segments.map((seg, si) => {
+        if (seg.kind === "shots") {
+          if (seg.images.length === 1) {
+            // Single screenshot: render as plain block card.
+            const img = seg.images[0]!;
+            return (
+              <article
+                key={`shot-single-${si}`}
+                className="block-card surface-card"
+                style={{ animationDelay: `${Math.min(si, 8) * 60}ms` }}
+              >
+                <p className="block-card__kind" aria-label="ブロック種別: 画面の証拠">
+                  画面の証拠
+                </p>
+                <div className="block-card__body">
+                  <ScreenshotFigure src={img.src} caption={img.caption} />
+                </div>
+              </article>
+            );
+          }
+          // Multiple screenshots: gallery grid.
+          return (
+            <ScreenshotGrid
+              key={`shot-grid-${si}`}
+              images={seg.images}
+              blockLabel="画面の証拠"
+            />
+          );
+        }
+        // Non-screenshot block.
+        return (
+          <BlockCard
+            key={`block-${seg.origIndex}`}
+            block={seg.block}
+            index={si}
+          />
+        );
+      })}
     </div>
   );
 }
 
 function BlockCard({ block, index }: { block: ReviewBlock; index: number }) {
-  const label = KIND_LABEL[block.type] ?? block.type.toUpperCase();
+  // missing-context is a dedicated block type — render as warning banner.
+  if (block.type === "missing-context") {
+    const msg = readString(block, "message") ||
+      "前サイクルの成果物が見つかりません — コンテキストが不完全な状態で実行されています。差し戻して再実行を検討してください。";
+    return (
+      <div
+        className="missing-context-banner"
+        role="alert"
+        aria-live="assertive"
+        style={{ animationDelay: `${Math.min(index, 8) * 60}ms` }}
+      >
+        <span className="missing-context-banner__icon" aria-hidden="true">⚠</span>
+        <span className="missing-context-banner__msg">
+          {msg.replace(/^⚠\s*/, "")}
+        </span>
+      </div>
+    );
+  }
+
+  const label = KIND_LABEL[block.type] ?? block.type;
   return (
     <article
       className="block-card surface-card"
@@ -57,13 +363,24 @@ function BlockCard({ block, index }: { block: ReviewBlock; index: number }) {
 
 function BlockBody({ block }: { block: ReviewBlock }) {
   switch (block.type) {
-    case "summary":
+    case "summary": {
+      const title = readString(block, "title");
+      const body = readString(block, "body");
       return (
-        <p className="block-summary">
-          <strong>{readString(block, "title")}</strong>{" "}
-          {readString(block, "body")}
-        </p>
+        <div className="block-summary">
+          {title ? (
+            <p className="block-summary__title">
+              <strong>{title}</strong>
+            </p>
+          ) : null}
+          {/* D-01: md rendering is limited to summary block only.
+              Markdown component uses react-markdown v9 (no raw HTML
+              passthrough) + remark-gfm. Fallback to plain text when body
+              is empty (never silently lose content). */}
+          <Markdown className="block-summary__body">{body}</Markdown>
+        </div>
       );
+    }
 
     case "ac-map": {
       const items = readArray(block, "items");
@@ -71,6 +388,7 @@ function BlockBody({ block }: { block: ReviewBlock }) {
         <ul className="ac-map">
           {items.map((item, i) => (
             <li key={i} className="ac-map__row">
+              <span className="ac-map__check" aria-hidden="true">✓</span>
               <span className="ac-map__ac mono">{readField(item, "ac")}</span>
               <span className="ac-map__status">{readField(item, "status")}</span>
             </li>
@@ -90,6 +408,9 @@ function BlockBody({ block }: { block: ReviewBlock }) {
       );
 
     case "screenshot":
+      // Standalone screenshot (not inside a grid — reached when a single
+      // screenshot block is NOT grouped by ReviewBlocks above; kept as
+      // forward-compat fallback).
       return (
         <ScreenshotFigure
           src={readString(block, "src")}
@@ -99,7 +420,7 @@ function BlockBody({ block }: { block: ReviewBlock }) {
 
     case "risk": {
       const level = readString(block, "level");
-      // 重要度は日本語(S3 scr-04 D-02: HIGH/MEDIUM/LOW でなく 高/中/低)。
+      // 重要度は日本語(S3 scr-03 D-02: HIGH/MEDIUM/LOW でなく 高/中/低)。
       const LEVEL_JA: Record<string, string> = { high: "高", med: "中", low: "低" };
       return (
         <p className="risk-row">
@@ -269,6 +590,45 @@ function ScreenshotFigure({ src, caption }: { src: string; caption: string }) {
       )}
       <figcaption className="screenshot-block__cap">{caption}</figcaption>
     </figure>
+  );
+}
+
+// ── Skeleton (loading state) ───────────────────────────────────────────────────
+// Renders placeholder block cards matching the typical review shape
+// (概要 with text lines / 画面の証拠 / リスク) before data arrives.
+// Layout matches the real content height to prevent CLS after load.
+export function ReviewBlocksSkeleton() {
+  return (
+    <div className="block-stream" aria-busy="true" aria-label="レビュー内容を読み込み中">
+      {/* Block 1: 概要 skeleton */}
+      <article className="block-card surface-card block-card--skel">
+        <p className="block-card__kind block-card__kind--skel review-skel-label">概要</p>
+        <div className="block-card__body">
+          <div className="review-skel-lines">
+            <span className="review-skel-line review-skel-line--full" />
+            <span className="review-skel-line review-skel-line--full" />
+            <span className="review-skel-line review-skel-line--med" />
+          </div>
+        </div>
+      </article>
+      {/* Block 2: 画面の証拠 skeleton */}
+      <article className="block-card surface-card block-card--skel">
+        <p className="block-card__kind review-skel-label">画面の証拠</p>
+        <div className="block-card__body">
+          <div className="review-skel-img-row">
+            <span className="review-skel-img" />
+            <span className="review-skel-img" />
+          </div>
+        </div>
+      </article>
+      {/* Block 3: リスク skeleton */}
+      <article className="block-card surface-card block-card--skel">
+        <p className="block-card__kind review-skel-label">リスク</p>
+        <div className="block-card__body">
+          <span className="review-skel-line review-skel-line--med" />
+        </div>
+      </article>
+    </div>
   );
 }
 

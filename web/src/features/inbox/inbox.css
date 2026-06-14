@@ -1,3 +1,4 @@
+/* ── トップバー右の件数 ─────────────────────────────────────────── */
 .inbox-count {
   font-size: var(--text-body);
   color: var(--color-text-mid);
@@ -6,12 +7,41 @@
 .inbox-count--muted {
   color: var(--color-text-low);
 }
-
-.inbox-list {
-  overflow: hidden;
-  padding: var(--sp-1) 0;
+/* loading 中のスケルトンバー(右上) */
+.inbox-count--skel {
+  display: inline-block;
+  width: 80px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  animation: inbox-skel-pulse 1.4s ease-in-out infinite;
+  vertical-align: middle;
 }
 
+/* ── セクションバー("AI → あなたへの依頼" + 件数) ──────────────── */
+.inbox-section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+.inbox-section-heading {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ── カードリスト ───────────────────────────────────────────────── */
+.inbox-list {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+/* ── カード(実データ) ──────────────────────────────────────────── */
 .inbox-card {
   display: flex;
   align-items: center;
@@ -82,4 +112,107 @@
 .inbox-card:hover .inbox-card__chevron {
   color: var(--color-text-mid);
   transform: translateX(2px);
+}
+
+/* ── スケルトンカード(loading 状態) ─────────────────────────────── */
+.inbox-card--skel {
+  animation: none;
+  cursor: default;
+}
+.inbox-card--skel:hover {
+  background: transparent;
+}
+
+.inbox-skel__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  animation: inbox-skel-pulse 1.4s ease-in-out infinite;
+  flex: 0 0 auto;
+}
+
+.inbox-skel__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inbox-skel__action {
+  flex: 0 0 auto;
+}
+
+/* skel-line 共通クラス(step-config-readback.css と同じ定義) */
+.inbox-skel-line {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  animation: inbox-skel-pulse 1.4s ease-in-out infinite;
+}
+.inbox-skel-line--short {
+  width: 80px;
+}
+.inbox-skel-line--med {
+  width: 200px;
+  max-width: 100%;
+}
+.inbox-skel-line--xs {
+  width: 48px;
+}
+
+/* ── empty 状態 ─────────────────────────────────────────────────── */
+.inbox-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-9) var(--sp-6);
+  gap: var(--sp-3);
+  text-align: center;
+}
+
+.inbox-empty__check {
+  font-size: 1.5rem;
+  color: var(--color-text-low);
+  line-height: 1;
+}
+
+.inbox-empty__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text-mid);
+  margin: 0;
+}
+
+.inbox-empty__body {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  margin: 0;
+}
+
+/* ── animation ──────────────────────────────────────────────────── */
+@keyframes inbox-skel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ── reduced-motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .inbox-count--skel,
+  .inbox-skel__icon,
+  .inbox-skel-line {
+    animation: none;
+    opacity: 0.6;
+  }
+  /* 新着カード差し込みアニメーションも無効化(S3 motion 仕様) */
+  .inbox-card {
+    animation: none;
+  }
 }

@@ -10,6 +10,7 @@ import { logError } from "../log";
 import { projectRoutes } from "./routes/projects";
 import { cycleRoutes } from "./routes/cycles";
 import { inboxRoutes } from "./routes/inbox";
+import { hearingRoutes } from "./routes/hearing";
 
 export function createApp(ports: Ports): Hono {
   const app = new Hono();
@@ -45,6 +46,7 @@ export function createApp(ports: Ports): Hono {
   app.route("/", projectRoutes(ports));
   app.route("/", cycleRoutes(ports));
   app.route("/", inboxRoutes(ports));
+  app.route("/", hearingRoutes(ports));
 
   app.onError((err, c) => {
     if (isServiceError(err)) {

@@ -717,6 +717,36 @@ describe("answerQuestion", () => {
     expect(resumes[0]!.args.body).toBe("sqlite");
   });
 
+  test("batch hearing — N open questions on one run → exactly ONE resume on the last answer (S2/S6 N問→N答→1 resume)", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const { cycle, runId } = await cycleWithRunningRun(h, projectId);
+    // Two `question` cards raised by the same run (a batch hearing).
+    const q1 = seedQuestion(h, cycle, runId, { kind: "question", prompt: "Q1?" }, undefined, "-a");
+    const q2 = seedQuestion(h, cycle, runId, { kind: "question", prompt: "Q2?" }, undefined, "-b");
+
+    // Answering the FIRST (a sibling question is still open) must NOT resume yet —
+    // otherwise the live session would be re-spawned once per answer.
+    const r1 = await post(h.app, `/api/questions/${q1}/answer`, { verdict: "answer", body: "batch-block" });
+    expect(r1.status).toBe(200);
+    expect(r1.json.data.question.state).toBe("answered");
+    expect(h.orchestrator.ofMethod("resume")).toHaveLength(0); // deferred.
+
+    // Answering the LAST one (no open question siblings remain) → single resume.
+    const r2 = await post(h.app, `/api/questions/${q2}/answer`, { verdict: "answer", body: "batch-block" });
+    expect(r2.status).toBe(200);
+
+    const resumes = h.orchestrator.ofMethod("resume");
+    expect(resumes).toHaveLength(1);
+    expect(resumes[0]!.args.runId as string).toBe(runId);
+    expect(resumes[0]!.args.body).toBe("batch-block");
+
+    // Both questions ended up answered (each persisted; only resume was deferred).
+    const inbox = await get(h.app, `/api/projects/${projectId}/inbox`);
+    expect(inbox.json.data.find((q: any) => q.id === q1)).toBeUndefined();
+    expect(inbox.json.data.find((q: any) => q.id === q2)).toBeUndefined();
+  });
+
   test("visual_review approve → run done + phase done (domain functions, not orchestrator.resume)", async () => {
     const h = buildTestApp();
     const projectId = await createProject(h);

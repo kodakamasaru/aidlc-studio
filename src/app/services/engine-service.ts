@@ -28,6 +28,7 @@ import {
 } from "../../domain/cycle/cycle";
 import { sameStep, type Step } from "../../domain/shared/vocab";
 import { resolveContracts, type StepContracts } from "../../domain/project/step-contracts";
+import { resolveContextPaths } from "./context-resolver";
 import { readPipeline, type Project } from "../../domain/project/project";
 import { lookupProfile, emptyProfile } from "../../domain/review/profile";
 import { evaluateCompleteness, type Requirement } from "../../domain/review/brief";
@@ -80,9 +81,20 @@ export class EngineService {
       ? lookupProfile(contracts.output.profileKind)
       : emptyProfile("default");
 
+    // Unit-02 前段文脈注入: resolve prior-step artifact paths for the deterministic gate.
+    // These are the same paths that were passed as contextPaths at launch; the gate
+    // checks that the prior-step artifacts actually exist on disk before advancing.
+    const artifactPaths = project
+      ? resolveContextPaths({
+          cycle,
+          step: ctx.step,
+          repoPath: project.repoPath,
+        })
+      : this.artifactPaths();
+
     const gate = runDeterministicGate(
       profile,
-      { artifacts: this.artifactPaths(), blocks: event.blocks },
+      { artifacts: artifactPaths, blocks: event.blocks },
       this.ports.fs,
     );
     if (!gate.ok) {

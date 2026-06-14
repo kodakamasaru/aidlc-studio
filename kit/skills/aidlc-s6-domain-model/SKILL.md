@@ -35,6 +35,7 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
    - `aidlc-docs/{version}/s6/` が既にあれば `index.md` の引き継ぎセクションと各集約ファイルを確認。
    - 無ければ `aidlc-docs/{version}/s6/` を作り、下のテンプレで `index.md` を新規作成。
    - **以降の質疑応答は md 上で行う**: AI が `### Q-NN` を md に追記 → **ユーザーが IDE で md を直接編集して `回答` を書き込む** → AI が次のやり取りで `確定` を埋める。
+   - **headless(live)実行で人間への質問が必要なとき**: [operating-model「人間確認の構造化 emit / 回答突合」](../../../kit/rules/aidlc-operating-model.md#人間確認の構造化-emit--回答突合live-headless-実行時の共通契約)に従って `aidlc-question` ブロックを emit し、`aidlc-answers` で突合して再開する。
    - **質問の所属**: スタック・DDD 判断・ユビキタス言語・モデル横断は `index.md`、個別集約の議論は該当 `{aggregate-name}.md`。
 
 1. **DDD 採用/未採用を最初に決める**(PDF 提示の分岐、`index.md` の「DDD 採用判断」に記録):

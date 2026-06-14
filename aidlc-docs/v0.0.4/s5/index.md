@@ -27,6 +27,9 @@
 - [Unit-06 会話スレッド UI](./unit-06-conversation-ui.md) — US-05 / US-06
 - [Unit-07 可変ステップ進捗](./unit-07-variable-step-progress.md) — US-07
 
+### 再分割(S8→S4 手戻り / 2026-06-14)
+- [BU 再分割 — コンテキスト/IO 契約 + 設定ヒアリング](./backtrack-context-io-units.md) — BU-1 構造化コンテキスト resolver(DB+docs)/ BU-2 `aidlc-result` 出力 protocol / BU-3 設定ヒアリングフロー + per-step 粒度表。既存 Unit-01〜06 の一部を置換/拡張(ledger BT-01/02)。
+
 ## US → Unit 割り当て(完了条件①の証跡)
 
 | US | 主担当 Unit | 備考 |

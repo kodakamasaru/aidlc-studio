@@ -16,6 +16,7 @@ import type {
   ReviewRepo,
   ArtifactRepo,
   WikiRepo,
+  SessionRepo,
 } from "./repos";
 
 export interface Repos {
@@ -28,6 +29,8 @@ export interface Repos {
   readonly reviews: ReviewRepo;
   readonly artifacts: ArtifactRepo;
   readonly wiki: WikiRepo;
+  /** Unit-04: runId → claude session_id store (infra-only; not on domain Run). */
+  readonly sessions: SessionRepo;
 }
 
 export interface Ports {

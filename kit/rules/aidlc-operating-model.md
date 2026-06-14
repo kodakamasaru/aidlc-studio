@@ -118,6 +118,70 @@ live(実 Claude headless)を起動するときのプロンプトは、**3 source
 - evaluator は末尾に `{requirements, addressed}` の JSON を 1 つ出す(US-04 completeness gate が機械的に読む)。未充足は addressed に入れない = gap。
 - 決定的スイートは合成結果の **3 source 含有**を fixture で常時検証。`bun test:live` は実 AI 加算層。
 
+## 人間確認の構造化 emit / 回答突合(live headless 実行時の共通契約)
+
+headless(バックグラウンド)で AI が実行中に人間の判断が必要になったとき、**この契約に従って質問を emit し、再開時に回答を突合する**。スキル本文はこの節を参照し、文面を複製しない。
+
+### emit — `aidlc-question` フェンスブロック
+
+人間への質問は以下のスキーマで **1 件 1 ブロック** として出力する:
+
+````
+```aidlc-question
+{"id":"Q-01","prompt":"質問本文","background":"補足(省略可)","options":[{"id":"A","label":"選択肢ラベル","hint":"補足(省略可)","recommended":true},{"id":"B","label":"別の選択肢"}],"answerKind":"single"}
+```
+````
+
+- `id`: `Q-NN` 形式(スキル内で連番)
+- `prompt`: 人間が判断するために必要な問いを事業語で書く(ソース未読の IT 人材が答えられる水準 / [責務契約①](./responsibility-contract.md))
+- `background`: 補足文脈。省略可だが、ある場合は **1 行のプレーンテキスト**のみ(コードブロックや ` ``` ` を含めない — フェンス内に裸の ` ``` ` 行があると fence 抽出が壊れる)
+- `options`: 選択肢の配列。`id` は A/B/C… 等の短縮 ID、`label` は人間が読むラベル、`hint` は省略可
+- `recommended`: **配列内で厳密に 1 件だけ** `true` にする(0 件・2 件以上はバリデーションエラー)
+- `answerKind`: `"single"` | `"multi"` | `"free"` — 単一選択 / 複数選択 / 自由記述
+- **フォーマット規則**: JSON は **1 行 minified** で書く(改行・インデントなし)。ブロック内に空行・裸の ` ``` ` 行を置かない
+
+### resume — `aidlc-answers` フェンスブロックで突合
+
+人間の回答は以下の形式で AI に返される:
+
+````
+```aidlc-answers
+{"questionId":"Q-01","choiceIds":["A"],"note":"任意の補足"}
+```
+````
+
+- `questionId`: 対応する `AidlcQuestion.id`
+- `choiceIds`: 選択した `option.id` の配列(`answerKind:"single"` でも配列)
+- `note`: 自由補足(省略可)
+
+AI は resume 時に `aidlc-answers` ブロックを受け取ったら、**`questionId` で対応する質問を特定し、`choiceIds` で選択肢を突合して実行を再開する**。回答がないまま先に進まない(stall 状態を維持し retry を待つ)。
+
+### wire ユーティリティ
+
+parse / serialize / バリデーションの実装は [`src/wire/aidlc-wire.ts`](../../src/wire/aidlc-wire.ts)(S7 Unit-01 成果物)を使う。スキル本文はスキーマの読み方と emit の書き方を知っていればよく、実装詳細には依存しない。
+
+---
+
+## 再発防止ゲート — Design/S4 と Build/S8 の完全性契約(BT-03 恒久ルール)
+
+v0.0.4 の S8 実機レビューで発覚した 2 つの構造的漏れを、スキル本文に焼いた恒久ルールとして定義する。各スキルはここを参照し、全文を複製しない。
+
+### Rule A — S4: AI 入出力設計を first-class 成果物とする
+
+> **S4(技術仕様)は transport/機構だけで完了にしない。AI への「入力コンテキストの設計」(何を・どの source=DB/docs/file から・どう構造化して渡すか)と「出力フォーマットの設計」(成果物・質問・決定・完了状態を確実に構造で受け取る protocol)を first-class 成果物として必ず含める。机上の機構だけ設計して中身(入出力)を設計しないことを禁止する。**
+
+- **なぜ**: v0.0.4 で S4 が transport のみを設計し入出力を設計しなかったため、S8 まで「機構はある・入出力が無い」状態が見えず、実機レビューで初めて顕在化した(BT-01/BT-02)。
+- **S4 の完了条件への追加**: 「AI 入力コンテキスト設計と出力フォーマット設計が成果物 md の専用セクションに記述されている」が充足されるまで S4 を `確定` にしない(詳細は `kit/skills/aidlc-s4-tech-spec/SKILL.md` の完了条件)。
+
+### Rule B — S8: 完全性ゲートは US-AC 機能フロー貫通を必須とする
+
+> **S8 の完全性ゲートは「US 受け入れ条件(AC)の機能フロー貫通」で回す。各 US の AC を end-to-end の動く動線(画面→API→ドメイン→永続 + AC が要求する振る舞い)に 1 件ずつ突合する。画面 mock 突合(S3 視覚契約)は必要条件であって十分条件ではない。完全性チェックを画面インベントリ起点でなく US-AC インベントリ起点で回す(画面が一致しても US 機能が空なら未完)。**
+
+- **なぜ**: v0.0.4 で S8 mock 突合が S3 画面状態を全件一致させたが、US-01/US-06 の機能フローが配線されておらず実機レビューで初めて顕在化した。画面が存在しても機能が unwired なら AC は満たせない。これは [[completeness-checks-anchor-on-spec]] の「機能フロー版」。
+- **S8 の完了条件への追加**: mock 突合(S3 起点)に加えて「US-AC 機能フロー突合表」が埋まるまで S8 を `確定` にしない(詳細は `kit/skills/aidlc-s8-integration/SKILL.md` の完了条件)。
+
+---
+
 ## S7/S8 Construction の進行方針(テスト + レビュー自動化)
 
 Construction 工程(S7 / S8)は **テスト方針** と **自動レビュー pipeline** を必ず以下のように回す。**本プロジェクト全バージョン** で適用。新サイクル開始時に再質問しない。

@@ -6,6 +6,8 @@ import type { Ports } from "../ports/composition";
 import { fail, isServiceError, messageOf, type ServiceError } from "./errors";
 import { compensateRun } from "./compensate";
 import { locatePhaseOfRun } from "./cycle-helpers";
+import { applyHearingAnswerToContracts } from "./hearing-service";
+import { parseAnswersBlock } from "../../wire/aidlc-wire";
 import {
   applyAnswer,
   type Question,
@@ -122,6 +124,33 @@ export class InboxService {
       if (backtrackedCycle) this.ports.repos.cycles.save(backtrackedCycle);
     });
 
+    // BU-3: config-hearing write. When the question carries a target, apply the
+    // answer deterministically to StepContracts (§C7.6). This is additive: normal
+    // dispatch still runs so the hearing turn continues (or finalises) as usual.
+    // Errors here are visible (ServiceError) — they do NOT silently drop (原則④).
+    if (question.target !== undefined && question.kind === "question") {
+      const cycle = this.ports.repos.cycles.findById(question.cycleId);
+      const projectId = cycle?.projectId;
+      if (projectId !== undefined) {
+        const scope =
+          question.target.scope ??
+          `cycle:${question.cycleId}`;
+        // Extract choiceId + note from the answer body. The body may be an
+        // aidlc-answers fenced block (multi-question batch) or a plain string.
+        const { choiceId, note } = this.extractHearingValues(question.id, input.body);
+        applyHearingAnswerToContracts(
+          {
+            scope,
+            projectId: String(projectId),
+            target: { step: question.target.step, field: question.target.field },
+            ...(choiceId !== undefined ? { choiceId } : {}),
+            ...(note !== undefined ? { note } : {}),
+          },
+          this.ports,
+        );
+      }
+    }
+
     // AFTER commit: dispatch ONLY the orchestrator side-effects. backtrack is
     // fully persisted above and needs no post-commit call.
     if (command.type !== "backtrack") {
@@ -140,12 +169,39 @@ export class InboxService {
     // surfaces a 502 — the loop stays recoverable.
     try {
       switch (command.type) {
-        case "resumeRun":
+        case "resumeRun": {
+          // Batch hearing (S2/S6: N問→N答→1 resume). One live run may raise
+          // several `question` cards at once; the human answers them as a batch.
+          // Each answer is persisted individually (above), but the session must
+          // be resumed ONCE with the full aidlc-answers body — NOT once per
+          // answer, which would re-spawn `claude --resume` N times on the same
+          // session. So defer the resume while sibling `question`s for this run
+          // are still open; only the FINAL answer (no open question siblings
+          // left — the just-answered one is already persisted as "answered")
+          // triggers the single resume carrying the batched body. The batch
+          // selection is an app-layer responsibility (S6 評価AI S-1), mirroring
+          // resolveDescopedRun's "wait until no open siblings" gate below.
+          if (command.body !== undefined) {
+            const openSiblings = this.ports.repos.questions
+              .listByRun(command.runId)
+              .filter((q) => q.kind === "question" && q.state === "open");
+            if (openSiblings.length > 0) return; // not the last answer → defer.
+          }
+          // Unit-04: when the human answered a `question` (body present), pass
+          // the captured session_id so the live adapter can `claude --resume`.
+          // Absent sessionId with body present → live adapter emits stalled
+          // (session not yet captured / server restarted); the human retries.
+          const sessionId =
+            command.body !== undefined
+              ? (this.ports.repos.sessions.find(command.runId) ?? undefined)
+              : undefined;
           await this.ports.orchestrator.resume({
             runId: command.runId,
             ...(command.body !== undefined ? { body: command.body } : {}),
+            ...(sessionId !== undefined ? { sessionId } : {}),
           });
           return;
+        }
         case "approveTaskReview":
           // Post-review approval: advance the run to "done" (which moves the
           // phase to "review"), then approve the phase (review → done) so the
@@ -374,5 +430,34 @@ export class InboxService {
     const cycle = this.ports.repos.cycles.findById(question.cycleId);
     if (!cycle) throw fail(404, "CycleNotFound");
     return cycle;
+  }
+
+  /**
+   * BU-3: extract (choiceId, note) from an answer body for config-hearing.
+   * If the body is an aidlc-answers fenced block, parse it and find the answer
+   * matching the given questionId. Otherwise treat the plain body string as the
+   * note value (simple direct answer for non-batch config questions).
+   */
+  private extractHearingValues(
+    questionId: import("../../domain/shared/ids").QuestionId,
+    body: Text | undefined,
+  ): { choiceId?: string; note?: string } {
+    if (body === undefined) return {};
+
+    // Try parsing as aidlc-answers block first.
+    const parsed = parseAnswersBlock(body);
+    if (parsed.ok) {
+      const match = parsed.value.find((a) => a.questionId === questionId);
+      if (match) {
+        return {
+          ...(match.choiceIds.length > 0 ? { choiceId: match.choiceIds[0] } : {}),
+          ...(match.note !== undefined ? { note: match.note } : {}),
+        };
+      }
+    }
+
+    // Fallback: treat the whole body string as a plain note value.
+    const plain = (body as string).trim();
+    return plain.length > 0 ? { note: plain } : {};
   }
 }

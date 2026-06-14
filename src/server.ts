@@ -212,6 +212,7 @@ function buildOrchestrator(
     "stall-first",
     "gen-eval-complete",
     "gen-eval-descope",
+    "config-hearing", // BU-3: exercises the config-hearing write mechanism
   ];
   const requested = process.env.AIDLC_SCENARIO as ScriptedScenario | undefined;
   const scenario =

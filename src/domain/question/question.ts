@@ -12,6 +12,21 @@ import type { QuestionId, RunId, CycleId, TaskId, FactId } from "../shared/ids";
 import type { Review } from "../review/review";
 import { type Fact, append as appendFact } from "../facts/facts";
 
+/**
+ * BU-3 config-hearing: the write target that travels with a config-hearing
+ * question. Mirrors wire.AidlcTarget (no cross-layer import). When present on
+ * a Question of kind "question", the answer-handler writes the human's choice
+ * deterministically into the specified StepContracts field (§C7.6).
+ *
+ * scope: "global" → project.pipelineDef (next cycle). "cycle:{id}" → cycle snapshot.
+ */
+export type QuestionTarget = {
+  readonly step: string;
+  readonly field: string;
+  /** Write destination scope (C7.6). Absent = infer "cycle:{question.cycleId}". */
+  readonly scope?: string;
+};
+
 export type QuestionKind =
   | "question"
   | "visual_review"
@@ -64,6 +79,12 @@ export type Question = {
   readonly state: QuestionState;
   readonly payload: QuestionPayload;
   readonly createdAt: Instant;
+  /**
+   * BU-3 config-hearing: write target. When present (kind="question"), the
+   * answer-handler applies the human's answer to StepContracts at the given
+   * step/field path (§C7.6). Absent on normal hearing questions (backward-compat).
+   */
+  readonly target?: QuestionTarget;
 };
 
 /** 人間の応答(値オブジェクト)。 */
@@ -116,6 +137,8 @@ export type RaiseQuestionCmd = {
   readonly taskId?: TaskId;
   readonly payload: QuestionPayload;
   readonly createdAt: Instant;
+  /** BU-3: optional config-hearing write target (absent on normal questions). */
+  readonly target?: QuestionTarget;
 };
 
 /** raiseQuestion: open な Question を 1 枚生成(`QuestionRaised` 受信)。kind は payload から導く。 */
@@ -128,6 +151,7 @@ export const raiseQuestion = (cmd: RaiseQuestionCmd): Question => ({
   state: "open",
   payload: cmd.payload,
   createdAt: cmd.createdAt,
+  ...(cmd.target !== undefined ? { target: cmd.target } : {}),
 });
 
 const nonEmpty = (t: Text | undefined): t is Text =>
