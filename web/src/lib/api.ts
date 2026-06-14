@@ -123,6 +123,16 @@ export interface CompletenessBlock {
   readonly addressed: readonly string[];
 }
 
+/**
+ * BU-2: A decision from the aidlc-result envelope (§C7.4).
+ * Additive optional — absent on pre-BU-2 reviews.
+ */
+export interface ResultDecision {
+  readonly id: string;
+  readonly decision: string;
+  readonly reason: string;
+}
+
 export interface Review {
   readonly runId: string;
   readonly cycleId: string;
@@ -132,6 +142,16 @@ export interface Review {
   readonly producedAt: string;
   /** evaluator 成果のとき completeness table を描画する元データ(scope K)。 */
   readonly completeness?: CompletenessBlock;
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送された
+   * 成果物パス一覧(aidlc-docs 相対パス)。欠落=従来動作。
+   */
+  readonly artifacts?: readonly string[];
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送された
+   * AI が独自に決めた事項(D-NN)一覧。欠落=従来動作。
+   */
+  readonly decisions?: readonly ResultDecision[];
 }
 
 export type QuestionKind =
@@ -227,16 +247,15 @@ export interface CreateProjectBody {
 /**
  * BU-3: Result returned by POST /api/hearing/launch.
  * cycle-scope: {scope, cycleId, runId, step} — web navigates to cycle thread.
- * global-scope: {scope:"global"} — web renders the /settings/hearing placeholder.
+ * global-scope: {scope:"global", cycleId:"__global_settings__", runId, step}
+ *   — web opens the conversation thread for the system cycle (global hearing).
  */
-export type HearingLaunchResult =
-  | { readonly scope: "global" }
-  | {
-      readonly scope: string;
-      readonly cycleId: string;
-      readonly runId: string;
-      readonly step: string;
-    };
+export type HearingLaunchResult = {
+  readonly scope: string;
+  readonly cycleId: string;
+  readonly runId: string;
+  readonly step: string;
+};
 
 // ── Error ────────────────────────────────────────────────────
 export class ApiError extends Error {
@@ -349,9 +368,10 @@ export const api = {
 
   // BU-3: config-hearing run launcher. scope="global" | "cycle:{id}".
   // cycle-scope: returns {scope, cycleId, runId, step}; web navigates to thread.
-  // global-scope: returns {scope:"global"}; web renders the /settings/hearing page.
-  launchHearing: (scope: string): Promise<HearingLaunchResult> =>
-    request("/hearing/launch", jsonBody({ scope })),
+  // global-scope: returns {scope:"global", cycleId, runId, step}; web opens system cycle thread.
+  // projectId is required for scope="global" (scopes the system cycle).
+  launchHearing: (scope: string, projectId?: string): Promise<HearingLaunchResult> =>
+    request("/hearing/launch", jsonBody({ scope, ...(projectId ? { projectId } : {}) })),
 
   // US-06 対話式編集: 要望から契約の提案を取得(適用はしない / 承認時に updateStepContracts)。
   proposeStepContracts: (

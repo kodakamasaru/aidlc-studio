@@ -171,10 +171,10 @@ export class ScriptedOrchestrator implements OrchestratorPort {
     }
     // BU-3: config-hearing scenario — emit 2 config questions with targets so
     // the integration test can answer them and assert StepContracts are written.
-    // Scope is passed as "cycle:{cycleId}" so the answer-handler writes to the
-    // cycle's phase snapshot (scope=global is also testable but cycle is the
-    // natural default for an in-flight run / §C7.6).
+    // Scope is taken from cmd.hearingScope when present (global launch passes
+    // "global"); otherwise defaults to "cycle:{cycleId}" (cycle-scoped launch).
     if (this.scenario === "config-hearing") {
+      const targetScope = cmd.hearingScope ?? `cycle:${cmd.cycleId}`;
       await this.emit(ctx, {
         type: "QuestionRaised",
         runId: cmd.runId,
@@ -190,7 +190,7 @@ export class ScriptedOrchestrator implements OrchestratorPort {
         target: {
           step: "S1",
           field: "output.profileKind",
-          scope: `cycle:${cmd.cycleId}`,
+          scope: targetScope,
         },
       });
       await this.emit(ctx, {
@@ -208,7 +208,7 @@ export class ScriptedOrchestrator implements OrchestratorPort {
         target: {
           step: "S1",
           field: "humanGate.mode",
-          scope: `cycle:${cmd.cycleId}`,
+          scope: targetScope,
         },
       });
       this.states.set(cmd.runId, "asked");

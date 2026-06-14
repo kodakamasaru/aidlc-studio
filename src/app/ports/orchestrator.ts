@@ -43,6 +43,13 @@ export interface RunLaunch {
    * absent (all scripted tests, legacy paths), the legacy compose() path is used unchanged.
    */
   readonly structuredContext?: StructuredContext;
+  /**
+   * BU-3 global hearing scope: "global" | "cycle:{id}". Passed through to the
+   * config-hearing scenario so the emitted QuestionRaised target.scope reflects
+   * whether answers should write to project.pipelineDef (global) or the cycle
+   * phase snapshot (cycle). Omitted for non-hearing runs (backward compat).
+   */
+  readonly hearingScope?: string;
 }
 
 /**

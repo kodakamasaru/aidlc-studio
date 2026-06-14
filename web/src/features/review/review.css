@@ -472,6 +472,101 @@
   color: var(--color-text-mid);
 }
 
+/* ── BU-2: 成果物セクション(ArtifactsSection) ────────────────── */
+.artifacts-section {
+  padding: var(--sp-5);
+}
+.artifacts-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.artifacts-section__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+}
+.artifacts-section__count {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+}
+.artifacts-section__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.artifacts-section__item {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  grid-template-rows: auto auto;
+  column-gap: var(--sp-2);
+  row-gap: 1px;
+  align-items: start;
+}
+.artifacts-section__icon {
+  grid-row: 1 / 3;
+  align-self: start;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.artifacts-section__filename {
+  font-weight: 600;
+  color: var(--color-text-hi);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.artifacts-section__path {
+  font-size: var(--text-micro);
+  color: var(--color-text-low);
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+/* ── BU-2: AI が決めたことセクション(DecisionsSection) ──────── */
+.decisions-section {
+  padding: var(--sp-5);
+}
+.decisions-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.decisions-section__title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+}
+.decisions-section__count {
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+}
+.decisions-section__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.decisions-section__item {
+  border-left: 2px solid var(--color-violet);
+  padding-left: var(--sp-3);
+}
+.decisions-section__decision {
+  font-weight: 600;
+  color: var(--color-text-hi);
+  line-height: var(--leading-body);
+}
+.decisions-section__reason {
+  margin-top: var(--sp-1);
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  line-height: var(--leading-body);
+}
+.decisions-section__reason-label {
+  font-weight: 600;
+  color: var(--color-text-low);
+}
+
 /* ── ac-map: ✓ list (受け入れ条件) ──────────────────────────── */
 .ac-map__check {
   flex: 0 0 auto;

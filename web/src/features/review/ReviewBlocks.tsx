@@ -4,8 +4,9 @@
 // with lightbox on click (‹ › prev/next, n/total counter, Esc to close).
 // missing-context blocks render as a clean Japanese warning banner (role="alert").
 // Unknown / heavy block types degrade gracefully to a labelled placeholder.
+// BU-2: ArtifactsSection and DecisionsSection render aidlc-result envelope data.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReviewBlock, CompletenessBlock } from "../../lib/api";
+import type { ReviewBlock, CompletenessBlock, ResultDecision } from "../../lib/api";
 import { Markdown } from "../../components/ui/Markdown";
 
 // Screenshot src is model-produced. Only allow safe, renderable schemes:
@@ -629,6 +630,86 @@ export function ReviewBlocksSkeleton() {
         </div>
       </article>
     </div>
+  );
+}
+
+// ── BU-2: Artifacts section (成果物) ─────────────────────────────────────────
+// Lists the aidlc-docs md files produced by this run (§C7.4 artifacts[]).
+// Shows the filename (basename) as the human-readable label. Empty list → omit.
+interface ArtifactsSectionProps {
+  readonly artifacts: readonly string[];
+}
+
+/**
+ * 成果物セクション — AI がこの工程で書き出したファイル一覧。
+ * パス全体を表示すると長くなりすぎるため、ファイル名(basename)を表示する。
+ * 人間がコードを読まず「何が作られたか」を確認できる中核ビュー(原則#3)。
+ */
+export function ArtifactsSection({ artifacts }: ArtifactsSectionProps) {
+  if (artifacts.length === 0) return null;
+  return (
+    <section className="artifacts-section surface-card" aria-label="この工程で作られたもの">
+      <header className="artifacts-section__head">
+        <h2 className="artifacts-section__title">この工程で作られたもの</h2>
+        <span className="artifacts-section__count">{artifacts.length} 件</span>
+      </header>
+      <ul className="artifacts-section__list">
+        {artifacts.map((path, i) => {
+          const filename = path.split("/").pop() ?? path;
+          return (
+            <li key={i} className="artifacts-section__item">
+              <span className="artifacts-section__icon" aria-hidden="true">📄</span>
+              <span className="artifacts-section__filename" title={path}>
+                {filename}
+              </span>
+              <span className="artifacts-section__path" aria-label={`ファイルパス: ${path}`}>
+                {path}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+// ── BU-2: Decisions section (AI が決めたこと) ────────────────────────────────
+// Lists the AI's autonomous decisions from the aidlc-result envelope (§C7.4
+// decisions[]). Each decision has an id, decision text, and reason. Shows all in
+// Japanese so the human can see WHAT the AI decided and WHY, without reading code.
+interface DecisionsSectionProps {
+  readonly decisions: readonly ResultDecision[];
+}
+
+/**
+ * AI が決めたことセクション — AI がこの工程で自律的に下した判断の一覧。
+ * 「何を決めたか」と「その理由」を人間が確認できるようにする(原則#3)。
+ * 問題があれば差し戻して再実行。
+ */
+export function DecisionsSection({ decisions }: DecisionsSectionProps) {
+  if (decisions.length === 0) return null;
+  return (
+    <section className="decisions-section surface-card" aria-label="AI が独自に決めたこと">
+      <header className="decisions-section__head">
+        <h2 className="decisions-section__title">AI が独自に決めたこと</h2>
+        <span className="decisions-section__count">{decisions.length} 件</span>
+      </header>
+      <ul className="decisions-section__list">
+        {decisions.map((d, i) => (
+          <li key={d.id ?? i} className="decisions-section__item">
+            <p className="decisions-section__decision">{d.decision}</p>
+            {d.reason ? (
+              <p className="decisions-section__reason">
+                <span className="decisions-section__reason-label" aria-hidden="true">
+                  理由:
+                </span>{" "}
+                {d.reason}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

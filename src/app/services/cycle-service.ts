@@ -79,6 +79,17 @@ export interface HearingLaunchResult {
   readonly step: string;
 }
 
+/**
+ * BU-3: Reserved id for the hidden "system" cycle that hosts the global
+ * config-hearing. This cycle is never shown in cycle listings (filtered at
+ * the listCycles boundary). Direct access via getCycle / thread still works
+ * so the web can navigate to the conversation thread by id.
+ */
+export const SYSTEM_CYCLE_ID = "__global_settings__" as const;
+
+/** True when a cycle id refers to the system (global-hearing) cycle. */
+export const isSystemCycle = (id: string): boolean => id === SYSTEM_CYCLE_ID;
+
 export class CycleService {
   constructor(private readonly ports: Ports) {}
 
@@ -181,7 +192,11 @@ export class CycleService {
   }
 
   listCycles(projectIdRaw: string): readonly Cycle[] {
-    return this.ports.repos.cycles.listByProject(ProjectId(projectIdRaw));
+    // Filter out the system (global-hearing) cycle — it must never appear in
+    // the user-visible cycle list (sidebar / CycleListPage).
+    return this.ports.repos.cycles
+      .listByProject(ProjectId(projectIdRaw))
+      .filter((c) => !isSystemCycle(c.id as string));
   }
 
   getCycle(cycleIdRaw: string): Cycle {
@@ -323,6 +338,152 @@ export class CycleService {
     }
 
     return next;
+  }
+
+  /**
+   * BU-3: lazily ensure the ONE reserved "system" cycle that hosts the global
+   * config-hearing. Called on every global hearing launch so re-launches after
+   * the cycle is exhausted recreate it cleanly.
+   *
+   * The system cycle:
+   *   - id = SYSTEM_CYCLE_ID
+   *   - version = "v0.0.0" (lowest semver so it does not conflict with real cycles;
+   *     the domain createCycle accepts any Version-branded string)
+   *   - belongs to the given projectId
+   *   - pipeline = single S1 phase (enough to host config questions)
+   *   - title = hidden internal label (users never see it)
+   *
+   * If the system cycle already exists in the DB AND still has a pending phase,
+   * it is reused (idempotent). If all phases are already running/done, a fresh
+   * system cycle replaces the old one (it is re-persisted with a new phaseId
+   * so the old run history is abandoned).
+   */
+  private ensureSystemCycle(projectId: ProjectId): Cycle {
+    const cycleId = CycleId(SYSTEM_CYCLE_ID);
+    const existing = this.ports.repos.cycles.findById(cycleId);
+    if (existing) {
+      const hasPending = existing.phases.some((p) => p.state === "pending");
+      if (hasPending) return existing;
+    }
+
+    // Create (or re-create) the system cycle with a fresh S1 phase.
+    const project = this.loadProject(projectId);
+    const s1Def = project.pipelineDef.find((sd) => (sd.id as string) === "S1");
+    const pipeline = s1Def
+      ? [
+          {
+            phaseId: this.ports.ids.phaseId(),
+            step: Step("S1"),
+            stepDef: {
+              label: s1Def.label,
+              order: s1Def.order,
+              skillRef: s1Def.skillRef,
+              ...(s1Def.contracts ? { contracts: s1Def.contracts } : {}),
+            },
+          },
+        ]
+      : [
+          {
+            phaseId: this.ports.ids.phaseId(),
+            step: Step("S1"),
+          },
+        ];
+
+    // Use the Version brand directly — "v0.0.0" matches VERSION_RE.
+    const ver = parseVersion("v0.0.0");
+    if (isErr(ver)) throw fail(500, "SystemCycleVersionInvalid");
+
+    const created = domainCreateCycle({
+      id: cycleId,
+      projectId,
+      version: ver.value,
+      title: "(global-settings)",
+      taskIds: [],
+      createdAt: this.ports.clock.now(),
+      pipeline,
+    });
+    if (isErr(created)) throw fail(500, `SystemCycleCreateFailed: ${created.error}`);
+
+    const cycle = created.value;
+    this.ports.uow.run(() => this.ports.repos.cycles.save(cycle));
+    return cycle;
+  }
+
+  /**
+   * BU-3 global hearing: ensure the system cycle for the given project, then
+   * launch a config-hearing run on its first pending phase.
+   * The launch carries hearingScope="global" so the orchestrator emits questions
+   * with target.scope="global" → answers write to project.pipelineDef.
+   * Returns cycleId=SYSTEM_CYCLE_ID + runId + step so the web can navigate to
+   * the conversation thread by the system cycle id.
+   */
+  async launchGlobalConfigHearing(projectIdRaw: string): Promise<HearingLaunchResult> {
+    const projectId = ProjectId(projectIdRaw);
+    const systemCycle = this.ensureSystemCycle(projectId);
+
+    const pendingPhase = systemCycle.phases
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .find((p) => p.state === "pending");
+    if (!pendingPhase) throw fail(409, "HearingNoPendingPhase");
+
+    // Build the "started" cycle using the domain command.
+    const runId = this.ports.ids.runId();
+    const step = pendingPhase.step;
+
+    const started = domainStartPhase(systemCycle, {
+      step,
+      runId,
+      startedAt: this.ports.clock.now(),
+    });
+    if (isErr(started)) throw cycleErrorStatus(started.error);
+
+    const project = this.loadProject(projectId);
+    const next = started.value;
+    this.ports.uow.run(() => this.ports.repos.cycles.save(next));
+
+    const phase = next.phases.find((p) => sameStep(p.step, step));
+    if (!phase) throw fail(400, "StepNotInPipeline");
+
+    // Structured context is minimal for the global hearing cycle.
+    const contextPaths: readonly string[] = [];
+    const structuredContext = composeStructuredContext(
+      { cycle: next, step, repoPath: project.repoPath },
+      {
+        fs: this.ports.fs,
+        questions: this.ports.repos.questions,
+        cycles: this.ports.repos.cycles,
+        runId,
+        cycleId: CycleId(SYSTEM_CYCLE_ID),
+      },
+    );
+
+    try {
+      await this.ports.orchestrator.launch({
+        runId,
+        projectId,
+        cycleId: CycleId(SYSTEM_CYCLE_ID),
+        phaseId: phase.id,
+        step,
+        repoPath: project.repoPath,
+        // Signal the orchestrator that this is a global hearing so config
+        // questions carry target.scope="global" instead of "cycle:{id}".
+        hearingScope: "global",
+        ...(contextPaths.length > 0 ? { contextPaths } : {}),
+        structuredContext,
+      });
+    } catch (err) {
+      compensateRun(
+        this.ports,
+        CycleId(SYSTEM_CYCLE_ID),
+        runId,
+        "failed",
+        `グローバル設定ヒアリングの起動に失敗しました: ${messageOf(err)}`,
+      );
+      throw fail(502, "OrchestratorLaunchFailed");
+    }
+
+    return { cycleId: SYSTEM_CYCLE_ID, runId: runId as string, step: step as string };
   }
 
   /**

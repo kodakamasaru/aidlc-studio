@@ -18,8 +18,11 @@
     block の best-effort parse で、質問など構造化出力を確実に受け取れない。
     発生源 = S4(技術仕様)が transport だけで「入力コンテキスト設計 + 出力フォーマット設計」を
     first-class 成果物にしなかったため。S5 Unit-02 も「機構」止まり。
-  state: carried
-  into: v0.0.4   # 自サイクル内 backtrack。S4 で コンテキスト/IO 契約(構造化セクション / DB+docs 統合 / 完全フォーマット化 protocol)を設計し直し、S5→S8 で実装して done 化する。
+  state: done
+  closed_in: >
+    2026-06-14 commit 163e8f4 + 後続。S4 §C7 で契約設計 → BU-2(aidlc-result 出力 protocol /
+    wire 純関数 + live/scripted 受領 + status ルーティング)+ BU-1(構造化コンテキスト resolver:
+    DB+docs+file から §C7.1 セクション列 / brief 常時 / 出力契約注入 / 粒度表 / 実 run パス配線)。505 green。
 
 - id: BT-02-config-hearing-flow
   origin: v0.0.4/s8-integration.md   # S8 実機レビュー(2026-06-14)で人間が発覚(ヒアリング画面→サイクル画面 bounce)
@@ -30,16 +33,14 @@
     無い(設定書込は今も個別フォーム PATCH のみ=US-06 が廃止すべきもの)③グローバル「会話で直す」は
     存在しないルート /settings/thread へ飛び サイクル一覧へ bounce。
     発生源 = S4(機構未設計)+ S5(Unit 未分割)。S2 にも 2層モデルとの文言不整合(「ステップ着手で」)。
-  state: carried
-  into: v0.0.4   # 自サイクル内 backtrack。
-  progress: >
-    2026-06-14 部分消化: §C7.6 で書込機構 pin(構造化質問→直接書込 / target:{step,field})。
-    BU-3 backend done(hearing-service.applyHearingAnswerToContracts + wire/domain target + 回答ルーティング
-    + scripted config-hearing シナリオ + 統合テスト end-to-end / 501 green)。BU-3 web 部分: グローバル
-    dead route(/settings/thread bounce)を解消し /settings/hearing 新設、cycle スコープは
-    POST /api/hearing/launch → 設定質問 → 回答→contracts 書込 まで配線完了。
-    残り: グローバルスコープの「サイクル非依存 run」モデル(Question/Run が cycleId 必須のため、
-    synthetic global cycle か null-cycleId run の導入が必要)。これが入るとグローバル設定も会話で埋まる。
+  state: done
+  closed_in: >
+    2026-06-14 commit 163e8f4 + 後続。§C7.6 書込機構 pin(構造化質問→直接書込 / target:{step,field})。
+    BU-3 backend(hearing-service.applyHearingAnswerToContracts + wire/domain target + 回答ルーティング
+    + scripted config-hearing)。BU-3 web: グローバル dead route(/settings/thread bounce)解消 →
+    /settings/hearing 新設。cycle スコープ end-to-end。グローバルスコープも完成: 隠し system サイクル
+    (__global_settings__ / 一覧から filter)を host に target.scope=global で回答→project.pipelineDef 書込。
+    505 green / web build clean。US-06 グローバル+サイクル両層が機能。
 
 - id: BT-03-recurrence-prevention
   origin: v0.0.4/s8-integration.md

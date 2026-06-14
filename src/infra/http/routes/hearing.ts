@@ -1,21 +1,22 @@
 // Hearing routes — BU-3 config-hearing launch endpoint.
-// POST /api/hearing/launch : launch a config-hearing run for a cycle.
+// POST /api/hearing/launch : launch a config-hearing run for a cycle or global.
 //
 // Scope values:
 //   "cycle:{cycleId}" → finds the first pending phase of the cycle and starts
 //                       it under the config-hearing scenario. Returns
-//                       {cycleId, runId, step} so the web can navigate to
+//                       {scope, cycleId, runId, step} so the web can navigate to
 //                       /cycles/:cycleId/thread?hearing=1.
-//   "global"          → global config-hearing is not tied to a cycle; the
-//                       endpoint returns {scope:"global"} and the web renders
-//                       the dedicated /settings/hearing landing page. A full
-//                       cycle-less hearing run requires a future extension
-//                       (see HearingNoCycleNotSupported).
+//   "global"          → ensures the hidden system cycle, starts its hearing
+//                       phase with hearingScope="global" (answers write to
+//                       project.pipelineDef). Returns {scope:"global", cycleId,
+//                       runId, step} so the web can open the thread by system
+//                       cycle id. Requires projectId in the body.
 import { Hono } from "hono";
 import type { Ports } from "../../../app/ports/composition";
 import { CycleService } from "../../../app/services/cycle-service";
 import { parseScope } from "../../../app/services/hearing-service";
-import { ok, readJson, asString } from "../envelope";
+import { fail } from "../../../app/services/errors";
+import { ok, readJson, asString, asOptionalString } from "../envelope";
 
 export function hearingRoutes(ports: Ports): Hono {
   const app = new Hono();
@@ -23,11 +24,13 @@ export function hearingRoutes(ports: Ports): Hono {
 
   /**
    * POST /api/hearing/launch
-   * Body: { scope: "global" | "cycle:{cycleId}" }
+   * Body: { scope: "global" | "cycle:{cycleId}", projectId?: string }
    *
-   * cycle-scope: starts the first pending phase → returns {cycleId, runId, step}.
-   * global-scope: no cycle available → returns {scope:"global"} (partial; the web
-   *               shows the /settings/hearing placeholder page).
+   * cycle-scope: starts the first pending phase → returns {scope, cycleId, runId, step}.
+   * global-scope: ensures system cycle, starts global hearing → returns
+   *   {scope:"global", cycleId:"__global_settings__", runId, step}. Requires
+   *   projectId when scope=global (used to scope the system cycle + project.pipelineDef
+   *   writes). If omitted, falls back to the first project in the store.
    */
   app.post("/api/hearing/launch", async (c) => {
     const body = await readJson(c);
@@ -35,9 +38,19 @@ export function hearingRoutes(ports: Ports): Hono {
     const scope = parseScope(scopeRaw);
 
     if (scope.kind === "global") {
-      // Global hearing is not yet tied to a run (cycle-less run model gap).
-      // Return the scope so the web can render the /settings/hearing placeholder.
-      return ok(c, { scope: "global" as const });
+      // Resolve projectId: caller may pass it explicitly (recommended); if absent,
+      // use the first project in the store (single-project v0 assumption).
+      const projectIdRaw = asOptionalString(body, "projectId");
+      const resolvedProjectId = projectIdRaw
+        ? projectIdRaw
+        : (() => {
+            const projects = ports.repos.projects.list();
+            if (projects.length === 0) throw fail(404, "ProjectNotFound");
+            return projects[0]!.id as string;
+          })();
+
+      const result = await service.launchGlobalConfigHearing(resolvedProjectId);
+      return ok(c, { scope: "global" as const, ...result });
     }
 
     // cycle-scope: launch config-hearing on the first pending phase.

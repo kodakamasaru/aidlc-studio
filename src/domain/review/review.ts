@@ -11,6 +11,7 @@ import type { Instant, Text } from "../shared/primitives";
 import type { Step } from "../shared/vocab";
 import type { CycleId, RunId, TaskId } from "../shared/ids";
 import type { CompletenessBlock } from "./brief";
+import type { ResultDecision } from "../events/events";
 
 // ── ReviewBlock(判別可能ユニオン / 共有 types 層の正本。S3 Unit-04) ──
 export type ReviewBlock =
@@ -68,6 +69,16 @@ export type Review = {
    * コードを読まず承認)。欠落=従来動作(generator や role 無し Run)。
    */
   readonly completeness?: CompletenessBlock;
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送する
+   * 成果物パス一覧(aidlc-docs 相対パス)。欠落=従来動作。
+   */
+  readonly artifacts?: readonly string[];
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送する
+   * AI が独自に決めた事項(D-NN)一覧。欠落=従来動作。
+   */
+  readonly decisions?: readonly ResultDecision[];
 };
 
 export type BuildReviewCmd = {
@@ -78,6 +89,8 @@ export type BuildReviewCmd = {
   readonly blocks: readonly ReviewBlock[];
   readonly producedAt: Instant;
   readonly completeness?: CompletenessBlock;
+  readonly artifacts?: readonly string[];
+  readonly decisions?: readonly ResultDecision[];
 };
 
 /** buildResult: `ResultEmitted` 受信で Review を構築(Task 単位 or Cycle 単位)。INV-1。 */
@@ -89,6 +102,8 @@ export const buildReview = (cmd: BuildReviewCmd): Review => ({
   blocks: cmd.blocks,
   producedAt: cmd.producedAt,
   ...(cmd.completeness !== undefined ? { completeness: cmd.completeness } : {}),
+  ...(cmd.artifacts !== undefined ? { artifacts: cmd.artifacts } : {}),
+  ...(cmd.decisions !== undefined ? { decisions: cmd.decisions } : {}),
 });
 
 /** この Review が Task 単位か(taskId あり)。 */

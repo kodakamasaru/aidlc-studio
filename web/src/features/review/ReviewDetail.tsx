@@ -10,7 +10,7 @@ import { errorMessage } from "../../lib/format";
 import { useSetTopbar } from "../../components/shell/topbar-context";
 import { StateBadge } from "../../components/ui/StateBadge";
 import { CheckIcon, BacktrackIcon } from "../../components/ui/Icon";
-import { ReviewBlocks, CompletenessTable } from "./ReviewBlocks";
+import { ReviewBlocks, CompletenessTable, ArtifactsSection, DecisionsSection } from "./ReviewBlocks";
 import { BacktrackModal, type StepOption } from "./BacktrackModal";
 import { reviewCrumb } from "./review-crumb";
 import { stepLabel } from "../../lib/step-label";
@@ -184,6 +184,14 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
 
       {review.completeness ? (
         <CompletenessTable completeness={review.completeness} />
+      ) : null}
+
+      {review.artifacts && review.artifacts.length > 0 ? (
+        <ArtifactsSection artifacts={review.artifacts} />
+      ) : null}
+
+      {review.decisions && review.decisions.length > 0 ? (
+        <DecisionsSection decisions={review.decisions} />
       ) : null}
 
       <ReviewBlocks blocks={normalisedBlocks} />

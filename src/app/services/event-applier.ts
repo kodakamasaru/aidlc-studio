@@ -120,6 +120,10 @@ export class EventApplier {
           ...(event.completeness !== undefined
             ? { completeness: event.completeness }
             : {}),
+          // BU-2: carry aidlc-result envelope artifacts + decisions so the web
+          // ReviewDetail can render "成果物" and "AI が決めたこと" sections.
+          ...(event.artifacts !== undefined ? { artifacts: event.artifacts } : {}),
+          ...(event.decisions !== undefined ? { decisions: event.decisions } : {}),
         });
         repos.reviews.save(review);
         // S8 gen→gate→eval: role-bearing runs (generator/evaluator) are driven by
