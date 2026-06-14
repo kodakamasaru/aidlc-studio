@@ -17,6 +17,7 @@ import type {
   ArtifactRepo,
   WikiRepo,
   SessionRepo,
+  ReconstructionProposalRepo,
 } from "./repos";
 
 export interface Repos {
@@ -31,6 +32,8 @@ export interface Repos {
   readonly wiki: WikiRepo;
   /** Unit-04: runId → claude session_id store (infra-only; not on domain Run). */
   readonly sessions: SessionRepo;
+  /** US-08: cycleId → ReconstructionProposal store. One slot per cycle, latest write wins. */
+  readonly reconstructionProposals: ReconstructionProposalRepo;
 }
 
 export interface Ports {

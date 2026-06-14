@@ -61,7 +61,50 @@ export class EngineService {
     const role = this.runRole(cycle, ctx.runId);
     if (role === "generator") await this.onGeneratorResult(cycle, ctx, event);
     else if (role === "evaluator") await this.onEvaluatorResult(cycle, ctx, event);
-    // role-less → handled by applier's legacy visual_review (no-op here).
+    else await this.onRolelessResult(cycle, ctx);
+    // role-less → applier's legacy visual_review already ran; additionally:
+    // S1 done triggers reconstruction auto-launch (US-08 AC-2).
+  }
+
+  /**
+   * US-08 AC-2: S1 確定(role-less ResultEmitted for step="S1")を検知して
+   * 再構成提案ランを自動起動する。ベストエフォート(失敗しても S1 完了に影響しない)。
+   *
+   * hearingScope="reconstruction" を RunLaunch に乗せることで scripted adapter が
+   * "reconstruction" シナリオを選択できる。live adapter は同フィールドを読んで
+   * aidlc-reconstruction ブロックを求めるプロンプトを生成する(live は additive / §4)。
+   *
+   * 新フェーズは作成しない — S1 の phase/step 文脈でそのまま起動する。
+   * run の DB 永続化はここでは行わない(scripted は状態機械内部に保持 / live は launch
+   * 後に DB を書かないアーキテクチャが存在する場合の互換性確保のため)。
+   */
+  private async onRolelessResult(cycle: Cycle, ctx: RunContext): Promise<void> {
+    if (!sameStep(ctx.step, "S1" as Step)) return;
+
+    const project = this.ports.repos.projects.findById(cycle.projectId);
+    if (!project) return;
+
+    const runId = this.ports.ids.runId();
+    const phaseId =
+      cycle.phases.find((p) => sameStep(p.step, ctx.step))?.id ?? ctx.phaseId;
+
+    try {
+      await this.ports.orchestrator.launch({
+        runId,
+        projectId: cycle.projectId,
+        cycleId: cycle.id,
+        phaseId,
+        step: ctx.step,
+        repoPath: project.repoPath,
+        hearingScope: "reconstruction",
+      });
+    } catch (err) {
+      logError("EngineService.onRolelessResult: reconstruction launch failed", {
+        cycleId: ctx.cycleId as string,
+        step: ctx.step as string,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**

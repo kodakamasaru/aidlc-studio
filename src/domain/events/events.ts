@@ -91,12 +91,29 @@ export type WikiUpdated = {
   readonly section: WikiSection;
 };
 
+/**
+ * US-08 (v0.0.4): AI emitted an aidlc-reconstruction block proposing pipeline changes.
+ * The scripted/live adapter parses the block and emits this event; the EventApplier
+ * persists it via ReconstructionProposalRepo keyed by cycleId.
+ * Additive optional event — existing adapters that do not emit it are unaffected.
+ */
+export type ReconstructionProposalEmitted = {
+  readonly type: "ReconstructionProposalEmitted";
+  readonly runId: RunId;
+  /**
+   * Raw proposal object (ReconstructionProposal from aidlc-wire) stored as-is.
+   * Using `object` here keeps the domain layer free of wire-format imports (INV-9).
+   */
+  readonly proposal: object;
+};
+
 export type DomainEvent =
   | RunStateChanged
   | QuestionRaised
   | ResultEmitted
   | ArtifactEmitted
-  | WikiUpdated;
+  | WikiUpdated
+  | ReconstructionProposalEmitted;
 
 export type DomainEventType = DomainEvent["type"];
 

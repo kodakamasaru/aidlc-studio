@@ -11,6 +11,8 @@
   - [stall](./screenshots/scr-02-conversation-thread.stall.png)
   - [hearing](./screenshots/scr-02-conversation-thread.hearing.png)(設定ヒアリング = このサイクルの**全ステップ**設定をまとめて / 1 ステップ単位でない / US-06 D-02)
   - [empty](./screenshots/scr-02-conversation-thread.empty.png)
+  - [reconstruction](./screenshots/scr-02-conversation-thread.reconstruction.png)(**US-08 工程の再構成 / サイクル側=AI 起点**。要件確定直後に AI が差分付き再構成案〔既定のまま/✕削除+理由/＋新設〕を提示→会話で修正→まとめて承認 / S2 D-05)
+  - [reconstruction-global](./screenshots/scr-02-conversation-thread.reconstruction-global.png)(**US-08 既定の編集 / グローバル側=人間起点**。AI が現在の既定構成を提示〔差分なし〕→人間が指示→AI が変更案+新設ルール生成→保存 / S2 D-06)
 - 対応 S2 SCR: [SCR-02](../s2/scr-02-conversation-thread.md)
 - 対応 US: [US-03](../s1/us-03-output-question-routing.md) / [US-04](../s1/us-04-conversational-resume.md) / [US-05](../s1/us-05-qa-thread-ui.md) / [US-06](../s1/us-06-bulk-hearing.md)
 - ステータス: 確定(2026-06-13)

@@ -95,6 +95,24 @@ export class ProjectService {
   }
 
   /**
+   * US-08 (AC-7): グローバル既定パイプラインを任意の StepDef 列で全置換する(人間起点の操作)。
+   *
+   * - 追加・削除・並べ替え・独自工程(CANONICAL_STEPS に無い id)・instruction をすべて受け付ける。
+   * - 内部は `customizePipeline`(非空・id 一意チェック)を通すため、空や重複は ProjectError になる。
+   * - 既存サイクルへの影響なし(Phase は作成時点の stepDef snapshot を持つ / S6 INV-S2 と同方針)。
+   *
+   * `updateStepContracts` との違い: 1 工程だけでなく、工程列全体を一度に差し替える。
+   */
+  replaceProjectPipeline(projectIdRaw: string, steps: readonly StepDef[]): Project {
+    const project = this.getProject(projectIdRaw);
+    const result = customizePipeline(project, steps);
+    if (isErr(result)) throw fail(400, result.error);
+    const next = result.value;
+    this.ports.uow.run(() => this.ports.repos.projects.save(next));
+    return next;
+  }
+
+  /**
    * US-06 (scope I): edit one step's contracts from the UI. Replaces that
    * StepDef's `contracts` in the project's pipelineDef (re-validating via
    * customizePipeline) and persists. The change applies to the NEXT cycle/phase

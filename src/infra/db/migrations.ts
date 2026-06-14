@@ -101,5 +101,10 @@ export function migrate(db: Database): void {
       runId     TEXT PRIMARY KEY,
       sessionId TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS reconstruction_proposals (
+      cycleId TEXT PRIMARY KEY,
+      data    TEXT NOT NULL
+    );
   `);
 }

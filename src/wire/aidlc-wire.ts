@@ -410,3 +410,210 @@ export const parseAnswersBlock = (text: string): Result<AidlcAnswer[], WireError
 
   return ok(answers);
 };
+
+// ---------------------------------------------------------------------------
+// aidlc-reconstruction types
+// ---------------------------------------------------------------------------
+
+/**
+ * US-08: diff tag for a step in a ReconstructionProposal.
+ * "keep"    — step exists in the current pipeline and is unchanged.
+ * "add"     — new step to append.
+ * "delete"  — step to remove (must carry a `reason`).
+ * "current" — global scope alias for "keep" (project-level replace has no diff).
+ */
+export type ReconstructionDiff = "keep" | "add" | "delete" | "current";
+
+/**
+ * One step entry inside a ReconstructionProposal.
+ * Mirrors StepDef but enriched with diff annotation + optional reason.
+ */
+export type ReconstructionStep = {
+  readonly id: string;
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  /**
+   * Per-step customized rule content (the `instruction` field on StepDef).
+   * Replaces the kit/skills/*.md skeleton for this step when present.
+   */
+  readonly instruction: string;
+  /** How this step differs from the current pipeline for this cycle/project. */
+  readonly diff: ReconstructionDiff;
+  /**
+   * Required when diff="delete": human-readable reason for the removal.
+   * Present (but optional) for add/keep/current to carry AI rationale.
+   */
+  readonly reason?: string;
+};
+
+/**
+ * US-08: structured pipeline-reconstruction proposal emitted by the AI as an
+ * ```aidlc-reconstruction``` fenced block. The web reads it via
+ * GET /api/cycles/:id/reconstruction-proposal and presents it to the human for
+ * review before applying via POST /api/cycles/:id/reconstruct.
+ *
+ * scope="cycle"  — proposes changes to this cycle's pending steps only.
+ * scope="global" — proposes a new project-level pipelineDef.
+ */
+export type ReconstructionProposal = {
+  readonly scope: "cycle" | "global";
+  readonly steps: readonly ReconstructionStep[];
+};
+
+const RECONSTRUCTION_FENCE_OPEN = "```aidlc-reconstruction";
+
+const VALID_DIFFS: ReadonlySet<string> = new Set(["keep", "add", "delete", "current"]);
+
+// ---------------------------------------------------------------------------
+// validateReconstructionStep
+// ---------------------------------------------------------------------------
+
+const validateReconstructionStep = (
+  raw: unknown,
+  index: number,
+): Result<ReconstructionStep, WireError> => {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return err({ code: "schema", detail: `steps[${index}] must be a non-null object` });
+  }
+  const s = raw as Record<string, unknown>;
+
+  if (typeof s["id"] !== "string" || s["id"].length === 0) {
+    return err({ code: "schema", detail: `steps[${index}].id must be a non-empty string` });
+  }
+  if (typeof s["label"] !== "string" || s["label"].length === 0) {
+    return err({ code: "schema", detail: `steps[${index}].label must be a non-empty string` });
+  }
+  if (typeof s["order"] !== "number" || !Number.isInteger(s["order"]) || s["order"] < 0) {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].order must be a non-negative integer`,
+    });
+  }
+  if (typeof s["skillRef"] !== "string" || s["skillRef"].length === 0) {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].skillRef must be a non-empty string`,
+    });
+  }
+  if (typeof s["instruction"] !== "string") {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].instruction must be a string`,
+    });
+  }
+  if (!VALID_DIFFS.has(s["diff"] as string)) {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].diff must be one of: ${[...VALID_DIFFS].join(", ")}. Got: ${JSON.stringify(s["diff"])}`,
+    });
+  }
+  const diff = s["diff"] as ReconstructionDiff;
+
+  // delete must carry a reason
+  if (diff === "delete") {
+    if (typeof s["reason"] !== "string" || s["reason"].trim().length === 0) {
+      return err({
+        code: "schema",
+        detail: `steps[${index}].reason is required (non-empty string) when diff="delete"`,
+      });
+    }
+  }
+  // optional reason on other diffs
+  if (s["reason"] !== undefined && typeof s["reason"] !== "string") {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].reason must be a string when present`,
+    });
+  }
+
+  return ok({
+    id: s["id"] as string,
+    label: s["label"] as string,
+    order: s["order"] as number,
+    skillRef: s["skillRef"] as string,
+    instruction: s["instruction"] as string,
+    diff,
+    ...(s["reason"] !== undefined ? { reason: s["reason"] as string } : {}),
+  });
+};
+
+// ---------------------------------------------------------------------------
+// validateReconstructionProposal
+// ---------------------------------------------------------------------------
+
+export const validateReconstructionProposal = (
+  raw: unknown,
+): Result<ReconstructionProposal, WireError> => {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return err({ code: "schema", detail: "reconstruction proposal must be a non-null object" });
+  }
+  const r = raw as Record<string, unknown>;
+
+  if (r["scope"] !== "cycle" && r["scope"] !== "global") {
+    return err({
+      code: "schema",
+      detail: `proposal.scope must be "cycle" or "global". Got: ${JSON.stringify(r["scope"])}`,
+    });
+  }
+  const scope = r["scope"] as "cycle" | "global";
+
+  if (!Array.isArray(r["steps"]) || r["steps"].length === 0) {
+    return err({ code: "schema", detail: "proposal.steps must be a non-empty array" });
+  }
+
+  const steps: ReconstructionStep[] = [];
+  for (let i = 0; i < r["steps"].length; i++) {
+    const result = validateReconstructionStep(r["steps"][i], i);
+    if (!result.ok) return result;
+    steps.push(result.value);
+  }
+
+  return ok({ scope, steps });
+};
+
+// ---------------------------------------------------------------------------
+// parseReconstructionBlock
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan for a single ```aidlc-reconstruction``` fenced block in text.
+ * - ok(null)  = no block present (normal: step did not emit a proposal)
+ * - ok(ReconstructionProposal) = block found, parsed, validated
+ * - err(WireError) = unclosed fence | bad JSON | schema violation
+ */
+export const parseReconstructionBlock = (
+  text: string,
+): Result<ReconstructionProposal | null, WireError> => {
+  const scan = scanFence(text, RECONSTRUCTION_FENCE_OPEN);
+
+  if (scan.kind === "absent") {
+    return ok(null);
+  }
+
+  if (scan.kind === "unclosed") {
+    return err({ code: "schema", detail: "unclosed aidlc-reconstruction fence" });
+  }
+
+  const content = scan.content;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return err({ code: "bad-json", detail });
+  }
+
+  return validateReconstructionProposal(parsed);
+};
+
+// ---------------------------------------------------------------------------
+// serializeReconstructionProposal
+// ---------------------------------------------------------------------------
+
+/**
+ * Produce the minified single-line ```aidlc-reconstruction``` fenced block.
+ * Used by the scripted adapter and tests for round-trip verification.
+ */
+export const serializeReconstructionProposal = (proposal: ReconstructionProposal): string =>
+  [RECONSTRUCTION_FENCE_OPEN, JSON.stringify(proposal), FENCE_CLOSE].join("\n");

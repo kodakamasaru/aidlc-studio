@@ -14,7 +14,7 @@ import {
   nonEmptyText,
 } from "../shared/primitives";
 import { type Step, sameStep } from "../shared/vocab";
-import type { StepDefSnapshot } from "../project/project";
+import type { StepDef, StepDefSnapshot } from "../project/project";
 import type { CycleId, ProjectId, PhaseId, RunId, TaskId } from "../shared/ids";
 
 // ── 状態列挙(S5 状態遷移のみ許可) ───────────────────────────────
@@ -93,7 +93,9 @@ export type CycleError =
   | "PhaseNotInReview"
   | "TaskReviewsPending"
   | "AlreadyInState"
-  | "PhasesNotAllDone";
+  | "PhasesNotAllDone"
+  /** US-08 reconstructPipeline: 新 pending steps に保持 phase の step id と重複がある。 */
+  | "DuplicateStep";
 
 const RUN_TERMINAL: ReadonlySet<RunState> = new Set(["done", "failed"]);
 const RUN_FROM_RUNNING: ReadonlySet<RunState> = new Set([
@@ -469,3 +471,74 @@ export const latestRun = (phase: Phase): Run | undefined =>
 /** 現在 running な Phase(高々 1。INV-2)。 */
 export const runningPhase = (cycle: Cycle): Phase | undefined =>
   cycle.phases.find((p) => p.state === "running");
+
+// ── US-08: reconstructPipeline ────────────────────────────────────
+
+/**
+ * 「着手済み(started)は固定、未着手(pending)だけを組み直す」操作(US-08 D-01)。
+ *
+ * 意味論:
+ * - started phase(state が pending 以外 = running/review/done)は一切変更しない。
+ * - pending phase は全て破棄し、newPendingSteps から新しい pending Phase 列を生成する。
+ *   各 Phase の order は「最後の started phase の order + 1」から連番。
+ *   stepDef snapshot は StepDef から写す(label/order/skillRef/contracts/instruction)。
+ * - newPendingSteps には 追加・削除・並べ替え・独自工程新設を表現できる(任意 id・任意順)。
+ *
+ * エラー:
+ * - newPendingSteps が空 → EmptyPipeline (全工程消し禁止)
+ * - 結果の step id に重複(started phase 分を含む全体で) → DuplicateStep
+ *
+ * INV-S2「phase 作成後不変」との関係:
+ *   INV-S2 は started(running/review/done)phase の凍結として解釈する。
+ *   pending phase の再構成は US-08 が導入する明示的例外であり、pending は
+ *   まだ実行されていないため不変原則の保護対象外と判断する(US-08 D-02)。
+ */
+export const reconstructPipeline = (
+  cycle: Cycle,
+  newPendingSteps: readonly StepDef[],
+): Result<Cycle, CycleError> => {
+  if (newPendingSteps.length === 0) return err("EmptyPipeline");
+
+  // 保持 phase: pending 以外 (running / review / done)
+  const startedPhases = cycle.phases.filter((p) => p.state !== "pending");
+
+  // 重複チェック: started の step id + newPendingSteps の id が全体で一意
+  const seenIds = new Set<string>(startedPhases.map((p) => p.step as string));
+  for (const s of newPendingSteps) {
+    const key = s.id as string;
+    if (seenIds.has(key)) return err("DuplicateStep");
+    seenIds.add(key);
+  }
+
+  // 新 pending phase の order ベース: 最後の started phase の order + 1(started が無ければ 0)
+  const baseOrder =
+    startedPhases.length === 0
+      ? 0
+      : Math.max(...startedPhases.map((p) => p.order)) + 1;
+
+  const newPendingPhases: Phase[] = newPendingSteps.map((s, i) => {
+    // StepDef → StepDefSnapshot(US-08: instruction を含む全フィールドを写す)
+    const snapshot: StepDefSnapshot = {
+      label: s.label,
+      order: baseOrder + i,
+      skillRef: s.skillRef,
+      ...(s.contracts !== undefined ? { contracts: s.contracts } : {}),
+      ...(s.instruction !== undefined ? { instruction: s.instruction } : {}),
+    };
+    return {
+      // Phase id の採番は app の責務(S6 D-04)。
+      // 再構成では stable な id を付与できないため、step id をベースにした仮 id を生成する。
+      // アプリ層が reconstructPipeline を呼ぶ前に phaseId を採番して渡す設計への拡張余地は残すが、
+      // ドメイン関数シグネチャは最小公倍数(US-08 スコープ)として step id 由来の id を使う。
+      // D-03: 既存の Phase.id はアプリ層が管理するため、新 pending は "new-<step>" と明示する。
+      id: `new-${s.id as string}` as PhaseId,
+      step: s.id,
+      order: baseOrder + i,
+      state: "pending" as PhaseState,
+      runs: [],
+      stepDef: snapshot,
+    };
+  });
+
+  return ok({ ...cycle, phases: [...startedPhases, ...newPendingPhases] });
+};

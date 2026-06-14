@@ -249,6 +249,9 @@ scripted アダプタ(決定論)と live アダプタは 2 アダプタ分離設
 - (S8 確定時に埋める)
 
 ## 前サイクルからの引き継ぎ (手戻り時のみ追記)
-- 何が漏れていたか:
-- 暫定の解決方針:
-- 棄却した案とその理由:
+
+### S9→S8 手戻り(2026-06-14 / O6 / ledger BT-04)
+- **何が漏れていたか**: `web/src/features/settings/StepConfigReadback.tsx`(Unit-06 成果物)に Rules of Hooks 違反。`useState(hearingLoading)` / `useState(hearingError)` を `if (isLoading) return` / `if (!hasData) return` の早期 return の **後** に宣言していた。loading→ready の再描画でフック数が 4→6 に変わり React #310 で **設定 readback 画面が真っ白**(US-06 AC-4 確認 / AC-5 会話で直す が通常操作で壊れる)。S8 はこの画面の E2E を持たず unit + 静的 mock 突合だけで確定したため見逃した。
+- **暫定の解決方針(実施済)**: 当該 useState 2 本を早期 return の前(`useNavigate` 直後)へ移動。web `tsc --noEmit` green。S9 で scr-04.default/pre-us を再撮影し視覚実証。
+- **再発防止**: 画面コンポーネントを追加/改修する Unit は、その画面の loading→ready 遷移を通す E2E(または render テスト)を Unit 完了条件に含める(unit + 静的 mock だけでは hooks 順序バグを検出できない)。→ 次サイクル S8 申し送り。
+- **棄却した案**: 「次サイクルへ送る」案 → S9 方針「検証は S9 で全部・S10 はダブルチェック」により本サイクル内 fix を選択。

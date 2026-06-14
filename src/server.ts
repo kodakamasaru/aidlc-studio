@@ -213,6 +213,7 @@ function buildOrchestrator(
     "gen-eval-complete",
     "gen-eval-descope",
     "config-hearing", // BU-3: exercises the config-hearing write mechanism
+    "missing-context", // S9: visual evidence for the missing-context banner in ReviewDetail
   ];
   const requested = process.env.AIDLC_SCENARIO as ScriptedScenario | undefined;
   const scenario =

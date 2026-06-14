@@ -15,6 +15,10 @@ import {
 import { StepSpecPage } from "./features/settings/StepSpecPage";
 import { ConversationThreadPage } from "./features/thread/ConversationThread";
 import { GlobalHearingPage } from "./features/settings/GlobalHearingPage";
+import {
+  CycleReconstructionPage,
+  GlobalReconstructionPage,
+} from "./features/thread/ReconstructionThread";
 
 export function App() {
   return (
@@ -33,6 +37,10 @@ export function App() {
         <Route path="settings/steps/:stepId" element={<StepSpecPage />} />
         {/* BU-3: global config-hearing placeholder (global scope has no cycle) */}
         <Route path="settings/hearing" element={<GlobalHearingPage />} />
+        {/* US-08: サイクル工程の再構成 (AI 起点) */}
+        <Route path="cycles/:cycleId/reconstruction" element={<CycleReconstructionPage />} />
+        {/* US-08: グローバル既定の再構成 (人間起点 / SCR-04 global から起動) */}
+        <Route path="settings/reconstruction" element={<GlobalReconstructionPage />} />
         <Route path="cycles/:cycleId/q/:questionId" element={<QuestionPage />} />
         <Route path="questions/:questionId" element={<QuestionPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

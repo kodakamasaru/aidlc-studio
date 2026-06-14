@@ -396,6 +396,341 @@
       </div>
     </section>
 
+    <!-- ── reconstruction: 要件確定直後に AI が工程再構成案を提示(US-08 / D-05) ── -->
+    <section data-state="reconstruction" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ 受信箱</a>
+        <span class="title">工程の再構成(このサイクル)</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill hearing"><span class="dot"></span>確認待ち</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+
+          <!-- AI バブル: 再構成案(差分リスト + ルール確認 + 選択肢) -->
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI</div>
+            <div class="box">
+              <div class="q-line" style="margin-bottom:var(--sp-4)">
+                <span class="q-tag">【工程の再構成】</span>
+                <span class="q-text">要件を踏まえ、このサイクルの工程を組み直しました。変更点を確認してください。</span>
+              </div>
+
+              <!-- 差分リスト(D-05a) -->
+              <div class="recon-list">
+
+                <div class="recon-row recon-fixed">
+                  <span class="recon-num">1.</span>
+                  <span class="recon-name">要件ヒアリング</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                  <span class="recon-note recon-locked">完了 — 固定</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">2.</span>
+                  <span class="recon-name">画面要素</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">3.</span>
+                  <span class="recon-name">UI デザイン</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row recon-deleted">
+                  <span class="recon-num">✕</span>
+                  <span class="recon-name recon-strike">技術仕様</span>
+                  <span class="recon-tag tag-del">【削除】</span>
+                  <span class="recon-note">今回は不要 — 実装先行で問題ない規模</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">4.</span>
+                  <span class="recon-name">作業分割</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">5.</span>
+                  <span class="recon-name">ドメインモデル</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">6.</span>
+                  <span class="recon-name">ドメインコード</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">7.</span>
+                  <span class="recon-name">実 PJ 統合</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row recon-added">
+                  <span class="recon-num">＋</span>
+                  <span class="recon-name">デプロイ手順</span>
+                  <span class="recon-tag tag-add">【新設】</span>
+                  <span class="recon-note">本番リリース前の手順をこのサイクルで作成</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">8.</span>
+                  <span class="recon-name">シナリオ検証</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+                <div class="recon-row">
+                  <span class="recon-num">9.</span>
+                  <span class="recon-name">最終受け入れ</span>
+                  <span class="recon-tag tag-keep">既定のまま</span>
+                </div>
+
+              </div>
+
+              <!-- ルール確認(D-05b) -->
+              <div class="disclosure" style="margin-top:var(--sp-4)">
+                <span class="chev">▸</span>
+                <span>各ルールを確認(各工程の指示全文を展開)</span>
+              </div>
+
+              <!-- 選択肢(D-05c) -->
+              <div class="q-field" style="margin-top:var(--sp-4)">
+                <div class="opt selected">
+                  <span class="radio"></span>
+                  <div class="opt-body">
+                    <div class="opt-label">◉ この構成で承認</div>
+                    <div class="opt-desc">この工程列でサイクルを開始します</div>
+                  </div>
+                </div>
+                <div class="opt">
+                  <span class="radio"></span>
+                  <div class="opt-body">
+                    <div class="opt-label">○ 直したい所を会話で</div>
+                    <div class="opt-desc">「○○を足して」「△△は要らない」など、このチャットで指示すると再提示します</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 人間バブル: 修正依頼 -->
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line">デプロイの前にレビュー工程も足して</div>
+            </div>
+          </div>
+
+          <!-- AI バブル: 更新版(v2) -->
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI&nbsp;·&nbsp;<span style="color:var(--color-running)">更新</span></div>
+            <div class="box" style="box-shadow:0 0 0 2px var(--color-running-border); border-left-color:var(--color-running)">
+              <div class="q-line" style="margin-bottom:var(--sp-3)">
+                <span class="q-tag">【更新 v2】</span>
+                <span class="q-text">「レビュー」を新設して更新しました。再度ご確認ください。</span>
+              </div>
+              <div class="recon-list">
+                <div class="recon-row recon-added">
+                  <span class="recon-num">＋</span>
+                  <span class="recon-name">レビュー</span>
+                  <span class="recon-tag tag-add">【新設】</span>
+                  <span class="recon-note">デプロイ手順の直前に追加</span>
+                </div>
+              </div>
+              <div class="q-field" style="margin-top:var(--sp-3)">
+                <div class="opt selected">
+                  <span class="radio"></span>
+                  <div class="opt-body"><div class="opt-label">◉ この構成で承認</div></div>
+                </div>
+                <div class="opt">
+                  <span class="radio"></span>
+                  <div class="opt-body"><div class="opt-label">○ 直したい所を会話で</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- フッタ: 承認 CTA(D-05c) -->
+      <div class="dock" style="display:flex; align-items:center; justify-content:flex-end; padding:var(--sp-4) var(--sp-5)">
+        <button class="btn primary">承認して進む →</button>
+      </div>
+    </section>
+
+    <!-- ── reconstruction-global: グローバル既定の編集(人間起点 / US-08 AC-7 / D-06) ── -->
+    <section data-state="reconstruction-global" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ 設定</a>
+        <span class="title">既定を編集(全サイクル共通)</span>
+        <span class="crumb">状態: 編集中</span>
+        <span class="spacer"></span>
+        <span class="pill hearing"><span class="dot"></span>編集中</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+
+          <!-- AI バブル: 現在の既定構成を参照提示(差分マーカーなし・全工程一覧)+「どこを変えますか?」-->
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI</div>
+            <div class="box">
+              <div class="q-line" style="margin-bottom:var(--sp-4)">
+                <span class="q-tag">【現在の既定構成】</span>
+                <span class="q-text">今後作成するサイクルの出発点となる工程です。どこを変えますか?</span>
+              </div>
+
+              <!-- 既定工程 全一覧(差分マーカーなし) -->
+              <div class="recon-list">
+                <div class="recon-row">
+                  <span class="recon-num">1.</span>
+                  <span class="recon-name">要件ヒアリング</span>
+                  <span class="recon-note">各サイクルの要件を AI が質問しながら整理</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">2.</span>
+                  <span class="recon-name">画面要素</span>
+                  <span class="recon-note">画面の構成要素・導線をワイヤーで整理</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">3.</span>
+                  <span class="recon-name">UI デザイン</span>
+                  <span class="recon-note">本格モックで視覚イメージを確定</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">4.</span>
+                  <span class="recon-name">作業分割</span>
+                  <span class="recon-note">並行可能な作業単位と依存関係を整理</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">5.</span>
+                  <span class="recon-name">ドメインモデル</span>
+                  <span class="recon-note">集約・境界・用語を定義</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">6.</span>
+                  <span class="recon-name">ドメインコード</span>
+                  <span class="recon-note">純粋ドメインロジックを実装・テスト</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">7.</span>
+                  <span class="recon-name">実 PJ 統合</span>
+                  <span class="recon-note">既存プロジェクトへ組み込み・結合確認</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">8.</span>
+                  <span class="recon-name">シナリオ検証</span>
+                  <span class="recon-note">シナリオテスト + 視覚証拠の確認</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">9.</span>
+                  <span class="recon-name">最終受け入れ</span>
+                  <span class="recon-note">人間による実機確認と承認</span>
+                </div>
+              </div>
+
+              <div class="disclosure" style="margin-top:var(--sp-4)">
+                <span class="chev">▸</span>
+                <span>各工程のルール(指示の全文)を確認</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 人間バブル: 変更指示 -->
+          <div class="bubble human">
+            <div class="who">あなた</div>
+            <div class="box">
+              <div class="ans-line">デプロイ工程を既定に足して</div>
+            </div>
+          </div>
+
+          <!-- AI バブル: 変更案 + 更新後の既定一覧 + 選択肢 -->
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI&nbsp;·&nbsp;<span style="color:var(--color-running)">更新</span></div>
+            <div class="box" style="box-shadow:0 0 0 2px var(--color-running-border); border-left-color:var(--color-running)">
+              <div class="q-line" style="margin-bottom:var(--sp-4)">
+                <span class="q-tag">【変更案】</span>
+                <span class="q-text">「デプロイ手順」を新設します。更新後の既定構成を確認してください。</span>
+              </div>
+
+              <!-- 更新後の既定一覧(新設工程のみ【新設】タグ付き) -->
+              <div class="recon-list">
+                <div class="recon-row">
+                  <span class="recon-num">1.</span>
+                  <span class="recon-name">要件ヒアリング</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">2.</span>
+                  <span class="recon-name">画面要素</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">3.</span>
+                  <span class="recon-name">UI デザイン</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">4.</span>
+                  <span class="recon-name">作業分割</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">5.</span>
+                  <span class="recon-name">ドメインモデル</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">6.</span>
+                  <span class="recon-name">ドメインコード</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">7.</span>
+                  <span class="recon-name">実 PJ 統合</span>
+                </div>
+                <div class="recon-row recon-added">
+                  <span class="recon-num">＋</span>
+                  <span class="recon-name">デプロイ手順</span>
+                  <span class="recon-tag tag-add">【新設】</span>
+                  <span class="recon-note">本番リリース前の手順をサイクルごとに作成。ステップの説明から指示を生成します。</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">8.</span>
+                  <span class="recon-name">シナリオ検証</span>
+                </div>
+                <div class="recon-row">
+                  <span class="recon-num">9.</span>
+                  <span class="recon-name">最終受け入れ</span>
+                </div>
+              </div>
+
+              <!-- 選択肢(保存か続行か) -->
+              <div class="q-field" style="margin-top:var(--sp-4)">
+                <div class="opt selected">
+                  <span class="radio"></span>
+                  <div class="opt-body">
+                    <div class="opt-label">◉ この既定で保存</div>
+                    <div class="opt-desc">この構成を今後のサイクルの出発点にします(作成済みサイクルは変わりません)</div>
+                  </div>
+                </div>
+                <div class="opt">
+                  <span class="radio"></span>
+                  <div class="opt-body">
+                    <div class="opt-label">○ 続けて直す</div>
+                    <div class="opt-desc">「○○も変えて」「△△は要らない」など、会話で指示すると再提示します</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- フッタ: 保存 CTA -->
+      <div class="dock" style="display:flex; align-items:center; justify-content:flex-end; padding:var(--sp-4) var(--sp-5)">
+        <button class="btn primary">既定を保存 →</button>
+      </div>
+    </section>
+
     <!-- ── empty: 着手直後、最初のバッチを待つ ───────────────── -->
     <section data-state="empty" data-screen="scr-02-conversation-thread" class="frame-narrow">
       <div class="scr-head">

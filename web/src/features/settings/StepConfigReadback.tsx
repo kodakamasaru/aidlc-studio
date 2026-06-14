@@ -96,6 +96,12 @@ export function StepConfigReadback({
     scope === "cycle" ? cycleQ.status === "success" : ctx.status === "ready";
   const hasData = scope === "cycle" ? !!cycleQ.data : !!ctx.project;
   const navigate = useNavigate();
+  // These hooks MUST precede the conditional early-returns below (isLoading /
+  // !hasData). Declaring them here keeps the hook order stable across the
+  // loading→ready re-render — otherwise React #310 ("rendered more hooks than
+  // during the previous render") blanks the page. [S9 O6 fix / backtrack S8]
+  const [hearingLoading, setHearingLoading] = useState(false);
+  const [hearingError, setHearingError] = useState<string | null>(null);
 
   const titleLabel =
     scope === "global" ? "ステップ設定 — 既定" : "ステップ設定";
@@ -162,9 +168,6 @@ export function StepConfigReadback({
   // Empty-value wording: a cycle's step is FROZEN at creation (no live inheritance),
   // so an unconfigured step reads "調整なし". Global scope edits live defaults.
   const inheritLabel = isCycle ? "調整なし(作成時の既定のまま)" : "未設定";
-
-  const [hearingLoading, setHearingLoading] = useState(false);
-  const [hearingError, setHearingError] = useState<string | null>(null);
 
   async function onTalkToFix() {
     setHearingLoading(true);
@@ -300,7 +303,7 @@ export function StepConfigReadback({
         )}
       </div>
 
-      {/* ── Footer: "会話で直す" button ── */}
+      {/* ── Footer: "会話で直す" button + US-08 "工程を組み直す" ── */}
       <div className="cfg-rb__foot">
         {hearingError ? (
           <p className="form-error" role="alert" style={{ marginBottom: "0.5rem" }}>
@@ -317,14 +320,26 @@ export function StepConfigReadback({
             会話で直す(要件決定後)→
           </button>
         ) : (
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void onTalkToFix()}
-            disabled={hearingLoading}
-          >
-            {hearingLoading ? "起動中…" : "会話で直す(再ヒアリング)→"}
-          </button>
+          <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void onTalkToFix()}
+              disabled={hearingLoading}
+            >
+              {hearingLoading ? "起動中…" : "会話で直す(再ヒアリング)→"}
+            </button>
+            {/* US-08: global only — reconstruct pipeline defaults via conversation */}
+            {!isCycle ? (
+              <button
+                type="button"
+                className="btn btn--surface"
+                onClick={() => navigate("/settings/reconstruction")}
+              >
+                工程を組み直す →
+              </button>
+            ) : null}
+          </div>
         )}
       </div>
     </div>

@@ -5,6 +5,25 @@
 import { logError } from "./log";
 
 // ── Wire types (mirror src/domain JSON shapes) ───────────────
+
+// US-08: ReconstructionProposal (mirrors src/wire/aidlc-wire.ts shapes)
+export type ReconstructionDiff = "keep" | "add" | "delete" | "current";
+
+export interface ReconstructionStep {
+  readonly id: string;
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  readonly instruction: string;
+  readonly diff: ReconstructionDiff;
+  readonly reason?: string;
+}
+
+export interface ReconstructionProposal {
+  readonly scope: "cycle" | "global";
+  readonly steps: readonly ReconstructionStep[];
+}
+
 export type RunState = "running" | "stalled" | "done" | "failed";
 export type PhaseState = "pending" | "running" | "review" | "done";
 export type CycleState = "planned" | "active" | "paused" | "done";
@@ -372,6 +391,20 @@ export const api = {
   // projectId is required for scope="global" (scopes the system cycle).
   launchHearing: (scope: string, projectId?: string): Promise<HearingLaunchResult> =>
     request("/hearing/launch", jsonBody({ scope, ...(projectId ? { projectId } : {}) })),
+
+  // US-08: サイクル向け再構成提案を取得。S1 確定後に自動保存される。未生成なら ApiError(404).
+  getReconstructionProposal: (cycleId: string): Promise<ReconstructionProposal> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruction-proposal`),
+
+  // US-08: 承認された工程列でサイクルの pending ステップを置換。
+  // diff!=="delete" の ReconstructionStep を StepDef 形式({id,label,order,skillRef,instruction})
+  // に写して送る。
+  applyCycleReconstruction: (cycleId: string, steps: readonly ReconstructionStep[]): Promise<Cycle> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruct`, jsonBody({ steps })),
+
+  // US-08 AC-7: グローバル既定パイプラインを全置換。
+  replaceProjectPipeline: (projectId: string, steps: readonly ReconstructionStep[]): Promise<Project> =>
+    request(`/projects/${encodeURIComponent(projectId)}/pipeline`, jsonBody({ steps })),
 
   // US-06 対話式編集: 要望から契約の提案を取得(適用はしない / 承認時に updateStepContracts)。
   proposeStepContracts: (

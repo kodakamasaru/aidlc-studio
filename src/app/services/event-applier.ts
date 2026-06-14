@@ -192,6 +192,12 @@ export class EventApplier {
         });
         return;
       }
+      case "ReconstructionProposalEmitted": {
+        // US-08: persist the proposal keyed by cycleId. One slot per cycle;
+        // latest write wins (re-emission on retry overwrites cleanly).
+        repos.reconstructionProposals.save(ctx.cycleId, event.proposal);
+        return;
+      }
     }
   }
 }

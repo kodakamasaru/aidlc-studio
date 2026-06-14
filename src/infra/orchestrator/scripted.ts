@@ -25,6 +25,7 @@ import type { Requirement } from "../../domain/review/brief";
 import { buildRunContext, type LaunchLike } from "./shared";
 import { aidlcResultToEvents } from "./live";
 import type { AidlcResult } from "../../wire/aidlc-result";
+import type { ReconstructionProposal } from "../../wire/aidlc-wire";
 
 export type ScriptedScenario =
   | "happy"
@@ -54,7 +55,19 @@ export type ScriptedScenario =
   // questions, each carrying a target:{step, field, scope}. Answering them writes
   // deterministically to StepContracts. After all questions are answered (via the
   // batch resume gate), the run concludes with a ResultEmitted.
-  | "config-hearing";
+  | "config-hearing"
+  // S9 visual evidence: missing-context scenario. Same ask→resume flow as "happy"
+  // but the ResultEmitted includes a summary block whose body starts with the
+  // MISSING_CTX_BODY_PREFIX sentinel ("⚠ missing-context ...") so that
+  // ReviewDetail.normaliseMissingContext converts it to a missing-context banner.
+  | "missing-context"
+  // US-08: pipeline reconstruction proposal scenarios.
+  // "reconstruction" — cycle-scoped proposal: S4 deleted + CUSTOM-QA added + S1/S2/S3 kept.
+  //   Emits ReconstructionProposalEmitted then concludes with ResultEmitted.
+  // "reconstruction-global" — global-scoped proposal: all steps tagged "current".
+  //   Emits ReconstructionProposalEmitted (scope:"global") then concludes with ResultEmitted.
+  | "reconstruction"
+  | "reconstruction-global";
 
 type RunPhase = "asked" | "reviewed" | "stalled" | "done";
 
@@ -97,6 +110,36 @@ const SCRIPTED_BLOCKS = [
  */
 export const CONFIG_HEARING_Q1_ID = "config-q1-profileKind";
 export const CONFIG_HEARING_Q2_ID = "config-q2-humanGateMode";
+
+/**
+ * US-08: deterministic reconstruction proposals for the "reconstruction" and
+ * "reconstruction-global" scenarios. Exported so integration tests can assert
+ * the exact proposal shape without re-creating it in the test file.
+ *
+ * "reconstruction" (cycle-scoped):
+ *   S1/S2/S3 kept, S4 deleted (今サイクル技術仕様不要), CUSTOM-QA added.
+ * "reconstruction-global" (global-scoped):
+ *   S1/S2/S3/S4 all tagged "current" (replace project default pipeline wholesale).
+ */
+export const SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE: ReconstructionProposal = {
+  scope: "cycle",
+  steps: [
+    { id: "S1", label: "要件ヒアリング", order: 0, skillRef: "kit/skills/aidlc-s1-requirements", instruction: "S1: 要件を構造化 US に展開する。", diff: "keep" },
+    { id: "S2", label: "画面要素", order: 1, skillRef: "kit/skills/aidlc-s2-wireframe", instruction: "S2: ワイヤーフレームを生成する。", diff: "keep" },
+    { id: "S3", label: "UIデザイン", order: 2, skillRef: "kit/skills/aidlc-s3-ui-design", instruction: "S3: 本格 UI デザインを生成する。", diff: "keep" },
+    { id: "S4", label: "技術仕様", order: 3, skillRef: "kit/skills/aidlc-s4-tech-spec", instruction: "", diff: "delete", reason: "今サイクルは技術仕様工程が不要なため削除する。" },
+    { id: "CUSTOM-QA", label: "独自QA工程", order: 4, skillRef: "kit/skills/aidlc-s1-requirements", instruction: "CUSTOM-QA: プロジェクト固有の品質検証チェックリストを実施する。", diff: "add" },
+  ],
+};
+
+export const SCRIPTED_RECONSTRUCTION_PROPOSAL_GLOBAL: ReconstructionProposal = {
+  scope: "global",
+  steps: [
+    { id: "S1", label: "要件ヒアリング", order: 0, skillRef: "kit/skills/aidlc-s1-requirements", instruction: "S1 グローバルルール更新版。", diff: "current" },
+    { id: "S2", label: "画面要素", order: 1, skillRef: "kit/skills/aidlc-s2-wireframe", instruction: "S2 グローバルルール更新版。", diff: "current" },
+    { id: "S3", label: "UIデザイン", order: 2, skillRef: "kit/skills/aidlc-s3-ui-design", instruction: "S3 グローバルルール更新版。", diff: "current" },
+  ],
+};
 
 /**
  * BU-2: build the deterministic AidlcResult for each aidlc-result-* scenario.
@@ -160,6 +203,34 @@ export class ScriptedOrchestrator implements OrchestratorPort {
 
   async launch(cmd: RunLaunch): Promise<void> {
     const ctx = this.ctxFor(cmd, cmd.runId);
+    // US-08: a hearingScope of "reconstruction" signals a reconstruction-proposal
+    // launch (fired by EngineService.onRolelessResult after S1 done). Route to
+    // the cycle-scoped reconstruction scenario regardless of the configured scenario
+    // so existing test harnesses (e.g. "happy") don't emit unexpected questions.
+    // "reconstruction-global" scenario is only reachable via direct scenario config.
+    //
+    // Emits RunStateChanged("done") — NOT ResultEmitted — to avoid triggering
+    // another onRolelessResult in EngineService (infinite loop guard).
+    if (cmd.hearingScope === "reconstruction") {
+      const proposal =
+        this.scenario === "reconstruction-global"
+          ? SCRIPTED_RECONSTRUCTION_PROPOSAL_GLOBAL
+          : SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE;
+      await this.emit(ctx, {
+        type: "ReconstructionProposalEmitted",
+        runId: cmd.runId,
+        proposal,
+      });
+      // Use RunStateChanged(done) not ResultEmitted — prevents re-triggering
+      // onRolelessResult in EngineService (no visual_review card for the proposal run).
+      await this.emit(ctx, {
+        type: "RunStateChanged",
+        runId: cmd.runId,
+        to: "done",
+      });
+      this.states.set(cmd.runId, "done");
+      return;
+    }
     if (this.scenario === "stall-first") {
       await this.emit(ctx, {
         type: "RunStateChanged",
@@ -212,6 +283,36 @@ export class ScriptedOrchestrator implements OrchestratorPort {
         },
       });
       this.states.set(cmd.runId, "asked");
+      return;
+    }
+    // US-08: reconstruction proposal scenarios.
+    // Emit ReconstructionProposalEmitted (cycle or global scope) then conclude
+    // with a ResultEmitted so the run moves to "reviewed" (human can approve it).
+    if (this.scenario === "reconstruction" || this.scenario === "reconstruction-global") {
+      const proposal =
+        this.scenario === "reconstruction"
+          ? SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE
+          : SCRIPTED_RECONSTRUCTION_PROPOSAL_GLOBAL;
+      await this.emit(ctx, {
+        type: "ReconstructionProposalEmitted",
+        runId: cmd.runId,
+        proposal,
+      });
+      await this.emit(ctx, {
+        type: "ResultEmitted",
+        runId: cmd.runId,
+        blocks: [
+          {
+            type: "summary",
+            title: "パイプライン再構成提案",
+            body:
+              this.scenario === "reconstruction"
+                ? "サイクル向け再構成提案: S4 削除 + CUSTOM-QA 追加。aidlc-reconstruction ブロックを確認してください。"
+                : "グローバルパイプライン再構成提案: 全工程ルール更新版。aidlc-reconstruction ブロックを確認してください。",
+          },
+        ],
+      });
+      this.states.set(cmd.runId, "reviewed");
       return;
     }
     // BU-2: aidlc-result envelope scenarios — build the AidlcResult and emit via
@@ -350,6 +451,25 @@ export class ScriptedOrchestrator implements OrchestratorPort {
           },
         });
         // Run stays "asked" — still awaiting the next answer.
+        return;
+      }
+
+      // missing-context scenario: emit ResultEmitted with a sentinel body so
+      // ReviewDetail.normaliseMissingContext converts it to a warning banner.
+      if (this.scenario === "missing-context") {
+        await this.emit(entry, {
+          type: "ResultEmitted",
+          runId: cmd.runId,
+          blocks: [
+            {
+              type: "summary",
+              title: "前サイクル参照失敗",
+              body: "⚠ missing-context: 前サイクルの成果物が見つかりませんでした。",
+            },
+          ],
+          completeness: { requirements: SCRIPTED_REQUIREMENTS, addressed: [] },
+        });
+        this.states.set(cmd.runId, "reviewed");
         return;
       }
 

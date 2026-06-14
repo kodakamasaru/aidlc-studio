@@ -93,6 +93,30 @@ describe("readPipeline / customizePipeline (US-27)", () => {
   });
 });
 
+describe("StepDef / StepDefSnapshot instruction field (US-08)", () => {
+  test("StepDef with instruction is accepted by customizePipeline and survives in pipelineDef", () => {
+    const p = unwrap(open());
+    const withInstruction: StepDef = {
+      ...step("X1", 0),
+      instruction: "## カスタム工程\nここにルール本文 md を書く",
+    };
+    const custom = unwrap(customizePipeline(p, [withInstruction]));
+    expect(custom.pipelineDef[0]!.instruction).toBe("## カスタム工程\nここにルール本文 md を書く");
+  });
+
+  test("StepDef without instruction keeps existing behavior (backward compatible)", () => {
+    const p = unwrap(open());
+    expect(p.pipelineDef.every((s) => s.instruction === undefined)).toBe(true);
+  });
+
+  test("customizePipeline does NOT require instruction (optional / backward compatible)", () => {
+    const p = unwrap(open());
+    // step() helper does not set instruction — should still pass validation
+    const r = customizePipeline(p, [step("A", 0)]);
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("setVision", () => {
   test("updates the vision ref immutably", () => {
     const p0: Project = unwrap(open());

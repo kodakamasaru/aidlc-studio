@@ -806,6 +806,35 @@ section.frame-narrow { width: 760px; }
 .skel.line.med { width: 70%; }
 .skel.card { height: 66px; margin-bottom: var(--sp-3); }
 
+/* ── 工程再構成 差分リスト(US-08 / D-05a) ──────────────── */
+.recon-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--color-line); border-radius: var(--radius-md); overflow: hidden; }
+.recon-row {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-body);
+}
+.recon-row:first-child { border-top: none; }
+.recon-num { flex: none; width: 1.6em; font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-text-low); text-align: right; }
+.recon-name { flex: 1; min-width: 0; color: var(--color-text-hi); }
+.recon-tag {
+  flex: none;
+  font-size: var(--text-micro); font-weight: 700;
+  padding: 1px var(--sp-2); border-radius: var(--radius-full);
+}
+.tag-keep { color: var(--color-text-low); background: var(--color-idle-soft); border: 1px solid var(--color-idle-border); }
+.tag-del  { color: var(--color-failed); background: var(--color-failed-soft); border: 1px solid var(--color-failed-border); }
+.tag-add  { color: var(--color-done);   background: var(--color-done-soft);   border: 1px solid var(--color-done-border); }
+.recon-note { font-size: var(--text-caption); color: var(--color-text-low); }
+/* 着手済み固定行 */
+.recon-fixed { background: var(--color-surface-2); }
+.recon-locked { color: var(--color-text-low); font-style: italic; }
+/* 削除行 */
+.recon-deleted { background: var(--color-failed-soft); }
+.recon-strike { text-decoration: line-through; color: var(--color-text-low); }
+/* 新設行 */
+.recon-added { background: var(--color-done-soft); }
+
 /* ── tokens.html カタログ専用 ────────────────────────────── */
 .cat { width: 100%; max-width: var(--content-max); border: none; background: none; box-shadow: none; }
 .cat h1 { font-size: var(--text-display); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 var(--sp-2); }

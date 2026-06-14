@@ -37,6 +37,11 @@ export type EnvConfig = {
  * 1 工程の定義(意味・並び・対応スキル)。per-PJ 可変(US-27)。
  * contracts / execMode は v0.0.2 追加の optional VO(S6 step-contracts)。
  * 欠落 = 従来動作(後方互換)。`validatePipeline` の検証対象には含めない。
+ *
+ * US-08: `instruction` は各工程のルール本文 md(加法 optional)。
+ * 存在時はこの工程のルールとして扱う想定だが、skillRef vs instruction の優先解決は
+ * app の責務(ドメインは保持のみ)。検証は要求しない(任意)。
+ * D-01: skillRef は optional にしない(独自工程は呼び出し側が汎用 skillRef + instruction を詰める前提)。
  */
 export type StepDef = {
   readonly id: Step;
@@ -45,6 +50,8 @@ export type StepDef = {
   readonly skillRef: SkillRef;
   readonly contracts?: StepContracts;
   readonly execMode?: ExecMode;
+  /** US-08: 工程ルール本文 md。存在時はこれが工程のルール(解決は app の責務)。加法 optional。 */
+  readonly instruction?: Text;
 };
 
 /**
@@ -54,12 +61,15 @@ export type StepDef = {
  * (平易ラベルの正本 = domain `CANONICAL_STEPS`(US-02)、snapshot はその作成時点の写し。
  *  役割が違うので二重定義ではない / S6 Q-01)。
  * 解決(正本 + per-cycle 上書き)は app、ドメインは受領した snapshot を写すだけ(S6 D-02)。
+ * US-08: `instruction` を加法 optional で追加。`reconstructPipeline` が StepDef から写す。
  */
 export type StepDefSnapshot = {
   readonly label: Text;
   readonly order: number;
   readonly skillRef: SkillRef;
   readonly contracts?: StepContracts;
+  /** US-08: 工程ルール本文 md のスナップショット(解決は app の責務)。加法 optional。 */
+  readonly instruction?: Text;
 };
 
 export type Project = {

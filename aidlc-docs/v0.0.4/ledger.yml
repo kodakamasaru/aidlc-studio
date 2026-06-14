@@ -54,3 +54,91 @@
     2026-06-14 / kit/rules/aidlc-operating-model.md「再発防止ゲート(BT-03 恒久ルール)」に Rule A/B を
     DRY 定義 + kit/skills/aidlc-s4-tech-spec/SKILL.md 完了条件(7) + kit/skills/aidlc-s8-integration/SKILL.md
     完了条件(6)・進め方・US-AC 機能フロー突合表 を追記(各 skill は参照のみ)。
+
+# ── S9(Validation)の手戻り / 確定項目 ──
+
+- id: BT-04-stepconfig-hooks-react310
+  origin: v0.0.4/s9-validation.md   # S9 実ブラウザ E2E(2026-06-14)で捕捉
+  decision: >
+    O6(HIGH 実バグ): web/src/features/settings/StepConfigReadback.tsx の Rules of Hooks 違反。
+    useState(hearingLoading)/useState(hearingError) を if(isLoading)return / if(!hasData)return の
+    早期 return の後に宣言 → loading→ready 再描画でフック数 4→6 → React #310 で設定 readback 画面が
+    真っ白(US-06 AC-4 確認 / AC-5 会話で直す が通常操作で壊れる)。S8 はこの画面の E2E を持たず
+    unit + 静的 mock 突合だけで確定したため見逃した。S9 の実ブラウザ E2E が初検出。
+  state: done
+  closed_in: >
+    2026-06-14 / 当該 useState 2 本を early-return の前(useNavigate 直後)へ移動。web tsc green /
+    playwright 33 green。scr-04.default/pre-us を実 backend で再撮影し US-06 AC-4 視覚実証。
+    再発防止: 画面コンポーネント追加/改修 Unit は loading→ready 遷移を通す E2E/render テストを
+    Unit 完了条件に含める(s8-integration.md 申し送り / 次サイクル S8 へ)。
+
+- id: O5-variable-pipeline-no-server-path
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    US-07「可変ステップ構成でも進捗が破綻しない」を決定論(実 backend)で実証する経路が無い。
+    可変工程の「出どころ」(=どうやってサイクルの工程が可変になるか)が US 化されていなかった
+    (US-07 Q-02 未解決)。S9 はフロント可変描画を page.route() モックで視覚実証(scr-05.variable)したが、
+    実 backend では可変サイクルを作れない=US-07 が要求する能力が未実装。
+  state: done
+  closed_in: >
+    2026-06-14 本サイクル内で解決(v0.0.5 への descope を撤回)。US-08 を S1 に手戻りして US 化 →
+    S2/S3 mock(SCR-02 reconstruction/reconstruction-global 確定)→ U08-1 domain(reconstructPipeline +
+    inline instruction)→ U08-2 app(applyCycleReconstruction / replaceProjectPipeline)→ U08-3 wire/orchestrator
+    (ReconstructionProposal + scripted 提案 + S1完了→自動起動)→ U08-4 HTTP(POST /reconstruct, /pipeline)→
+    U08-5 web(再構成スレッド 2モード)。**scr-05.variable を mock 注入から実 backend(POST /reconstruct で
+    S4省略+独自工程新設)に置換し実機実証**。決定論 580 + e2e 35 + live 8 green / web build clean。
+    descope 撤回の経緯(責務契約④違反の是正)は S11 process-problem として記録(P2)。
+
+- id: BT-05-s9-to-s1-step-reconstruction
+  origin: v0.0.4/s9-validation.md   # S9 が US-07 の未実装能力を捕捉 → S1 手戻り
+  decision: >
+    US-07(可変工程の表示)・US-06(工程設定)を実装したが、可変工程構成の「出どころ=工程再構成機構」を
+    US 化しておらず実装も無かった。S9 でこの完全性ギャップ(O5)を捕捉。S1 へ手戻りし US-08 を新設。
+  state: done
+  closed_in: >
+    2026-06-14 US-08 を新設し本サイクル内で S2/S3→U08-1〜5→S9 再実証までカスケード完了(O5 と同時消し込み)。
+    再発防止: US-07 のような「前提能力を別 US が要求するのに機構 US が無い」漏れは、S1 完了ゲートで US 間の
+    前提依存(ある US が別 US の能力を前提にしていないか)を突合する(次サイクル S1 申し送り / S11 P6・T4 と連動)。
+
+- id: O3-live-resume-continuation-unproven
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    US-04 resume 継続が live 未実証。isolated テストセッションが turn 間で揮発し --resume が
+    No conversation found で失敗 → RunStateChanged(failed) として honest 表面化(黙らない)。
+    turn パリティは決定論層(unit-04.test)で担保済。
+  state: carried
+  into: v0.0.5
+  reason: >
+    本番の長 session(S1 等の実 run)での --resume 継続を実機実証するには、揮発しない実 session を
+    用いた live E2E が必要。次サイクルで実施。
+
+- id: S9-housekeeping-O4-O7
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    非 blocking housekeeping: O4(scripted レビュー summary の英語 placeholder)/ O7(src/server.ts の
+    allowed 配列に "multi-turn" 不在で multi-turn シナリオが happy にフォールバック)/ O1 任意改善
+    (scripted config-hearing の質問文を読みやすく)/ dead code StepConfigPage.tsx 削除(S8 継続)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    いずれも実害なし(機能・検証は別経路で担保)。次サイクル housekeeping でまとめて処理。
+
+# 注: O1(ヒアリング質問文)= live 確認で良性確定(内部語は scripted fixture のみ / 実 claude は S1 skill
+#     経由で自然なプロダクト語)。O2(step-spec フィールド)= 設計どおり(DEFAULT_STEP_CONTRACTS={} / hearing 後に
+#     全項目表示)。いずれもバグでないため carried 対象外(s9-validation.md 観測表に記録)。
+
+- id: S11-process-problems-pointer
+  origin: v0.0.4/s9-validation.md   # S9 進行中(2026-06-14)にユーザー指摘 + AI 自己分析
+  decision: >
+    AI 開発部の進め方に重大なプロセス問題が判明(P1〜P9)。根本原因 = 着手時に最上位の正本
+    responsibility-contract(US+mock 最上位 / human=ダブルチェック / human-gate のみ停止)と S1–S3 の
+    US/mock 意図を読まず、「テストが緑・完成して見える」を「事業部の正解に一致」より優先した。
+    具体 = ①human=ダブルチェックの未認識 ②US/mock を勝手に descope ③S1–S3 の想定未把握
+    ④正本未読 ⑤mock 注入で未実装能力を糊塗 ⑥産物起点で網羅漏れ ⑦worker の緑を未検証で外注
+    ⑧機能実証を主成果にし mock 突合を後回し ⑨手戻り判定の不一致。
+  state: carried
+  into: v0.0.4/s11-retrospective.md   # 本サイクルの S11 で必ず Problem/Try として根本原因分析する
+  reason: >
+    詳細・Problem 表・Try(再発防止 T1〜T5)は aidlc-docs/v0.0.4/s11-retrospective.md の
+    「先取りプロセス問題メモ」に記録済。S11 はこのファイルを最優先で取り込み分析すること。
+    メモリ機構は信用しない方針のため、決定論的に必ず読まれる場所(S11 出力ファイル + 本台帳)に二重化。

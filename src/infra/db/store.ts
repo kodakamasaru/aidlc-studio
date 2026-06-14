@@ -16,6 +16,7 @@ import { SqliteReviewRepo } from "./review-repo";
 import { SqliteArtifactRepo } from "./artifact-repo";
 import { SqliteWikiRepo } from "./wiki-repo";
 import { SqliteSessionRepo } from "./session-repo";
+import { SqliteReconstructionProposalRepo } from "./reconstruction-proposal-repo";
 
 export interface Store {
   readonly repos: Repos;
@@ -34,6 +35,7 @@ export function buildStore(db: Database): Store {
     artifacts: new SqliteArtifactRepo(db),
     wiki: new SqliteWikiRepo(db),
     sessions: new SqliteSessionRepo(db),
+    reconstructionProposals: new SqliteReconstructionProposalRepo(db),
   };
   return { repos, uow: new SqliteUnitOfWork(db) };
 }

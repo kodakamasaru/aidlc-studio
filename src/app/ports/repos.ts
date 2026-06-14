@@ -102,3 +102,16 @@ export interface SessionRepo {
   /** Returns null when no session has been captured for this run yet. */
   find(runId: RunId): string | null;
 }
+
+/**
+ * US-08: stores ReconstructionProposal keyed by cycleId.
+ * The scripted/live orchestrator adapter parses an aidlc-reconstruction block
+ * and calls save(). The web fetches it via GET /api/cycles/:id/reconstruction-proposal.
+ * One proposal slot per cycle (latest write wins — scripted/live may re-emit on retry).
+ */
+export interface ReconstructionProposalRepo {
+  /** Upsert by cycleId (one slot per cycle, latest write wins). */
+  save(cycleId: CycleId, proposal: object): void;
+  /** Returns undefined when no proposal has been stored for this cycle yet. */
+  find(cycleId: CycleId): object | undefined;
+}

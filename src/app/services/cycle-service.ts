@@ -12,12 +12,13 @@ import {
   startPhase as domainStartPhase,
   relaunchPhase as domainRelaunchPhase,
   retryRun as domainRetryRun,
+  reconstructPipeline as domainReconstructPipeline,
   version as parseVersion,
   type Cycle,
   type CycleError,
 } from "../../domain/cycle/cycle";
 import { assignToCycle } from "../../domain/task/task";
-import { readPipeline, type Project } from "../../domain/project/project";
+import { readPipeline, type Project, type StepDef } from "../../domain/project/project";
 import { resolveContracts } from "../../domain/project/step-contracts";
 import type { RunRole } from "../../domain/cycle/cycle";
 import { Step, sameStep } from "../../domain/shared/vocab";
@@ -508,6 +509,56 @@ export class CycleService {
     const run = started?.runs.slice().sort((a, b) => b.attempt - a.attempt)[0];
     if (!run) throw fail(500, "HearingRunNotFound");
     return { cycleId: cycleIdRaw, runId: run.id, step: pendingPhase.step as string };
+  }
+
+  /**
+   * US-08: サイクルの未着手 pending 工程列を newPendingSteps で全置換する(着手済は凍結)。
+   *
+   * 処理フロー:
+   * 1. cycle を repo から load し `reconstructPipeline` を呼ぶ(ドメイン純粋関数)。
+   * 2. ドメインが返した Cycle の pending Phase は id が "new-<stepId>" の仮 id 。
+   *    app 層が `ports.ids.phaseId()` (UUID) で実 id に採番し直す(S6 D-04 遵守)。
+   * 3. 採番済み Cycle を保存して返す。
+   *
+   * エラーマッピング:
+   *   EmptyPipeline → 400  (全工程消し禁止)
+   *   DuplicateStep → 409  (着手済み step id と新 step id が重複)
+   */
+  applyCycleReconstruction(
+    cycleIdRaw: string,
+    newPendingSteps: readonly StepDef[],
+  ): Cycle {
+    const cycleId = CycleId(cycleIdRaw);
+    const cycle = this.loadCycle(cycleId);
+
+    // ドメイン関数で pending 置換 — 仮 "new-<stepId>" id の Cycle が返る
+    const reconstructed = domainReconstructPipeline(cycle, newPendingSteps);
+    if (isErr(reconstructed)) throw cycleErrorStatus(reconstructed.error);
+
+    // 仮 id を実 PhaseId(UUID)に採番し直す。
+    // createCycle で pipeline.map(sd => ({ phaseId: ports.ids.phaseId(), ... })) しているのと同一方式。
+    const next: Cycle = {
+      ...reconstructed.value,
+      phases: reconstructed.value.phases.map((p) =>
+        (p.id as string).startsWith("new-")
+          ? { ...p, id: this.ports.ids.phaseId() }
+          : p,
+      ),
+    };
+
+    this.ports.uow.run(() => this.ports.repos.cycles.save(next));
+    return next;
+  }
+
+  /**
+   * US-08: S1 確定後に scripted/live オーケストレータが emit した
+   * ReconstructionProposal を取得する。
+   * 提案が存在しない場合は undefined を返す(HTTP 層が 404 に変換)。
+   */
+  getReconstructionProposal(cycleIdRaw: string): object | undefined {
+    // Verify the cycle exists — throws 404 if not.
+    this.loadCycle(CycleId(cycleIdRaw));
+    return this.ports.repos.reconstructionProposals.find(CycleId(cycleIdRaw));
   }
 
   async retryRun(cycleIdRaw: string, runIdRaw: string): Promise<Cycle> {

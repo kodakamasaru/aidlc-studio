@@ -21,10 +21,10 @@
 
 ## 画面一覧
 - [SCR-01 対応待ち一覧(Inbox)](./scr-01-inbox.md) — US-03
-- [SCR-02 会話スレッド(統合対話ビュー)](./scr-02-conversation-thread.md) — US-03 / US-04 / US-05 / US-06 ★核
+- [SCR-02 会話スレッド(統合対話ビュー)](./scr-02-conversation-thread.md) — US-03 / US-04 / US-05 / US-06 / **US-08(工程の再構成モード / 2026-06-14 S9 手戻りで追加)** ★核
 - [SCR-03 成果物レビュー詳細](./scr-03-review-detail.md) — US-02(+ US-04 完了の着地点 / US-01 の可視マーカー footprint)
-- [SCR-04 ステップ設定の確認・修正](./scr-04-step-config-readback.md) — US-06
-- [SCR-05 サイクル進捗(工程グループ束ね)](./scr-05-cycle-progress.md) — US-07(2026-06-13 S3 レビューで追加)
+- [SCR-04 ステップ設定の確認・修正](./scr-04-step-config-readback.md) — US-06(+ **US-08: 再構成後の実工程・ルールを確認する着地点**)
+- [SCR-05 サイクル進捗(工程グループ束ね)](./scr-05-cycle-progress.md) — US-07(2026-06-13 S3 レビューで追加)(+ **US-08: 再構成で可変になった実工程を描く**)
 - SCR-06 ステップの指示・全文(原文)— US-06 品質基準②(SCR-04 のステップ名からドリルイン / 既存 StepSpecPage の昇格)。2026-06-13 S3 レビューで導線追加
 
 **画面を持たない US**: **US-01(前段成果物注入)= 画面なし**。engine/app 側の prompt 合成ロジックで、UI 上の footprint は「合成 prompt 内の可視マーカー(※ 前段文脈が見つかりません)」のみ。run ログ画面は v0.0.4 scope 外のため、マーカーは SCR-03 のレビュー文脈(前段が反映されているか)として間接的に現れる。→ フロー図に注記。
