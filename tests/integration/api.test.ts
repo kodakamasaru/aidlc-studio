@@ -14,6 +14,7 @@ import type { QuestionPayload } from "../../src/domain/question/question";
 import { buildReview } from "../../src/domain/review/review";
 import {
   advanceRun,
+  backtrackTo as domainBacktrackTo,
   createCycle as domainCreateCycle,
   startPhase as domainStartPhase,
   version,
@@ -439,31 +440,31 @@ describe("startPhase", () => {
 
 describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
   test("success → fresh run launched on the rewound phase", async () => {
+    // Seed the rewound cycle state DIRECTLY via domain functions + repo save,
+    // bypassing the inbox answer flow. This is necessary because inbox.answerQuestion
+    // now auto-relaunches after backtrack (US-13 UX), so a cycle seeded through
+    // the answer flow already has a running run — calling /relaunch again would
+    // hit PhaseAlreadyRunning (409). We isolate the manual /relaunch endpoint test
+    // by seeding the post-backtrack state without triggering auto-relaunch.
     const h = buildTestApp();
-    const projectId = await createProject(h);
+    const repoPath = makeRepoDir();
+    const projectId = await createProject(h, repoPath);
+
+    // Create and start the cycle via API so the cycle is in DB and the project exists.
     const { cycle, runId } = await cycleWithRunningRun(h, projectId);
     const firstStep = cycle.phases[0]!.step as string;
-    const review = buildReview({
-      runId: RunId(runId),
-      cycleId: CycleId(cycle.id),
+
+    // Advance the run to "done" (simulate the AI completing its output), then
+    // backtrack the phase to "running" with no live run — exactly the state that
+    // relaunchPhase requires (PhaseNotRewound if phase is pending; PhaseAlreadyRunning
+    // if a run is still running).
+    const liveDb = h.ports.repos.cycles.findById(CycleId(cycle.id))!;
+    const done = unwrap(advanceRun(liveDb, { runId: RunId(runId), to: "done", at: T0 }));
+    const rewound = unwrap(domainBacktrackTo(done, {
       step: Step(firstStep),
-      taskId: TaskId("task-1"),
-      blocks: [{ type: "summary", title: "x", body: "y" }],
-      producedAt: T0,
-    });
-    const qid = seedQuestion(
-      h,
-      cycle,
-      runId,
-      { kind: "visual_review", review },
-      "task-1",
-    );
-    // Reject → backtrack to the SAME phase: it becomes rewound (running, run done).
-    await post(h.app, `/api/questions/${qid}/answer`, {
-      verdict: "reject",
-      backtrackTo: firstStep,
-      reason: "redo it",
-    });
+      reason: "test-seed: manual backtrack",
+    }));
+    h.ports.repos.cycles.save(rewound);
 
     const { status, json } = await post(
       h.app,
@@ -480,6 +481,7 @@ describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
     const last = launches[launches.length - 1]!.args;
     expect(last.runId).toBe(newRun.id);
     expect(last.step as string).toBe(firstStep);
+    expect(last.repoPath).toBe(repoPath);
   });
 
   test("relaunch on a pending (non-rewound) phase → 409 PhaseNotRewound", async () => {

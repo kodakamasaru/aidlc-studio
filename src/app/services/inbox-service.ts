@@ -6,6 +6,7 @@ import type { Ports } from "../ports/composition";
 import { fail, isServiceError, messageOf, type ServiceError } from "./errors";
 import { compensateRun } from "./compensate";
 import { locatePhaseOfRun } from "./cycle-helpers";
+import { CycleService } from "./cycle-service";
 import { applyHearingAnswerToContracts } from "./hearing-service";
 import { parseAnswersBlock, validateReconstructionProposal } from "../../wire/aidlc-wire";
 import type { StepDef, SkillRef } from "../../domain/project/project";
@@ -111,9 +112,10 @@ export class InboxService {
     if (isErr(outcome)) throw questionErrorStatus(outcome.error);
     const command = outcome.value.command;
 
-    // backtrack is a pure cycle rollback (no orchestrator side-effect), so it
-    // joins question+fact in the SAME transaction — never a partial commit where
-    // the question is answered but the cycle is not yet rolled back.
+    // backtrack: rollback the cycle in the SAME transaction as question+fact so
+    // the DB is never in a partial state (question answered but cycle not yet
+    // rewound). The orchestrator auto-relaunch fires AFTER this commit (post-commit
+    // side-effect), mirroring the startPhase/relaunchPhase pattern (S7 D-04).
     const backtrackedCycle =
       command.type === "backtrack"
         ? this.computeBacktrack(question, command.toStep, command.reason)
@@ -153,9 +155,15 @@ export class InboxService {
       }
     }
 
-    // AFTER commit: dispatch ONLY the orchestrator side-effects. backtrack is
-    // fully persisted above and needs no post-commit call.
-    if (command.type !== "backtrack") {
+    // AFTER commit: dispatch orchestrator side-effects.
+    // backtrack: the cycle rollback is now persisted — auto-relaunch the rewound
+    // phase so the human never needs to press "relaunch" manually (US-13 UX).
+    // If the orchestrator launch fails, compensate the new run to "stalled" (still
+    // retriable via the manual relaunch button) and swallow the error — the
+    // backtrack itself succeeded and returning 502 would be misleading.
+    if (command.type === "backtrack") {
+      await this.autoRelaunchAfterBacktrack(question.cycleId, command.toStep);
+    } else {
       await this.dispatch(question, command);
     }
 
@@ -505,6 +513,42 @@ export class InboxService {
     const result = backtrackTo(base, { step: toStep, reason });
     if (isErr(result)) throw fail(400, result.error);
     return result.value;
+  }
+
+  /**
+   * Auto-relaunch the rewound phase after a backtrack commit (US-13 UX).
+   *
+   * Design decisions:
+   * D-1 REUSE: delegates entirely to CycleService.relaunchPhase — no duplicate
+   *     domainRelaunchPhase + persistThenLaunch logic here. CycleService already
+   *     owns the "persist cycle then launch orchestrator" pattern (S7 D-04).
+   * D-2 SOFT FAILURE: if the orchestrator launch throws, CycleService's internal
+   *     compensateRun drives the new run to "failed" (same as startPhase behavior).
+   *     We catch and swallow the error — do NOT propagate it. The backtrack is
+   *     already committed and returning 502 would mislead the caller about what
+   *     failed. The human uses /retry to create a new attempt or /relaunch to
+   *     restart the rewound phase.
+   * D-3 MANUAL RELAUNCH PRESERVED: the /relaunch HTTP endpoint is NOT removed.
+   *     It is still needed for stall recovery (when auto-relaunch itself stalls).
+   */
+  private async autoRelaunchAfterBacktrack(
+    cycleId: import("../../domain/shared/ids").CycleId,
+    toStep: Extract<import("../../domain/question/question").Unit02Command, { type: "backtrack" }>["toStep"],
+  ): Promise<void> {
+    try {
+      const cycleService = new CycleService(this.ports);
+      await cycleService.relaunchPhase(cycleId as string, toStep as string);
+    } catch (_err) {
+      // CycleService.relaunchPhase already compensates the new run to "failed"
+      // when the orchestrator launch throws (same as startPhase behavior). The
+      // human can use /retry to create a new attempt, or the manual /relaunch
+      // button to restart the whole rewound phase.
+      // Any non-ServiceError (e.g. PhaseNotRewound) is also swallowed: it means
+      // the cycle state didn't allow a relaunch at this moment — the backtrack
+      // is already committed, so the human can use the /relaunch button.
+      // Swallow — do not propagate. The backtrack is committed; auto-relaunch is
+      // best-effort. Returning 502 would mislead the caller about what failed.
+    }
   }
 
   private loadCycle(question: Question): Cycle {

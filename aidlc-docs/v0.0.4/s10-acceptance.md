@@ -113,7 +113,15 @@
 - **scope 判定**: ②(プロジェクト管理 UI)は **v0.0.4 の US-01〜08 範囲外**(baseline 機能)。ここで新規実装するのは scope creep のため**作らない** → v0.0.5 候補(ledger carried)。① legacy データの自動正規化は非 canonical legacy ID で脆く非推奨。
 - **対応(本サイクルの unblock)**: ユーザー承認のもと、ローカル dev DB の legacy プロジェクト(+19 サイクル)を削除(backup 取得済)。canonical 12 工程プロジェクトのみ残し、全工程に既定 contracts 投入済を確認。app 再起動で「12 工程・既定値あり」表示。
 
-> 上記 F-1/F-2 を修正・再検証済 / F-3 を unblock 済(UI gap は v0.0.5)。US 判定を再開する。
+### F-4 (実機 / 修正済): 差し戻しをしても始まらない
+- **現象**: 視覚レビューを差し戻し(reject + 巻き戻し先)しても AI が再実行を始めない。
+- **根本原因**: backtrack は「純ロールバック(orchestrator 副作用なし)」設計で、対象工程を `running`(rewound)にするのみ。実際に動かすには人間が手動「再実行」(relaunch)を押す必要があり、差し戻し直後は AI が起動しない。バックエンドの backtrack→relaunch 機構自体は正常(curl 再現で確認)。
+- **事業判断(2026-06-14)**: 「差し戻したら AI が自動で再実行(推奨)」。責務契約②(人間が判断したら以降は AI 自走・無駄に止めない)に整合。
+- **修正**: `inbox-service.answerQuestion` の backtrack 経路で、ロールバック commit 後に対象工程を `CycleService.relaunchPhase` で**自動 relaunch**(新 run append + orchestrator.launch / 失敗時は run を failed に補償しループ継続)。手動 relaunch エンドポイントは別経路(stalled 等)用に残す。
+- **検証**: integration 4 件(自動 run 付与 / launch 引数 / 失敗補償 / approve は余分起動なし)+ **独立 curl 再現(差し戻し単独→ /relaunch 不要で新 run #2 running + 新 question)**。決定論 597 green。
+- **判定**: 修正済。
+
+> F-1/F-2/F-4 修正済 + F-3 unblock 済(UI gap は v0.0.5)。US 判定を再開する。
 
 ## サイクル全体の成果物サマリー (確定時に記入)
 - (全 US 判定が揃ったら記入)
