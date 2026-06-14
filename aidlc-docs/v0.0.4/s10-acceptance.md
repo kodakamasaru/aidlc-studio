@@ -141,7 +141,12 @@
 - **修正**: `OUTPUT_CONTRACT_INSTRUCTION` の questions[] 定義を強化 — 「人間に確認・質問・選択・不足情報を求めたいことが少しでもあれば必ず questions[] に入れよ。本文や status で代用するな。空にしてよいのは成果物完成でレビュー/承認だけを求めるときのみ。聞きたいことがあるのにレビューにするな」。
 - **判定**: 修正済(プロンプト指示。live で実機確認要)。決定論 605 + tsc clean(プロンプト文変更でロジック不変)。
 
-> F-1/F-2/F-4/F-5/F-6/F-7 修正済 + F-3 unblock 済(UI gap は v0.0.5)。US 判定を再開する。
+### F-8 (実機 live / 修正済): live タイムアウト 120s が短すぎて stall しやすい
+- **現象**: 実 AI の工程実行(S1 が brief + US 群を生成等)が 2 分を超え、`DEFAULT_TIMEOUT_MS=120_000` の壁時計 backstop に当たって stall に落ちやすい。
+- **修正**: `live.ts` の `DEFAULT_TIMEOUT_MS` を **120s → 600s(10分)** に引き上げ(実 AI 工程に headroom)。env `AIDLC_STALL_TIMEOUT_MS` で deploy 毎に上書き可は維持。技術チューニング(責務契約② / D 記録相当)。
+- **判定**: 修正済。決定論 605 / tsc clean。
+
+> F-1/F-2/F-4/F-5/F-6/F-7/F-8 修正済 + F-3 unblock 済(UI gap は v0.0.5)。US 判定を再開する。
 
 ## サイクル全体の成果物サマリー (確定時に記入)
 - (全 US 判定が揃ったら記入)

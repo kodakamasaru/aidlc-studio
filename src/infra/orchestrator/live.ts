@@ -196,7 +196,11 @@ export function aidlcQuestionToEvent(runId: RunId, q: AidlcQuestion): QuestionRa
 }
 
 const DEFAULT_CLAUDE_BIN = "claude";
-const DEFAULT_TIMEOUT_MS = 120_000;
+// Wall-clock backstop for a live run producing no result. A real AI-DLC step
+// (e.g. S1 generating brief + US docs) routinely runs several minutes, so the
+// old 2-min default tripped stalls too easily (S10 実機指摘 F-8). 10 min gives
+// real runs headroom; override per-deploy via AIDLC_STALL_TIMEOUT_MS (server.ts).
+const DEFAULT_TIMEOUT_MS = 600_000;
 /** Grace period after SIGTERM before SIGKILL, so a process ignoring TERM still dies. */
 const HARD_KILL_GRACE_MS = 2_000;
 /** Sentinel thrown when extractResultText sees an `is_error:true` result event. */
