@@ -32,7 +32,7 @@ import type { SessionRepo } from "../../app/ports/repos";
 import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { join, resolve } from "node:path";
-import { logError } from "../log";
+import { logError, logInfo } from "../log";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parseQuestionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
@@ -571,6 +571,17 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     this.children.set(ctx.runId, child);
     this.contexts.set(ctx.runId, ctx);
 
+    // Diagnostics (F-8/実機 slow-run 調査): record what was actually launched so a
+    // slow/failed run is explainable — prompt size, model, and the wall-clock cap.
+    logInfo("LiveClaude run launched", {
+      runId: ctx.runId as string,
+      step: ctx.step as string,
+      pid: child.pid,
+      promptChars: prompt.length,
+      model: this.model ?? "(claude CLI default)",
+      timeoutMs: this.timeoutMs,
+    });
+
     // Detached: do NOT await. awaitAndEmit owns the rest of the lifecycle and is
     // total — it catches everything and always emits a terminal/result event — so
     // there is never an unhandled rejection. void marks the intentional detach.
@@ -591,6 +602,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     child: SpawnedChild,
     parseCompleteness = false,
   ): Promise<void> {
+    const startedAt = Date.now();
     let timedOut = false;
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
@@ -621,6 +633,19 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         new Response(err).text(),
         child.exited,
       ]);
+      // Diagnostics: record how the child actually terminated so "slow run" can be
+      // attributed — exited cleanly (exitCode) vs killed by the wall-clock timeout
+      // (timedOut), how long it took, and whether it produced any output at all
+      // (stdoutChars=0 + timedOut ⇒ claude hung/never produced output).
+      logInfo("LiveClaude run finished", {
+        runId: ctx.runId as string,
+        step: ctx.step as string,
+        timedOut,
+        exitCode,
+        durationMs: Date.now() - startedAt,
+        stdoutChars: stdout.length,
+        stderrChars: stderr.length,
+      });
       if (timedOut) {
         throw new Error(`claude timed out after ${this.timeoutMs}ms`);
       }
