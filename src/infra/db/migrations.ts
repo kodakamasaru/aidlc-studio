@@ -21,7 +21,16 @@
 // every boot.
 //
 // Note: questions.listOpenByProject joins questions→cycles on cycleId.
+//
+// Versioned data migrations (PRAGMA user_version):
+//  v1 (user_version = 1): backfill DEFAULT_STEP_CONTRACTS into existing
+//     projects.pipelineDef and cycles.phases[].stepDef where contracts is
+//     absent. Idempotent: re-running after v1 is already applied is a no-op
+//     because user_version gate skips the block.
 import type { Database } from "bun:sqlite";
+import { DEFAULT_STEP_CONTRACTS } from "../../domain/project/step-contracts";
+import type { StepContracts } from "../../domain/project/step-contracts";
+import { logError } from "../log";
 
 export function migrate(db: Database): void {
   db.run(`
@@ -107,4 +116,140 @@ export function migrate(db: Database): void {
       data    TEXT NOT NULL
     );
   `);
+
+  // ── Versioned data migrations ────────────────────────────────────────────────
+  // user_version is a SQLite integer pragma: 0 = never migrated, N = ran through
+  // migration N. Each block is guarded by a version check so it is idempotent.
+  const { user_version: userVersion } = db
+    .query<{ user_version: number }, []>("PRAGMA user_version")
+    .get()!;
+
+  if (userVersion < 1) {
+    migrateV1BackfillContracts(db);
+    db.run("PRAGMA user_version = 1");
+  }
+}
+
+// ── v1: backfill DEFAULT_STEP_CONTRACTS into existing rows ───────────────────
+//
+// For each project row: iterate pipelineDef; for any StepDef whose `contracts`
+// is absent (undefined / null) and whose id has a DEFAULT entry, inject the
+// default. Rows with explicit contracts keep them (override respected).
+//
+// For each cycle row: iterate phases[].stepDef; same rule — fill absent
+// contracts from the default registry. The phase snapshot was frozen at cycle
+// creation; "absent" means "not yet explicitly set", so the default is the
+// correct display value.
+//
+// Error policy: a row that fails JSON parse or re-serialisation is skipped with
+// a logged warning. The migration does NOT abort; partial success is preferable
+// to blocking boot entirely on a corrupt row.
+function migrateV1BackfillContracts(db: Database): void {
+  backfillProjects(db);
+  backfillCycles(db);
+}
+
+type RawRow = { id: string; data: string };
+
+function backfillProjects(db: Database): void {
+  const rows = db
+    .query<RawRow, []>("SELECT id, data FROM projects")
+    .all();
+
+  const update = db.prepare(
+    "UPDATE projects SET data = ? WHERE id = ?",
+  );
+
+  for (const row of rows) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const project: any = JSON.parse(row.data);
+      if (!Array.isArray(project?.pipelineDef)) continue;
+
+      let changed = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nextPipeline = project.pipelineDef.map((stepDef: any) => {
+        if (stepDef.contracts !== undefined && stepDef.contracts !== null) {
+          return stepDef; // explicit override → do not touch
+        }
+        const stepId: string = stepDef.id as string;
+        const defaults: StepContracts | undefined =
+          DEFAULT_STEP_CONTRACTS[stepId];
+        if (defaults === undefined) {
+          return stepDef; // custom / unknown step — leave as-is
+        }
+        changed = true;
+        return { ...stepDef, contracts: defaults };
+      });
+
+      if (changed) {
+        update.run(
+          JSON.stringify({ ...project, pipelineDef: nextPipeline }),
+          row.id,
+        );
+      }
+    } catch (err) {
+      logError(
+        `migrations v1: skipping corrupt projects row id=${row.id}`,
+        err,
+      );
+    }
+  }
+}
+
+function backfillCycles(db: Database): void {
+  const rows = db
+    .query<RawRow, []>("SELECT id, data FROM cycles")
+    .all();
+
+  const update = db.prepare(
+    "UPDATE cycles SET data = ? WHERE id = ?",
+  );
+
+  for (const row of rows) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cycle: any = JSON.parse(row.data);
+      if (!Array.isArray(cycle?.phases)) continue;
+
+      let changed = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nextPhases = cycle.phases.map((phase: any) => {
+        // phase.stepDef is the StepDefSnapshot (optional, absent on old rows)
+        if (phase.stepDef === undefined || phase.stepDef === null) {
+          return phase; // no snapshot at all — cannot backfill
+        }
+        if (
+          phase.stepDef.contracts !== undefined &&
+          phase.stepDef.contracts !== null
+        ) {
+          return phase; // explicit override → do not touch
+        }
+        // step id lives on phase.step (the Phase.step discriminator)
+        const stepId: string = phase.step as string;
+        const defaults: StepContracts | undefined =
+          DEFAULT_STEP_CONTRACTS[stepId];
+        if (defaults === undefined) {
+          return phase; // custom / unknown step — leave as-is
+        }
+        changed = true;
+        return {
+          ...phase,
+          stepDef: { ...phase.stepDef, contracts: defaults },
+        };
+      });
+
+      if (changed) {
+        update.run(
+          JSON.stringify({ ...cycle, phases: nextPhases }),
+          row.id,
+        );
+      }
+    } catch (err) {
+      logError(
+        `migrations v1: skipping corrupt cycles row id=${row.id}`,
+        err,
+      );
+    }
+  }
 }
