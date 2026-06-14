@@ -66,6 +66,11 @@ export const briefBodyPath = (repoPath: string): string =>
  * Schema: {artifacts[], questions[], decisions[], completeness{requirements,addressed}, status}.
  */
 export const OUTPUT_CONTRACT_INSTRUCTION = [
+  "── 言語(必須) ──",
+  "成果物・質問(prompt/background/options のラベル等)・decisions・説明など、人間が読む文章は",
+  "**すべて日本語**で書け。コード・識別子・ファイルパス・固有名詞はそのままでよいが、地の文は日本語。",
+  "英語で回答しない。",
+  "",
   "── 出力契約(§C7.4 aidlc-result 必須) ──",
   "この工程の最後に、以下の形式の minified JSON を ```aidlc-result``` フェンスブロックで",
   "1 つだけ出力せよ(複数不可 / 末尾に必ず出力 / 本文テキストのみでは不可):",
@@ -77,13 +82,17 @@ export const OUTPUT_CONTRACT_INSTRUCTION = [
   "フィールド定義:",
   "- artifacts[]: 生成・更新した成果物の aidlc-docs パス(本文はファイルに書く / エンベロープに載せない)",
   "- questions[]: 人間への質問(aidlc-question schema: id/prompt/background/options[{id,label,hint,recommended}]/answerKind)",
+  "  - **人間に確認・質問・選択・不足情報を求めたいことが少しでもあれば、必ず questions[] に入れよ**。",
+  "    質問を成果物本文や status で代用するな。questions[] に入れたものだけが「回答できる質問カード」になる。",
+  "  - questions[] を空にしてよいのは、成果物が完成して人間に**レビュー / 承認**だけを求めるときのみ",
+  "    (空 = レビューカードになる)。聞きたいことがあるのにレビューにするな。",
   "  - ★おすすめは options の中にちょうど 1 つ(recommended:true が厳密に 1 件)",
   "  - 質問がない場合は空配列 []",
   "- decisions[]: AI が独自に決めた事項({id,decision,reason} — 理由必須)",
   "- completeness: {requirements:[{key,text}], addressed:[key]} — 未充足は addressed に含めない",
   "- status: \"done\" | \"needs_human\" | \"stalled\"",
   "  - done: 人間ゲート不要で前進可(完了条件を完全に充足)",
-  "  - needs_human: 人間のレビュー / 承認が必要",
+  "  - needs_human: 人間のレビュー / 承認が必要、または questions[] に質問がある",
   "  - stalled: 続行不能(理由は decisions に書く)",
   "  - questions[] が空でない場合は status=\"needs_human\" にすること",
 ].join("\n");
