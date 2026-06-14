@@ -107,10 +107,15 @@ describe("full loop — happy path", () => {
     expect(answerRes.json.data.fact.id).toBeDefined();
     expect(answerRes.json.data.question.state).toBe("answered");
 
-    // The visual_review question is now the only open one.
+    // After answering the "question" kind: the scripted orchestrator emits
+    // ResultEmitted → visual_review card. Separately, EngineService.onRolelessResult
+    // auto-launches a reconstruction run which emits ReconstructionProposalEmitted
+    // → reconstruction inbox card (US-08 F-1). So the inbox now has ≥1 open card.
     const inbox2 = await get(h.app, `/api/projects/${projectId}/inbox`);
-    expect(inbox2.json.data).toHaveLength(1);
-    const reviewQ = inbox2.json.data[0];
+    expect(inbox2.json.data.length).toBeGreaterThanOrEqual(1);
+    // The visual_review card is present among the open questions.
+    const reviewQ = inbox2.json.data.find((q: any) => q.kind === "visual_review");
+    expect(reviewQ).toBeDefined();
     expect(reviewQ.kind).toBe("visual_review");
 
     // Its payload carries the Review with the 4 MVP block types.
@@ -139,9 +144,14 @@ describe("full loop — happy path", () => {
     expect(cycleGet.status).toBe(200);
     expect(runStates(cycleGet.json.data)).toContain("done");
 
-    // Inbox is now empty (both questions answered).
+    // Inbox: visual_review and original question are answered/closed.
+    // The reconstruction card (US-08 F-1) remains open until the human explicitly
+    // approves or rejects it via the /cycles/:id/reconstruction screen.
     const inbox3 = await get(h.app, `/api/projects/${projectId}/inbox`);
-    expect(inbox3.json.data).toHaveLength(0);
+    const remainingOpen: any[] = inbox3.json.data.filter((q: any) => q.state === "open");
+    // No visual_review or question cards remain open.
+    expect(remainingOpen.filter((q: any) => q.kind === "visual_review")).toHaveLength(0);
+    expect(remainingOpen.filter((q: any) => q.kind === "question")).toHaveLength(0);
 
     // The S1 phase is "done" (the approved review completed it) — so the NEXT
     // phase is startable. Regression guard: approving used to mark only the run

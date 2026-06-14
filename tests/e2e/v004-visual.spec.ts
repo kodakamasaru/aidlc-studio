@@ -41,6 +41,9 @@ const MULTITURN = "http://127.0.0.1:8895";
 const HEARING = "http://127.0.0.1:8896";
 const MISSING_CTX = "http://127.0.0.1:8897";
 const VARIABLE = "http://127.0.0.1:8898";
+// Dedicated server for the inbox.empty screenshot. No other test touches this
+// port, so the inbox is guaranteed to be empty (no reconstruction cards).
+const EMPTY_INBOX = "http://127.0.0.1:8899";
 
 // ═════════════════════════════════════════════════════════════════════════
 // SCR-01: Inbox (InboxPage)
@@ -48,9 +51,13 @@ const VARIABLE = "http://127.0.0.1:8898";
 // ═════════════════════════════════════════════════════════════════════════
 
 test("SCR-01 inbox.empty: no questions, shows empty state", async ({ page }) => {
-  await page.goto(`${HAPPY}/`);
+  // US-08 F-1: S1 開始後は reconstruction カードが受信箱に現れる仕様になったため、
+  // このテストは「サイクルが1つも存在しない状態」での空表示を確認する。
+  // EMPTY_INBOX (8899) は専用の隔離サーバー。他のどのテストもこのポートを使わないため、
+  // サイクル未作成・inbox 空 が保証される。stalled.spec.ts などが 8892 を汚染しても影響なし。
+  await page.goto(`${EMPTY_INBOX}/`);
   await ensureProject(page);
-  await page.goto(`${HAPPY}/inbox`);
+  await page.goto(`${EMPTY_INBOX}/inbox`);
 
   await expect(page.locator(".inbox-empty__title")).toBeVisible({ timeout: 8000 });
   await expect(page.locator(".inbox-empty__title")).toHaveText("対応待ちはありません");

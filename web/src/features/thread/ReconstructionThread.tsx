@@ -392,6 +392,25 @@ export function CycleReconstructionThread({
         (s) => s.diff !== "delete" && !startedStepIds.has(s.id),
       );
       await api.applyCycleReconstruction(cycleId, stepsToSend);
+
+      // US-08 F-1: close the open reconstruction inbox card(s) for this cycle.
+      // The card was raised by EventApplier when ReconstructionProposalEmitted was
+      // handled. Answering it with "approve" marks it "answered" so it disappears
+      // from the inbox (CLAUDE.md: 「AI→人間の依頼は全部カード化」).
+      try {
+        const inbox = await api.getCycleInbox(cycleId);
+        const openReconCards = inbox.filter(
+          (q) => q.state === "open" && q.kind === "reconstruction",
+        );
+        await Promise.all(
+          openReconCards.map((q) =>
+            api.answerQuestion(q.id, { verdict: "approve" }),
+          ),
+        );
+      } catch {
+        // Best-effort: card closure does not block navigation.
+      }
+
       refreshInbox();
       navigate(`/cycles/${cycleId}`);
     } catch (err) {

@@ -180,7 +180,9 @@ export type QuestionKind =
   | "decision"
   | "backtrack"
   | "stall_retry"
-  | "descope";
+  | "descope"
+  // US-08 F-1: 再構成提案の受信箱カード。
+  | "reconstruction";
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
@@ -208,7 +210,9 @@ export type QuestionPayload =
       readonly aiReason: string;
       readonly recommendedStep?: string;
       readonly requirementKey?: string;
-    };
+    }
+  // US-08 F-1: 再構成提案カード。summary は受信箱での 1 行説明。
+  | { readonly kind: "reconstruction"; readonly summary: string };
 
 export interface Question {
   readonly id: string;

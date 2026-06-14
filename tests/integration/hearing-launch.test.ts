@@ -203,11 +203,13 @@ describe("POST /api/hearing/launch — global-scope", () => {
     const { cycleId } = launchRes.json.data;
 
     // Capture the project pipeline contracts before answering.
+    // S10 F-2: DEFAULT_STEP_CONTRACTS now seeds contracts on createProject, so
+    // s1Before?.contracts is defined. The pre-answer state has no profileKind="briefing".
     const projBefore = await get(h.app, `/api/projects/${projectId}`);
     const s1Before = (projBefore.json.data.pipelineDef as any[]).find(
       (sd: any) => sd.id === "S1",
     );
-    expect(s1Before?.contracts).toBeUndefined();
+    expect(s1Before?.contracts?.output?.profileKind).not.toBe("briefing");
 
     // Answer both global config questions.
     const inbox = await get(h.app, `/api/cycles/${cycleId}/inbox`);

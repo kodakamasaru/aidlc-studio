@@ -286,6 +286,7 @@ export function StepConfigReadback({
             const hasOverride =
               isCycle &&
               (!!c.output?.profileKind ||
+                !!c.output?.artifactGlob ||
                 !!c.humanGate?.mode ||
                 !!c.escalation?.onStall ||
                 (c.verification?.observations?.length ?? 0) > 0);
@@ -383,6 +384,10 @@ function StepRow({ step, contracts, scope, showContracts, inheritLabel }: StepRo
               <span className="cfg-rb__kv">
                 <span className="cfg-rb__k">成果物:</span> {c.output.profileKind}
               </span>
+            ) : c.output?.artifactGlob ? (
+              <span className="cfg-rb__kv">
+                <span className="cfg-rb__k">成果物:</span> {c.output.artifactGlob}
+              </span>
             ) : null}
             {c.humanGate?.mode ? (
               <span className="cfg-rb__kv">
@@ -397,6 +402,7 @@ function StepRow({ step, contracts, scope, showContracts, inheritLabel }: StepRo
               </span>
             ) : null}
             {!c.output?.profileKind &&
+              !c.output?.artifactGlob &&
               !c.humanGate?.mode &&
               !c.escalation?.onStall ? (
               <span className="cfg-rb__kv cfg-rb__kv--empty">

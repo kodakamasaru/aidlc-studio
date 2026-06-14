@@ -11,6 +11,7 @@ import {
   raiseQuestion,
   type Question,
 } from "../../domain/question/question";
+import type { Text } from "../../domain/shared/primitives";
 import { buildReview } from "../../domain/review/review";
 import { advanceRun } from "../../domain/cycle/cycle";
 import {
@@ -196,6 +197,30 @@ export class EventApplier {
         // US-08: persist the proposal keyed by cycleId. One slot per cycle;
         // latest write wins (re-emission on retry overwrites cleanly).
         repos.reconstructionProposals.save(ctx.cycleId, event.proposal);
+
+        // US-08 F-1: raise a reconstruction inbox card so the human is notified.
+        // Guard: if an open reconstruction card already exists for this cycle
+        // (e.g. re-emission on retry), do not create a duplicate.
+        const existingOpenReconstruction = repos.questions
+          .listByCycle(ctx.cycleId)
+          .some(
+            (existing) =>
+              existing.state === "open" && existing.kind === "reconstruction",
+          );
+        if (existingOpenReconstruction) return;
+
+        const q = raiseQuestion({
+          id: ids.questionId(),
+          runId: ctx.runId,
+          cycleId: ctx.cycleId,
+          payload: {
+            kind: "reconstruction",
+            summary: "工程の再構成提案が届きました — 確認して承認してください" as Text,
+          },
+          createdAt: clock.now(),
+        });
+        repos.questions.save(q);
+        raised.push(q);
         return;
       }
     }

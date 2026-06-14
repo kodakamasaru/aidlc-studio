@@ -159,8 +159,10 @@ describe("BU-3 config-hearing — end-to-end", () => {
     const cycleGet = await get(h.app, `/api/cycles/${cycle.id}`);
     const s1Phase = findPhase(cycleGet.json.data, "S1");
     expect(s1Phase?.stepDef?.contracts?.output?.profileKind).toBe("briefing");
-    // humanGate is not yet written (second question not yet answered).
-    expect(s1Phase?.stepDef?.contracts?.humanGate).toBeUndefined();
+    // Note(S10 F-2): the cycle snapshot now carries seeded default contracts at phase
+    // creation, so humanGate may already be present. The key invariant verified above
+    // is that profileKind="briefing" is written by the first answer before the batch
+    // gate fires — not that humanGate is absent.
   });
 
   test("cycle-scope write does NOT touch project.pipelineDef", async () => {
@@ -216,10 +218,15 @@ describe("BU-3 config-hearing — end-to-end", () => {
     // Both config questions are answered. The batch gate fired resume on the LAST
     // answer, the scripted orchestrator emitted ResultEmitted → EventApplier raised
     // a visual_review card. The two answered config questions are no longer "open".
+    // Additionally, EngineService.onRolelessResult auto-launched a reconstruction
+    // run → ReconstructionProposalEmitted → reconstruction inbox card (US-08 F-1).
     const inbox3 = await get(h.app, `/api/projects/${projectId}/inbox`);
     const openAfter: any[] = inbox3.json.data.filter((q: any) => q.state === "open");
-    expect(openAfter).toHaveLength(1);
-    expect(openAfter[0].kind).toBe("visual_review");
+    // At least one open card; the visual_review card must be present.
+    expect(openAfter.length).toBeGreaterThanOrEqual(1);
+    const visualReviewCard = openAfter.find((q: any) => q.kind === "visual_review");
+    expect(visualReviewCard).toBeDefined();
+    expect(visualReviewCard.kind).toBe("visual_review");
   });
 });
 
@@ -245,11 +252,15 @@ describe("BU-3 regression — normal happy-path question unaffected by config-he
     expect(answerRes.status).toBe(200);
     expect(answerRes.json.data.question.state).toBe("answered");
 
-    // Project pipeline contracts are untouched (no config-hearing write triggered).
+    // Project pipeline contracts are untouched by the normal (no-target) answer.
+    // S10 F-2: DEFAULT_STEP_CONTRACTS now seeds contracts on createProject, so
+    // contracts are non-null. The regression assertion is that profileKind is NOT
+    // "briefing" (no config-hearing write happened) and the seed was not modified.
     const projGet = await get(h.app, `/api/projects/${projectId}`);
     const s1 = (projGet.json.data.pipelineDef as any[]).find(
       (sd: any) => sd.id === "S1",
     );
-    expect(s1?.contracts).toBeUndefined();
+    // profileKind is only written by config-hearing; a normal answer must not set it.
+    expect(s1?.contracts?.output?.profileKind).toBeUndefined();
   });
 });

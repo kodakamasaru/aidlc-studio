@@ -18,6 +18,9 @@ export function questionTitle(q: Question): string {
       return `「${stepLabel(q.payload.toStep)}」への手戻り提案`;
     case "stall_retry":
       return "AI の作業が停止しました — 再開の確認";
+    // US-08 F-1: 再構成提案カードのタイトル。
+    case "reconstruction":
+      return q.payload.summary || "工程の再構成提案が届きました";
     default:
       return "依頼";
   }

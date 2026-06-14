@@ -1,7 +1,7 @@
 // Phase 5 visual E2E config. Drives the REAL browser against the REAL Hono
 // server (bun:sqlite file DB) + deterministic ScriptedOrchestrator.
 //
-// Seven web servers run in parallel, each with its own file DB + scenario:
+// Eight web servers run in parallel, each with its own file DB + scenario:
 //   - happy         (PORT 8891): full Q → visual_review → done loop. baseURL.
 //   - stall         (PORT 8892): stall-first; exercises the stalled/retry surface.
 //   - complete      (PORT 8893): gen→gate→eval, every req addressed (US-07).
@@ -9,6 +9,11 @@
 //   - multi-turn    (PORT 8895): Unit-04 multi-turn: resume turn1 re-asks, turn2 done.
 //   - config-hearing(PORT 8896): BU-3: launch emits 2 config questions (US-06).
 //   - variable      (PORT 8898): US-08: variable pipeline cycle (S4省略+独自工程) via real backend.
+//   - empty-inbox   (PORT 8899): US-08 F-1 inbox.empty screenshot — isolated happy server,
+//                                 NO cycles created before the test. Dedicated so that other
+//                                 tests (stalled.spec, reconstruction.spec, etc.) cannot
+//                                 leave reconstruction/question cards behind and break the
+//                                 "empty inbox" assertion.
 //
 // workers:1 + fullyParallel:false: the servers hold file DBs, so serializing
 // avoids cross-test races (e.g. the happy DB is shared across happy specs).
@@ -22,6 +27,7 @@ const MULTITURN_PORT = 8895;
 const HEARING_PORT = 8896;
 const MISSING_CTX_PORT = 8897;
 const VARIABLE_PORT = 8898;
+const EMPTY_INBOX_PORT = 8899;
 const HAPPY_DB = "/tmp/aidlc-e2e-happy.db";
 const STALL_DB = "/tmp/aidlc-e2e-stall.db";
 const COMPLETE_DB = "/tmp/aidlc-e2e-complete.db";
@@ -30,6 +36,7 @@ const MULTITURN_DB = "/tmp/aidlc-e2e-multiturn.db";
 const HEARING_DB = "/tmp/aidlc-e2e-hearing.db";
 const MISSING_CTX_DB = "/tmp/aidlc-e2e-missing-ctx.db";
 const VARIABLE_DB = "/tmp/aidlc-e2e-variable.db";
+const EMPTY_INBOX_DB = "/tmp/aidlc-e2e-empty-inbox.db";
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -109,6 +116,15 @@ export default defineConfig({
       // call the new reconstruct endpoint to build a non-standard step set.
       command: `rm -f ${VARIABLE_DB}* && PORT=${VARIABLE_PORT} AIDLC_DB=${VARIABLE_DB} AIDLC_SCENARIO=happy bun run src/main.ts`,
       url: `http://127.0.0.1:${VARIABLE_PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      // US-08 F-1: dedicated inbox-empty server — isolated happy instance used
+      // ONLY by the SCR-01 inbox.empty screenshot test. No other test touches
+      // this server, so the inbox stays empty (no reconstruction/question cards).
+      command: `rm -f ${EMPTY_INBOX_DB}* && PORT=${EMPTY_INBOX_PORT} AIDLC_DB=${EMPTY_INBOX_DB} AIDLC_SCENARIO=happy bun run src/main.ts`,
+      url: `http://127.0.0.1:${EMPTY_INBOX_PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 30_000,
     },

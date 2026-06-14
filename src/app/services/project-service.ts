@@ -15,7 +15,7 @@ import {
   type EnvConfig,
   type VisionRef,
 } from "../../domain/project/project";
-import type { StepContracts } from "../../domain/project/step-contracts";
+import { DEFAULT_STEP_CONTRACTS, type StepContracts } from "../../domain/project/step-contracts";
 import { CANONICAL_STEPS, Step, sameStep } from "../../domain/shared/vocab";
 import { ProjectId } from "../../domain/shared/ids";
 import { isErr } from "../../domain/shared/result";
@@ -38,14 +38,22 @@ export interface CreateProjectInput {
  * Build the default pipeline from the single canonical source (US-02): each StepDef
  * derives id + 平易ラベル + 実 dir skillRef from CANONICAL_STEPS. No more fake
  * `aidlc-${step}` skillRef and no `label = step` 死蔵.
+ *
+ * Contracts are seeded from DEFAULT_STEP_CONTRACTS so the global readback (scr-04)
+ * shows real values instead of "未設定". pipelineDef.contracts is the live editable
+ * copy; DEFAULT_STEP_CONTRACTS is the readonly fallback used by resolveContracts.
  */
 const defaultPipeline = (): readonly StepDef[] =>
-  CANONICAL_STEPS.map((c, index) => ({
-    id: c.id,
-    label: c.label,
-    order: index,
-    skillRef: c.skillRef,
-  }));
+  CANONICAL_STEPS.map((c, index) => {
+    const contracts = DEFAULT_STEP_CONTRACTS[c.id as string];
+    return {
+      id: c.id,
+      label: c.label,
+      order: index,
+      skillRef: c.skillRef,
+      ...(contracts !== undefined ? { contracts } : {}),
+    };
+  });
 
 const buildEnv = (modelName: string): EnvConfig => ({
   modelName,

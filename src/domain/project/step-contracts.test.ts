@@ -78,8 +78,13 @@ describe("resolveContracts (override > default registry)", () => {
     expect(resolved?.humanGate?.mode).toBe("device_check");
   });
 
-  test("returns undefined when neither override nor registry has it", () => {
-    expect(resolveContracts(baseStep())).toBeUndefined();
-    expect(DEFAULT_STEP_CONTRACTS).toEqual({});
+  test("returns undefined when neither override nor registry has it (explicit empty registry)", () => {
+    // Pass an explicit empty registry so we isolate "no entry" behavior.
+    expect(resolveContracts(baseStep(), {})).toBeUndefined();
+    // DEFAULT_STEP_CONTRACTS は S10 F-2 でこのリポの実設定(12 工程)を投入済み。
+    // 空ではないこと + S7 の既定値が取得できることを確認する。
+    expect(Object.keys(DEFAULT_STEP_CONTRACTS).length).toBe(12);
+    expect(DEFAULT_STEP_CONTRACTS["S7"]).toBeDefined();
+    expect(DEFAULT_STEP_CONTRACTS["S7"]?.humanGate?.mode).toBe("none");
   });
 });

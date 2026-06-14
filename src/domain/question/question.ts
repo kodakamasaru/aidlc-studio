@@ -34,7 +34,14 @@ export type QuestionKind =
   | "decision"
   | "backtrack"
   | "stall_retry"
-  | "descope";
+  | "descope"
+  // US-08 F-1: 再構成提案を受信箱カードとして立てる新 kind。
+  // AI が S1 完了後に生成したパイプライン再構成提案を人間に示す。
+  // 承認 (approve) → applyCycleReconstruction 実行 + カードをクローズ。
+  // 既存 kind (decision/visual_review) 流用案もあったが、遷移先が
+  // /cycles/:id/reconstruction(専用画面)で承認フローも独自のため
+  // 新 kind が最小・後方互換(既存 question テーブル行は全て変化なし)。
+  | "reconstruction";
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
@@ -67,7 +74,11 @@ export type QuestionPayload =
       // S8 手戻り追補(加法 optional): requirement の安定 key。app の completeness
       // gate が gap.key と決定的に照合するため(text 照合の揺れを排除)。欠落=従来動作。
       readonly requirementKey?: string;
-    };
+    }
+  // US-08 F-1: パイプライン再構成提案の受信箱カード。
+  // cycleId は Question 本体が持つため payload には不要。
+  // summary は受信箱カードのタイトル描画に使う(1行・人間語)。
+  | { readonly kind: "reconstruction"; readonly summary: Text };
 
 export type Question = {
   readonly id: QuestionId;
@@ -111,6 +122,8 @@ const ALLOWED_VERDICTS: Record<QuestionKind, ReadonlySet<Verdict>> = {
   stall_retry: new Set(["approve", "reject"]),
   // descope 4 択(S6 descope-policy D-01): つくる/見送る/後回し/前のステップからやり直す。
   descope: new Set(["rework", "descope", "defer", "rewind"]),
+  // US-08 F-1: 再構成提案カード。approve = 承認(pipeline 置換) / reject = 却下(no-op)。
+  reconstruction: new Set(["approve", "reject"]),
 };
 
 // ── Unit-02 へ渡す命令(回答の効果。S5 kind×verdict 効果表) ──────
@@ -128,7 +141,11 @@ export type Unit02Command =
       readonly requirement: Text;
       readonly aiReason: Text;
       readonly deferred: boolean;
-    };
+    }
+  // US-08 F-1: 再構成提案承認 → app 層が applyCycleReconstruction を呼ぶ橋渡し。
+  // reject は no-op(カードをクローズするだけ / runId は診断用)。
+  | { readonly type: "approveReconstruction"; readonly cycleId: CycleId }
+  | { readonly type: "rejectReconstruction"; readonly runId: RunId };
 
 export type RaiseQuestionCmd = {
   readonly id: QuestionId;
@@ -199,6 +216,13 @@ const deriveCommand = (
       return answer.verdict === "approve"
         ? ok({ type: "retryLaunch", runId: q.runId })
         : ok({ type: "cancelRun", runId: q.runId });
+    // US-08 F-1: 再構成提案の承認/却下。
+    // approve → app 層が applyCycleReconstruction(cycle, steps) を実行。
+    // reject  → カードをクローズするだけ(no-op: 却下してそのままのパイプラインで進む)。
+    case "reconstruction":
+      return answer.verdict === "approve"
+        ? ok({ type: "approveReconstruction", cycleId: q.cycleId })
+        : ok({ type: "rejectReconstruction", runId: q.runId });
     case "descope": {
       // payload は kind=descope のとき必ず descope(raiseQuestion が kind を payload から導く)。
       const p = q.payload.kind === "descope" ? q.payload : undefined;
@@ -240,6 +264,10 @@ const statementOf = (q: Question, answer: Answer): Text => {
     const { requirement, aiReason } = q.payload;
     return `${base} — ${requirement}(理由: ${aiReason})`;
   }
+  // US-08 F-1: 再構成提案の判断を Fact に残す(audit trail)。
+  if (q.kind === "reconstruction" && q.payload.kind === "reconstruction") {
+    return `${base} — ${q.payload.summary}`;
+  }
   if (nonEmpty(answer.reason)) return `${base} — ${answer.reason}`;
   return base;
 };
@@ -273,6 +301,17 @@ export const applyAnswer = (
   const cmd = deriveCommand(q, answer);
   if (!cmd.ok) return cmd;
 
+  // US-08 F-1: reconstruction の reject は「提案を却下して既存パイプラインを維持」する
+  // ユーザー操作で、手戻り(visual_review reject)と異なり理由は任意。
+  // Fact INV-4 は reject に reason 必須だが reconstruction では明示しない。
+  // appendFact が EmptyReasonOnReject を返さないよう、reason 欠落時はデフォルト理由を補う。
+  const factReason =
+    nonEmpty(answer.reason)
+      ? answer.reason
+      : q.kind === "reconstruction" && answer.verdict === "reject"
+        ? ("再構成提案を却下しました" as Text)
+        : undefined;
+
   const factResult = appendFact({
     id: ctx.factId,
     questionId: q.id,
@@ -280,7 +319,7 @@ export const applyAnswer = (
     by: ctx.by,
     verdict: answer.verdict,
     statement: statementOf(q, answer),
-    ...(nonEmpty(answer.reason) ? { reason: answer.reason } : {}),
+    ...(factReason !== undefined ? { reason: factReason } : {}),
     at: ctx.at,
   });
   // Fact 側の reject-reason 要件は deriveCommand 後なので backtrack 系では reason 充足済み。
