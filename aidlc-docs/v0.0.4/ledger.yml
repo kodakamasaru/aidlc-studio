@@ -142,3 +142,17 @@
     詳細・Problem 表・Try(再発防止 T1〜T5)は aidlc-docs/v0.0.4/s11-retrospective.md の
     「先取りプロセス問題メモ」に記録済。S11 はこのファイルを最優先で取り込み分析すること。
     メモリ機構は信用しない方針のため、決定論的に必ず読まれる場所(S11 出力ファイル + 本台帳)に二重化。
+
+- id: F3-project-management-ui
+  origin: v0.0.4/s10-acceptance.md   # S10 実機レビュー(2026-06-14)で発見
+  decision: >
+    web に**プロジェクト作成/リセット/切替の UI が無い**(project-context が projects[0] 固定)。
+    一度プロジェクトが登録されると画面から作り直せず、legacy プロジェクト(step-model-v2 前 / S2.5 入り)が
+    残ると 12 工程にならない問題が表面化。本サイクルでは legacy データを DB から削除して unblock した
+    (backup: aidlc-studio.db.bak-manual / 一時 script: scripts/cleanup-legacy-project.ts)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    プロジェクト管理 UI(作成/リセット/切替)は v0.0.4 の US-01〜08(S1 会話ループ)の範囲外 = baseline 機能。
+    ここで実装するのは scope creep のため次サイクルへ。併せて legacy データのマイグレーション方針も検討
+    (非 canonical legacy ID の正規化 / 安全なマッピング)。一時 cleanup script + backup は housekeeping で整理。

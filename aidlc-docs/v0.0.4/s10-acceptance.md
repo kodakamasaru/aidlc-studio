@@ -103,10 +103,17 @@
 ### F-1/F-2 修正・検証結果(2026-06-14)
 - **F-1 解消**: `ReconstructionProposalEmitted` 適用時に **`kind:"reconstruction"` の受信箱カード**(「工程の再構成提案が届きました — 確認して承認してください」)を立てるよう修正(domain question kind 追加 + applier + 重複ガード)。web `InboxCard` がこのカードを `/cycles/:id/reconstruction` へ遷移。承認/却下でカードを閉じる。integration テスト「ReconstructionProposalEmitted → reconstruction card appears in inbox」で実証。**要件完了後に受信箱で気づける**。
 - **F-2 解消**: `DEFAULT_STEP_CONTRACTS` をこの repo の 12 工程設定で投入(成果物パス + 確認[S7=確認なし/S8=実機/S10=実機+すぐ人間へ 等] + 再試行→3回)。`defaultPipeline()` が seed し scr-04 readback が**実値表示**(「未設定」解消)。profileKind は registry 実在キーが "bugfix" のみのため付けず artifactGlob 表示。scr-04(default/global/pre-us)・scr-06 を再撮影。
+- **F-2 追補(実機再テストで判明)**: 初版 F-2 は createProject 時 seed のみで、**修正前に作られた既存の永続 project/cycle は空 contracts のまま「未設定」**だった(ユーザー再テスト指摘)。→ `migrations.ts` に PRAGMA user_version=1 の backfill migration を追加し、既存 projects.pipelineDef + cycles の phase スナップショットの空 contracts を既定で埋める(明示 override 不変・冪等)。**app 再起動で既存プロジェクトにも既定が適用**。独立実機検証(空contracts→再起動→既定注入)+ migration テスト 9 件で実証。決定論 593 green。
 - **検証**: 決定論 **584** + E2E **35** + web build + tsc clean。scr-04 global の実機 screenshot を AI 再Read 検証(全工程に実値・「未設定」なし)。
 - → US 判定を再開可能。
 
-> 上記 F-1/F-2 を修正・再検証済。US 判定を再開する。
+### F-3 (実機 / v0.0.4 US 範囲外 → v0.0.5): legacy プロジェクトデータ + プロジェクト管理 UI 欠如
+- **現象**: 実機の既存プロジェクトが「12 工程になっていない」(退役 S2.5 入りの 8 工程)+ 先頭工程が未設定。ローカル dev DB に 2 プロジェクト = legacy(S1,S2,S2.5,S3-S7)と canonical(S1-S12)。web は `projects[0]` 固定で legacy を表示。
+- **根本原因**: ① step-model-v2 移行(S2.5 退役)前に作られた legacy プロジェクトデータ(コード・新規プロジェクトは正しく 12)。② web に**プロジェクト作成/リセット/切替 UI が無い**(projects[0] 固定)ため画面から作り直せない。
+- **scope 判定**: ②(プロジェクト管理 UI)は **v0.0.4 の US-01〜08 範囲外**(baseline 機能)。ここで新規実装するのは scope creep のため**作らない** → v0.0.5 候補(ledger carried)。① legacy データの自動正規化は非 canonical legacy ID で脆く非推奨。
+- **対応(本サイクルの unblock)**: ユーザー承認のもと、ローカル dev DB の legacy プロジェクト(+19 サイクル)を削除(backup 取得済)。canonical 12 工程プロジェクトのみ残し、全工程に既定 contracts 投入済を確認。app 再起動で「12 工程・既定値あり」表示。
+
+> 上記 F-1/F-2 を修正・再検証済 / F-3 を unblock 済(UI gap は v0.0.5)。US 判定を再開する。
 
 ## サイクル全体の成果物サマリー (確定時に記入)
 - (全 US 判定が揃ったら記入)
