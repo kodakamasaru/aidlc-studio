@@ -307,6 +307,11 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   // locate + advance the Cycle. Populated at startAttempt; never evicted in v0
   // (one run per launch; bounded by process lifetime).
   private readonly contexts = new Map<string, RunContext>();
+  // Each run's target repoPath, kept so a resume turn re-spawns `claude --resume`
+  // in the SAME cwd the original run used. The Claude CLI scopes sessions per
+  // project directory: resuming from a different cwd fails with "No conversation
+  // found with session ID". RunContext carries no repoPath, so it is stored here.
+  private readonly repoPaths = new Map<string, string>();
   // Unit-04: count resume turns per runId (turns in one hearing). When this
   // exceeds MAX_HEARING_TURNS the run is stalled so the human decides next steps.
   private readonly resumeCounts = new Map<string, number>();
@@ -536,8 +541,13 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       ...(this.model !== undefined ? ["--model", this.model] : []),
     ];
 
+    // Resume in the SAME cwd the original run used — Claude sessions are scoped
+    // per project directory, so resuming from a different cwd fails with "No
+    // conversation found with session ID". Fall back to process.cwd() only if the
+    // repoPath was lost (e.g. server restart), where resume is best-effort anyway.
+    const cwd = this.repoPaths.get(ctx.runId) ?? process.cwd();
     const child = Bun.spawn([this.claudeBin, ...args], {
-      cwd: process.cwd(), // resumed session has no repoPath context; use cwd
+      cwd,
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -615,6 +625,9 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     });
     this.children.set(ctx.runId, child);
     this.contexts.set(ctx.runId, ctx);
+    // Remember the cwd this run used so a later resume turn resumes in the same
+    // project directory (Claude sessions are cwd-scoped — see repoPaths above).
+    this.repoPaths.set(ctx.runId, repoPath);
 
     // Diagnostics (F-8/実機 slow-run 調査): record what was actually launched so a
     // slow/failed run is explainable — prompt size, model, and the wall-clock cap.
@@ -714,13 +727,21 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         logError("LiveClaudeOrchestrator: stream-json init line missing — session_id unavailable (--resume disabled for this run)", {
           runId: ctx.runId as string,
         });
+      } else if (this.sessionRepo === undefined) {
+        // A session_id WAS captured but there is nowhere to persist it — the
+        // composition root forgot to wire sessionRepo. Without it the human's
+        // answer can't `--resume` and the hearing stalls ("sessionId missing").
+        // This was a real S10 実機 wiring gap; make it loud, never a silent no-op (原則④).
+        logError("LiveClaudeOrchestrator: sessionRepo not wired — session_id captured but NOT persisted; resume will fail. Wire sessionRepo in the composition root.", {
+          runId: ctx.runId as string,
+        });
       } else {
         // Unit-04: persist the captured session_id so a later resume turn can
         // pass `--resume <sessionId>`. Writing is best-effort: a failure here
         // does NOT abort the run — we log it and continue (the run's result is
         // still valid; only the resume path becomes unavailable for this run).
         try {
-          this.sessionRepo?.save(ctx.runId, sessionId);
+          this.sessionRepo.save(ctx.runId, sessionId);
         } catch (saveErr) {
           logError("LiveClaudeOrchestrator: failed to persist session_id (resume disabled for this run)", saveErr);
         }

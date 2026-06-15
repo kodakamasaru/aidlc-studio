@@ -31,6 +31,7 @@ import { PlaywrightCapturer } from "./infra/screenshot/playwright-capturer";
 import type { Ports } from "./app/ports/composition";
 import type { OrchestratorPort, DomainEventSink } from "./app/ports/orchestrator";
 import type { NotifyPort } from "./app/ports/notify";
+import type { SessionRepo } from "./app/ports/repos";
 
 export interface BuildServerOptions {
   readonly dbPath?: string;
@@ -83,7 +84,11 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
   const orchestratorKind =
     opts?.orchestrator ??
     (process.env.AIDLC_ORCHESTRATOR === "live" ? "live" : "scripted");
-  const orchestrator = buildOrchestrator(orchestratorKind, sink);
+  // Unit-04: the live adapter persists each run's claude session_id via this repo
+  // so a later answer can `claude --resume <sessionId>`. Without it the session_id
+  // is captured but never saved → resume fails with "sessionId missing" and the
+  // hearing stalls right after the human answers (S10 実機: 回答したら止まる).
+  const orchestrator = buildOrchestrator(orchestratorKind, sink, store.repos.sessions);
 
   const ports: Ports = {
     clock,
@@ -155,6 +160,7 @@ function mountStaticSpa(app: Hono): void {
 function buildOrchestrator(
   kind: "scripted" | "live",
   sink: DomainEventSink,
+  sessionRepo: SessionRepo,
 ): OrchestratorPort {
   if (kind === "live") {
     // Drive the locally-installed Claude Code CLI headless (S7 Phase 5b). The
@@ -194,6 +200,7 @@ function buildOrchestrator(
       composer,
       capturer,
       verifyUrl,
+      sessionRepo,
       shotsDir: SHOTS_DIR,
       shotUrlBase: SHOT_URL_BASE,
       ...(model !== undefined ? { model } : {}),
