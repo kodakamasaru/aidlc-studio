@@ -191,11 +191,52 @@ export function aidlcQuestionToEvent(runId: RunId, q: AidlcQuestion): QuestionRa
     type: "QuestionRaised",
     runId,
     kind: "question",
-    payload: { kind: "question", prompt, options },
+    // Free-text questions (answerKind="free") carry no options; omit the field
+    // entirely so the domain payload reads as "free input only" (question.ts:
+    // options 欠落 = 自由入力), not an empty choice list. Choice questions keep theirs.
+    payload: { kind: "question", prompt, ...(options.length > 0 ? { options } : {}) },
   };
 }
 
 const DEFAULT_CLAUDE_BIN = "claude";
+/**
+ * Headless isolation (S10 実機 F-10). A live run's cwd is the TARGET repo so the
+ * step can write aidlc-docs/. But a default `claude -p` then auto-loads that repo's
+ * CLAUDE.md + the user's SessionStart hooks (the prior-session summary that says
+ * "MUST NOT re-execute") + auto-memory — which HIJACK the run: the agent answers
+ * conversationally in English and refuses the generator prompt as "stale" instead of
+ * emitting an aidlc-result envelope. `--setting-sources project` drops that ambient
+ * user-level context (CLAUDE.md / auto-memory / session hooks) while keeping the
+ * local subscription auth, so the composed prompt is the ONLY instruction.
+ */
+const SETTING_SOURCES_ARGS = ["--setting-sources", "project"] as const;
+/**
+ * Dropping user settings also drops the user's tool allowlist, so a headless run's
+ * tool use would otherwise block on an un-answerable permission prompt. Grant the
+ * step its tools via an EXPLICIT allow-list — an allow rule, NOT
+ * `--permission-mode bypassPermissions` / `--dangerously-skip-permissions`, which
+ * the operator boundary forbids. These are the tools an AI-DLC step needs to
+ * read/write aidlc-docs.
+ */
+const HEADLESS_TOOL_ALLOW = [
+  "Read",
+  "Write",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Bash",
+  "TodoWrite",
+  "LS",
+] as const;
+const HEADLESS_SETTINGS_ARGS = [
+  "--settings",
+  JSON.stringify({ permissions: { allow: HEADLESS_TOOL_ALLOW } }),
+] as const;
+/** Appended to every live spawn (launch / retry / eval / resume) — see above. */
+const ISOLATION_ARGS: readonly string[] = [
+  ...SETTING_SOURCES_ARGS,
+  ...HEADLESS_SETTINGS_ARGS,
+];
 // Wall-clock backstop for a live run producing no result. A real AI-DLC step
 // (e.g. S1 generating brief + US docs) routinely runs several minutes, so the
 // old 2-min default tripped stalls too easily (S10 実機指摘 F-8). 10 min gives
@@ -490,6 +531,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       "--output-format",
       "stream-json",
       "--verbose",
+      ...ISOLATION_ARGS,
       ...(this.maxTurns !== undefined ? ["--max-turns", String(this.maxTurns)] : []),
       ...(this.model !== undefined ? ["--model", this.model] : []),
     ];
@@ -553,6 +595,9 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       "--output-format",
       "stream-json",
       "--verbose",
+      // Isolate from the target repo's ambient Claude context (CLAUDE.md / hooks /
+      // auto-memory) so the composed prompt is the only instruction (F-10).
+      ...ISOLATION_ARGS,
       // No --max-turns by default: a low cap aborts the agent the instant it uses
       // a tool (error_max_turns). Only pass it when explicitly configured.
       ...(this.maxTurns !== undefined
