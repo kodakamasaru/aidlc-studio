@@ -916,6 +916,43 @@
   }
 }
 
+/* SCR-03: live レビューの3セクション(対応状況/成果物/AI決定)の見出しも
+   block-head 帯(薄背景 + primary 縦マーカー + mono ラベル)に統一する。 */
+.completeness__head,
+.artifacts-section__head,
+.decisions-section__head {
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-2);
+  background: var(--color-surface-2);
+  margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5)) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.completeness__head::before,
+.artifacts-section__head::before,
+.decisions-section__head::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+.completeness__title,
+.artifacts-section__title,
+.decisions-section__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-mid);
+}
+.completeness__count,
+.artifacts-section__count,
+.decisions-section__count {
+  margin-left: auto;
+}
+
 /* ── reduced-motion overrides ─────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .review-skel-line,
