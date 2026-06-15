@@ -6,11 +6,17 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   margin-bottom: var(--sp-6);
 }
+/* SCR-03: badge + title は横一列(mock 準拠) */
+.review-detail__head-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
 .review-detail__title {
-  font-size: var(--text-h1);
+  font-size: var(--text-h2);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -31,13 +37,34 @@
   animation: fade-slide-up 180ms var(--ease-out) backwards;
 }
 
+/* SCR-03: block ヘッダ帯(薄背景 + primary の縦マーカー + mono ラベル) */
 .block-card__kind {
-  font-size: var(--text-micro);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-violet);
-  margin-bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text-mid);
+  background: var(--color-surface-2);
+  /* カード端まで伸ばす(card padding=--sp-5 を相殺)+ 上角を card に合わせる */
+  margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5)) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.block-card__kind::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+.block-card__count {
+  margin-left: auto;
+  color: var(--color-text-low);
 }
 
 .block-card__body {

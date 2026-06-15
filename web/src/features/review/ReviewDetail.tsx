@@ -162,12 +162,14 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
   return (
     <div className="content-inner review-detail">
       <header className="review-detail__head">
-        <StateBadge variant="review" noDot icon={<span aria-hidden="true">◎</span>}>
-          レビュー待ち
-        </StateBadge>
-        <h1 className="review-detail__title">
-          「{stepLabel(review.step)}」のできあがり確認
-        </h1>
+        <div className="review-detail__head-top">
+          <StateBadge variant="review" noDot icon={<span aria-hidden="true">◎</span>}>
+            できあがりの確認
+          </StateBadge>
+          <h1 className="review-detail__title">
+            「{stepLabel(review.step)}」のできあがり確認
+          </h1>
+        </div>
         <p className="review-detail__meta">
           コードを読まずに、できあがりを確認できます。問題なければ「承認」、直しが要るなら「差し戻し」。
         </p>
