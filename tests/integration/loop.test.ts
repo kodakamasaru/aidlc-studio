@@ -108,9 +108,9 @@ describe("full loop — happy path", () => {
     expect(answerRes.json.data.question.state).toBe("answered");
 
     // After answering the "question" kind: the scripted orchestrator emits
-    // ResultEmitted → visual_review card. Separately, EngineService.onRolelessResult
-    // auto-launches a reconstruction run which emits ReconstructionProposalEmitted
-    // → reconstruction inbox card (US-08 F-1). So the inbox now has ≥1 open card.
+    // ResultEmitted → visual_review card. Reconstruction does NOT fire yet — it is
+    // triggered only on S1 確定 (the run reaching `done` at approve, below), so at
+    // this pre-approval point the inbox holds the visual_review card.
     const inbox2 = await get(h.app, `/api/projects/${projectId}/inbox`);
     expect(inbox2.json.data.length).toBeGreaterThanOrEqual(1);
     // The visual_review card is present among the open questions.
@@ -145,8 +145,9 @@ describe("full loop — happy path", () => {
     expect(runStates(cycleGet.json.data)).toContain("done");
 
     // Inbox: visual_review and original question are answered/closed.
-    // The reconstruction card (US-08 F-1) remains open until the human explicitly
-    // approves or rejects it via the /cycles/:id/reconstruction screen.
+    // Approving S1 reached `done`, which now triggers the reconstruction run
+    // (US-08 AC-2) → its reconstruction card (US-08 F-1) is open here and remains
+    // open until the human approves/rejects it via /cycles/:id/reconstruction.
     const inbox3 = await get(h.app, `/api/projects/${projectId}/inbox`);
     const remainingOpen: any[] = inbox3.json.data.filter((q: any) => q.state === "open");
     // No visual_review or question cards remain open.

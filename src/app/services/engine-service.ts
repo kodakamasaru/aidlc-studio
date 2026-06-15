@@ -11,9 +11,12 @@
 //       allow-done    → raise visual_review (human approves the evaluator output)
 //       await-descope → advanceRun(stalled, reason)  [descope Qs already in inbox]
 //       auto-rework   → advanceRun(stalled, reason)  [Q-02: loud, not silent re-gen]
+//   RunStateChanged → "done" for a role-less S1 run → S1 確定 → auto-launch ONE
+//       reconstruction proposal run (US-08 AC-2). Fires on confirmation only, and
+//       never from a reconstruction run itself (recursion guard) — the live loop fix.
 //
-// Role-less runs (v0.0.1 single-run flow) get NO reaction — the applier's own
-// visual_review path handles them unchanged (backward compatible).
+// Role-less runs (v0.0.1 single-run flow) get NO ResultEmitted reaction — the
+// applier's own visual_review path handles them unchanged (backward compatible).
 import type { Ports } from "../ports/composition";
 import type { RunEmission, RunContext } from "../ports/orchestrator";
 import { EventApplier } from "./event-applier";
@@ -41,6 +44,16 @@ import { logError } from "../../infra/log";
 
 export class EngineService {
   private readonly applier: EventApplier;
+  /**
+   * US-08 AC-2 recursion guard: runIds we launched as reconstruction proposal runs.
+   * A reconstruction run is itself a role-less S1 run, so when the human approves it
+   * and it reaches `done`, onS1Confirmed would re-launch reconstruction → the
+   * infinite live loop (scripted side-stepped it by emitting RunStateChanged(done)
+   * from a single-shot scenario; live emits a plain ResultEmitted that recursed).
+   * Skipping these runIds makes reconstruction single-shot in BOTH adapters.
+   * In-memory, never evicted (one entry per S1 確定 / bounded by process lifetime).
+   */
+  private readonly reconstructionRuns = new Set<string>();
 
   constructor(private readonly ports: Ports) {
     this.applier = new EventApplier(ports);
@@ -55,36 +68,56 @@ export class EngineService {
   // ── reactions ────────────────────────────────────────────────────
   private async react(emission: RunEmission): Promise<void> {
     const { ctx, event } = emission;
-    if (event.type !== "ResultEmitted") return;
     const cycle = this.ports.repos.cycles.findById(ctx.cycleId);
     if (!cycle) return;
-    const role = this.runRole(cycle, ctx.runId);
-    if (role === "generator") await this.onGeneratorResult(cycle, ctx, event);
-    else if (role === "evaluator") await this.onEvaluatorResult(cycle, ctx, event);
-    else await this.onRolelessResult(cycle, ctx);
-    // role-less → applier's legacy visual_review already ran; additionally:
-    // S1 done triggers reconstruction auto-launch (US-08 AC-2).
+
+    if (event.type === "ResultEmitted") {
+      const role = this.runRole(cycle, ctx.runId);
+      if (role === "generator") await this.onGeneratorResult(cycle, ctx, event);
+      else if (role === "evaluator") await this.onEvaluatorResult(cycle, ctx, event);
+      // role-less ResultEmitted: the applier already raised the visual_review card.
+      // Reconstruction is NOT triggered here anymore — it fires only on S1 確定
+      // (RunStateChanged done) below, so it never runs during the pre-approval
+      // review-waiting state, and a reconstruction run's own role-less ResultEmitted
+      // can no longer re-trigger it (the live infinite-loop root cause).
+      return;
+    }
+
+    // US-08 AC-2: S1 確定 = the run reached `done` (human approved its review).
+    // Only then auto-launch the reconstruction proposal run.
+    if (event.type === "RunStateChanged" && event.to === "done") {
+      await this.onS1Confirmed(cycle, ctx);
+    }
   }
 
   /**
-   * US-08 AC-2: S1 確定(role-less ResultEmitted for step="S1")を検知して
-   * 再構成提案ランを自動起動する。ベストエフォート(失敗しても S1 完了に影響しない)。
+   * US-08 AC-2: S1 確定(role-less S1 run reaching `done` = 人間がレビュー承認)を
+   * 検知して再構成提案ランを 1 回だけ自動起動する。ベストエフォート(失敗しても
+   * S1 完了に影響しない)。
+   *
+   * 再帰ガード: 自分が起動した reconstruction run(role-less S1)が承認されて done に
+   * なっても再起動しない(reconstructionRuns で除外)。これが live 無限ループの根治。
    *
    * hearingScope="reconstruction" を RunLaunch に乗せることで scripted adapter が
-   * "reconstruction" シナリオを選択できる。live adapter は同フィールドを読んで
+   * 単発の reconstruction シナリオを選択できる。live adapter は同フィールドを読んで
    * aidlc-reconstruction ブロックを求めるプロンプトを生成する(live は additive / §4)。
    *
    * 新フェーズは作成しない — S1 の phase/step 文脈でそのまま起動する。
    * run の DB 永続化はここでは行わない(scripted は状態機械内部に保持 / live は launch
    * 後に DB を書かないアーキテクチャが存在する場合の互換性確保のため)。
    */
-  private async onRolelessResult(cycle: Cycle, ctx: RunContext): Promise<void> {
+  private async onS1Confirmed(cycle: Cycle, ctx: RunContext): Promise<void> {
     if (!sameStep(ctx.step, "S1" as Step)) return;
+    // Recursion guard: never spawn reconstruction-of-reconstruction (the live loop).
+    if (this.reconstructionRuns.has(ctx.runId as string)) return;
 
     const project = this.ports.repos.projects.findById(cycle.projectId);
     if (!project) return;
 
     const runId = this.ports.ids.runId();
+    // Mark BEFORE launching so the new run's own terminal `done` is recognized and
+    // skipped — even if its events arrive before this method returns.
+    this.reconstructionRuns.add(runId as string);
     const phaseId =
       cycle.phases.find((p) => sameStep(p.step, ctx.step))?.id ?? ctx.phaseId;
 
@@ -99,7 +132,7 @@ export class EngineService {
         hearingScope: "reconstruction",
       });
     } catch (err) {
-      logError("EngineService.onRolelessResult: reconstruction launch failed", {
+      logError("EngineService.onS1Confirmed: reconstruction launch failed", {
         cycleId: ctx.cycleId as string,
         step: ctx.step as string,
         error: err instanceof Error ? err.message : String(err),
