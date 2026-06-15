@@ -122,6 +122,49 @@ async function drainFake(
   void emissions; // already mutated by the sink
 }
 
+/** Build fake JSONL containing an aidlc-reconstruction block (→ ReconstructionProposalEmitted). */
+function fakeReconstructionStdout(sessionId = "sess-recon-001"): string {
+  const initLine = JSON.stringify({ type: "system", subtype: "init", session_id: sessionId });
+  const block = [
+    "```aidlc-reconstruction",
+    JSON.stringify({
+      scope: "cycle",
+      steps: [
+        { id: "S2", label: "画面", order: 0, skillRef: "aidlc-s2-wireframe", instruction: "ワイヤーフレーム", diff: "keep" },
+        { id: "S6", label: "モデル", order: 1, skillRef: "aidlc-s6-domain-model", instruction: "ドメインモデル", diff: "keep" },
+      ],
+    }),
+    "```",
+  ].join("\n");
+  const resultLine = JSON.stringify({ type: "result", subtype: "success", result: block });
+  return [initLine, resultLine].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// US-08 / O5: live adapter emits ReconstructionProposalEmitted from a block
+// ---------------------------------------------------------------------------
+
+describe("LiveClaudeOrchestrator.awaitAndEmit — aidlc-reconstruction (US-08 / O5)", () => {
+  test("reconstruction block → ReconstructionProposalEmitted + RunStateChanged(done), NO ResultEmitted", async () => {
+    const { emissions, sink } = makeSink();
+    const orc = new LiveClaudeOrchestrator({ sink });
+    injectCtx(orc, ctx);
+
+    await drainFake(orc, fakeReconstructionStdout(), emissions);
+
+    // Mirrors scripted: proposal then done — never a visual_review (loop guard).
+    expect(emissions.map((e) => e.event.type)).toEqual([
+      "ReconstructionProposalEmitted",
+      "RunStateChanged",
+    ]);
+    const proposalEv = emissions[0]!.event as Extract<DomainEvent, { type: "ReconstructionProposalEmitted" }>;
+    expect((proposalEv.proposal as { scope: string }).scope).toBe("cycle");
+    expect((proposalEv.proposal as { steps: unknown[] }).steps).toHaveLength(2);
+    const doneEv = emissions[1]!.event as Extract<DomainEvent, { type: "RunStateChanged" }>;
+    expect(doneEv.to).toBe("done");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Port type guard: ResumeRun accepts sessionId
 // ---------------------------------------------------------------------------

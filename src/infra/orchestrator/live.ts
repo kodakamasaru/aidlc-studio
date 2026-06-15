@@ -35,7 +35,7 @@ import { join, resolve } from "node:path";
 import { logError, logInfo } from "../log";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { parseQuestionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
+import { parseQuestionBlock, parseReconstructionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
 import { parseAidlcResultBlock, type AidlcResult } from "../../wire/aidlc-result";
 
 /**
@@ -361,6 +361,13 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   /** Generator prompt: real composition when a composer is wired, else the stub. */
   private generatorPrompt(cmd: RunLaunch): string {
     if (!this.composer) return this.buildPrompt(cmd);
+    // US-08 / O5: a reconstruction-proposal launch composes a bespoke prompt that
+    // asks the AI for an aidlc-reconstruction block (not a normal step generator
+    // prompt). content-driven detection at emit time handles the block; this is the
+    // belt-and-suspenders that makes the AI actually produce it.
+    if (cmd.hearingScope === "reconstruction") {
+      return this.composer.composeReconstruction(cmd.repoPath);
+    }
     // BU-1: prefer structured path when structuredContext is present (§C7.1-C7.4 sections).
     // Legacy path (contextPaths) is kept as fallback for scripted / backward-compat cases.
     if (cmd.structuredContext !== undefined) {
@@ -750,6 +757,27 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       const text = extractResultText(stdout);
       if (text === undefined || text.trim().length === 0) {
         throw new Error("claude produced no assistant result text");
+      }
+
+      // US-08 / O5: a reconstruction run emits an ```aidlc-reconstruction``` block.
+      // Present → ReconstructionProposalEmitted + RunStateChanged(done), mirroring
+      // the scripted adapter (done, NOT ResultEmitted — no visual_review card and no
+      // re-trigger of onS1Confirmed). Absent (ok null) → fall through to the normal
+      // aidlc-result/question paths. Parse error → log (原則④) + fall through.
+      const reconParseResult = parseReconstructionBlock(text);
+      if (!reconParseResult.ok) {
+        logError(
+          "LiveClaudeOrchestrator: aidlc-reconstruction block parse error — falling back",
+          { runId: ctx.runId as string, code: reconParseResult.error.code, detail: reconParseResult.error.detail },
+        );
+      } else if (reconParseResult.value !== null) {
+        await this.emit(ctx, {
+          type: "ReconstructionProposalEmitted",
+          runId: ctx.runId,
+          proposal: reconParseResult.value,
+        });
+        await this.emit(ctx, { type: "RunStateChanged", runId: ctx.runId, to: "done" });
+        return;
       }
 
       // BU-2: FIRST try aidlc-result envelope (§C7.4). Present → drive events

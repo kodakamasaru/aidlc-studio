@@ -132,6 +132,36 @@ export class PromptComposer {
   }
 
   /**
+   * US-08 / O5: bespoke prompt for the reconstruction-proposal run. Reconstruction
+   * is a meta-step (no kit/skills 本文), fired once right after S1 確定. The live run
+   * reads THIS cycle's S1 output (US群) + brief from aidlc-docs/ with its own tools,
+   * then proposes the PENDING pipeline (S1 is already fixed — AC-5). Output is a
+   * single ```aidlc-reconstruction``` block (scope:"cycle"), all human text 日本語.
+   */
+  composeReconstruction(repoPath: string): string {
+    const docsDir = join(repoPath, "aidlc-docs");
+    return [
+      "あなたは AI-DLC の工程再構成器です。S1(要件)が確定した直後に、このサイクルの工程を US に合わせて1回だけ組み直します(US-08)。",
+      "",
+      "── 入力(自分のツールで読め) ──",
+      `- ${docsDir} 配下の最新バージョンの s1/(index + US 群)を Glob/Read で読む。brief(${docsDir}/ 直下の brief)も読む。`,
+      "- 既定工程は S1〜S12(Discovery/Design/Build/Validation/Improvement)。skillRef は aidlc-sN-* 形式。",
+      "",
+      "── やること ──",
+      "US と brief から、この案件に本当に必要な工程列へ組み直す。工程の keep/delete/並べ替え/独自工程の新設、各工程のルール本文(instruction)の作り直しを含む。変化なし(既定のまま keep)もありうる。",
+      "**S1 は着手済み(確定)なので steps に含めない**。残り(pending)の工程のみを提案する(AC-5)。",
+      "",
+      "── 出力(必須) ──",
+      "最後に下記スキーマの minified JSON を ```aidlc-reconstruction``` フェンスで1つだけ出力せよ(散文だけは不可 / 末尾に必ず出力):",
+      "```aidlc-reconstruction",
+      '{"scope":"cycle","steps":[{"id":"S2","label":"画面","order":0,"skillRef":"aidlc-s2-wireframe","instruction":"この工程のルール本文(日本語・何をどう作るか)","diff":"keep","reason":"根拠(任意)"}]}',
+      "```",
+      "フィールド: scope=\"cycle\"。steps[] は非空・各要素に id / label / order(0始まり連番) / skillRef / instruction(ルール本文・日本語) / diff(\"keep\"|\"add\"|\"delete\"|\"current\")。diff=\"delete\" のときは reason 必須。",
+      "label・instruction・reason など人間が読む文字列はすべて日本語。",
+    ].join("\n");
+  }
+
+  /**
    * [Structured / BU-1] Compose a prompt using a pre-built StructuredContext (§C7.1-C7.4).
    *
    * Renders:
