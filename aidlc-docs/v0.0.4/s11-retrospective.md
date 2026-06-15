@@ -41,6 +41,18 @@
 
 ---
 
+### Problem 追補 — composition-root 配線漏れ(S10 実機 live 検証 / 2026-06-15)
+
+| # | 問題 | 根本原因 | 出典 |
+|---|------|---------|------|
+| P10 | **live orchestrator の composition-root 配線漏れが連続露呈**。① reconstruction 自己再発火による無限ループ ② 隔離フラグ欠如で headless claude が対象リポの CLAUDE.md/フック/memory を読み英語ハイジャック ③ `sessionRepo` 未配線で session_id が保存されず回答後 resume が停止 ④ resume が `process.cwd()` 起動で別 cwd のセッションを見失う — いずれも**決定論テスト緑のまま実機でのみ露呈**。 | `LiveClaudeOptions` 等が**任意フィールド(`foo?:`)主体 → server.ts で渡し忘れても tsc 通過 → 決定論テストは依存をモック直接注入するので composition-root の漏れを構造的に検出できない**。実機の縦経路(launch→question→answer→resume)を一度も通していなかった。 | S10 実機 live + 配線監査 |
+
+- T6: **composition-root を仕様(インターフェース)起点で監査する**。adapter のオプション/ポートは「任意フィールドでも本番必須なら必須化、できなければ未配線時 loud-log(原則④)」。決定論テストは mock 注入で composition を見ないので、**live の縦経路は実機 e2e を1本通すまで「未配線かもしれない」前提**で扱う([completeness-checks-anchor-on-spec] の composition 版)。
+- T7: **プロセス問題は発生時にこの S11 へ即メモする**(ユーザー指示 2026-06-15)。サイクル末でまとめて思い出すのでなく、起きた時点で Problem 表に追補する。
+- T8: **ハーネス検証の対象 PJ は使い捨てリポ(/tmp 等)にし、studio リポ自身に向けない**(ユーザー指示 2026-06-15)。live S1 等は実 `aidlc-docs/{version}/` に成果物を書くため、dogfood リポに向けると本物の作業ツリーが汚染される(実際に test サイクル v0.0.5 の S1 US 群が混入した)。検証は isolated repo + isolated DB + 別ポートで行う。
+
+---
+
 ## 品質メトリクス
 （S10 完了後に S11 本実行で記入。S9 = バグ CRITICAL 0 / HIGH 1(O6 検出・本サイクル修正) / MEDIUM 2(O3/O5 carried) ほか。決定論 505 + E2E 33 + live 8 green。）
 
