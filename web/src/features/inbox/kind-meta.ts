@@ -28,7 +28,10 @@ const META: Record<QuestionKind, KindMeta> = {
 };
 
 export function kindMeta(kind: QuestionKind): KindMeta {
-  return META[kind];
+  // Fallback for an unexpected kind from the backend: never return undefined
+  // (InboxCard reads meta.variant — an undefined would throw and white-screen the
+  // WHOLE inbox, hiding every other card / 原則④: degrade visibly, don't crash).
+  return META[kind] ?? { variant: "q", icon: "•", label: String(kind), action: "確認する" };
 }
 
 /** Where a kind opens: review detail (SCR-04) vs answer (SCR-05). */

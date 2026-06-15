@@ -4,7 +4,7 @@
 import type { Cycle, Phase, Run, RunState, Question } from "./api";
 
 /** Coarse run-state badge a Cycle shows in the list / topbar. */
-export type DisplayState = "running" | "stalled" | "failed" | "done" | "idle";
+export type DisplayState = "running" | "stalled" | "failed" | "done" | "review" | "idle";
 
 const latestRun = (phase: Phase): Run | undefined =>
   phase.runs.length > 0 ? phase.runs[phase.runs.length - 1] : undefined;
@@ -44,10 +44,15 @@ const RUN_TO_DISPLAY: Record<RunState, DisplayState> = {
 export function cycleDisplayState(cycle: Cycle): DisplayState {
   if (cycle.state === "done") return "done";
   const latest = latestRunOfCycle(cycle);
-  if (latest && latest.run.state !== "done") {
-    return RUN_TO_DISPLAY[latest.run.state];
-  }
-  return "idle";
+  // No run anywhere → genuinely not started.
+  if (!latest) return "idle";
+  // A run is still active (running/stalled/failed) → surface that.
+  if (latest.run.state !== "done") return RUN_TO_DISPLAY[latest.run.state];
+  // The latest run is DONE but the cycle is not → the active phase is awaiting the
+  // human (review) or sits between phases. This is a STARTED cycle, never "idle"
+  // (未起動). When the active phase is in review, say 確認待ち; otherwise 進行中.
+  const active = activePhase(cycle);
+  return active?.state === "review" ? "review" : "running";
 }
 
 /**
@@ -96,6 +101,7 @@ export const STATE_LABEL: Record<DisplayState, string> = {
   stalled: "停止",
   failed: "失敗",
   done: "完了",
+  review: "確認待ち",
   idle: "未起動",
 };
 
@@ -104,5 +110,7 @@ export const STATE_BADGE_CLASS: Record<DisplayState, string> = {
   stalled: "badge--stalled",
   failed: "badge--failed",
   done: "badge--done",
+  // 確認待ち = 人間のアクション待ち。視覚的には running と同系(active)を流用。
+  review: "badge--running",
   idle: "badge--idle",
 };
