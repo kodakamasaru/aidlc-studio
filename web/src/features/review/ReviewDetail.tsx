@@ -184,6 +184,10 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
         {busy ? "送信しています…" : ""}
       </p>
 
+      {/* SCR-03 順: 成果物本文(概要)→ 受け入れ条件 → 成果物 → AI決定。
+          live は本文を summary block として注入(US-02)、scripted は元から block。 */}
+      <ReviewBlocks blocks={normalisedBlocks} />
+
       {review.completeness ? (
         <CompletenessTable completeness={review.completeness} />
       ) : null}
@@ -195,8 +199,6 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
       {review.decisions && review.decisions.length > 0 ? (
         <DecisionsSection decisions={review.decisions} />
       ) : null}
-
-      <ReviewBlocks blocks={normalisedBlocks} />
 
       {backtracking ? (
         <BacktrackModal

@@ -33,7 +33,7 @@ import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { join, resolve } from "node:path";
 import { logError, logInfo } from "../log";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parseQuestionBlock, parseReconstructionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
 import { parseAidlcResultBlock, type AidlcResult } from "../../wire/aidlc-result";
@@ -59,21 +59,27 @@ export const MAX_HEARING_TURNS = 10;
  *
  * Pure: no I/O, no side effects. Exported for direct unit testing.
  */
-export function aidlcResultToEvents(runId: RunId, result: AidlcResult): DomainEvent[] {
+export function aidlcResultToEvents(
+  runId: RunId,
+  result: AidlcResult,
+  // US-02: the artifact md files' content, pre-read by the live adapter and passed
+  // in as `summary` blocks so the human can READ the brief/US in the review without
+  // opening files (SCR-03 / 原則③). Empty for the scripted/pure path.
+  contentBlocks: readonly ReviewBlock[] = [],
+): DomainEvent[] {
   // questions[] non-empty: emit one QuestionRaised per question (highest priority).
   if (result.questions.length > 0) {
     return result.questions.map((q) => aidlcQuestionToEvent(runId, q));
   }
 
   if (result.status === "needs_human") {
-    // Build a ResultEmitted that carries completeness + artifacts + decisions
-    // from the envelope (§C7.4). blocks starts empty — the review text is in
-    // aidlc-docs md files (path refs in artifacts); the ReviewDetail renderer
-    // uses artifacts + completeness directly (Unit-05 alignment).
+    // Build a ResultEmitted that carries the artifact content (md 本文) as blocks
+    // PLUS completeness + artifacts + decisions from the envelope (§C7.4). Rendering
+    // the body fulfils US-02 (review without opening files).
     const event: DomainEvent = {
       type: "ResultEmitted",
       runId,
-      blocks: [],
+      blocks: contentBlocks,
       completeness: result.completeness,
       ...(result.artifacts.length > 0 ? { artifacts: result.artifacts } : {}),
       ...(result.decisions.length > 0 ? { decisions: result.decisions } : {}),
@@ -793,8 +799,15 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         );
         // Fall through to legacy path (aidlc-question then ResultEmitted).
       } else if (resultParseResult.value !== null) {
-        // Envelope found and validated → emit events derived from it.
-        const events = aidlcResultToEvents(ctx.runId, resultParseResult.value);
+        // Envelope found and validated → emit events derived from it. For a
+        // needs_human review, read the artifact md bodies so the review shows the
+        // actual brief/US content, not just file links (US-02).
+        const result = resultParseResult.value;
+        const contentBlocks =
+          result.status === "needs_human"
+            ? this.readArtifactBlocks(ctx.runId as string, result.artifacts)
+            : [];
+        const events = aidlcResultToEvents(ctx.runId, result, contentBlocks);
         for (const event of events) {
           await this.emit(ctx, event);
         }
@@ -886,6 +899,35 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     } catch {
       // best-effort kill; the awaited child.exited still resolves.
     }
+  }
+
+  /**
+   * US-02: read each `.md` artifact's content (resolved against the run's repoPath)
+   * into a `summary` ReviewBlock so the review renders the actual brief/US body —
+   * the human reviews without opening files (SCR-03 / 原則③). Best-effort: a missing
+   * repoPath (server restart) or unreadable file is skipped + logged, never thrown
+   * (the review still surfaces via completeness/artifacts).
+   */
+  private readArtifactBlocks(runId: string, artifacts: readonly string[]): ReviewBlock[] {
+    const repoPath = this.repoPaths.get(runId);
+    if (repoPath === undefined) return [];
+    const blocks: ReviewBlock[] = [];
+    for (const rel of artifacts) {
+      if (!rel.endsWith(".md")) continue;
+      const abs = isAbsolute(rel) ? rel : join(repoPath, rel);
+      try {
+        if (!existsSync(abs)) continue;
+        const body = readFileSync(abs, "utf8");
+        if (body.trim().length === 0) continue;
+        blocks.push({ type: "summary", title: rel as Text, body: body as Text });
+      } catch (err) {
+        logError("LiveClaudeOrchestrator.readArtifactBlocks: read failed", {
+          artifact: rel,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return blocks;
   }
 
   private async emit(ctx: RunContext, event: DomainEvent): Promise<void> {
