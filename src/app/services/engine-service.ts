@@ -22,6 +22,7 @@ import type { RunEmission, RunContext } from "../ports/orchestrator";
 import { EventApplier } from "./event-applier";
 import { compensateRun } from "./compensate";
 import { runDeterministicGate } from "./deterministic-gate";
+import { launchReconstructionForS1 } from "./reconstruction-launch";
 import {
   advanceRun,
   launchEval,
@@ -44,16 +45,6 @@ import { logError } from "../../infra/log";
 
 export class EngineService {
   private readonly applier: EventApplier;
-  /**
-   * US-08 AC-2 recursion guard: runIds we launched as reconstruction proposal runs.
-   * A reconstruction run is itself a role-less S1 run, so when the human approves it
-   * and it reaches `done`, onS1Confirmed would re-launch reconstruction → the
-   * infinite live loop (scripted side-stepped it by emitting RunStateChanged(done)
-   * from a single-shot scenario; live emits a plain ResultEmitted that recursed).
-   * Skipping these runIds makes reconstruction single-shot in BOTH adapters.
-   * In-memory, never evicted (one entry per S1 確定 / bounded by process lifetime).
-   */
-  private readonly reconstructionRuns = new Set<string>();
 
   constructor(private readonly ports: Ports) {
     this.applier = new EventApplier(ports);
@@ -83,60 +74,12 @@ export class EngineService {
       return;
     }
 
-    // US-08 AC-2: S1 確定 = the run reached `done` (human approved its review).
-    // Only then auto-launch the reconstruction proposal run.
+    // US-08 AC-2: S1 確定 = the run reached `done`. The AI-emits-status:"done" path
+    // hits here; the human-approves-review path triggers the SAME shared launcher
+    // from InboxService.finalizeApprovedReview. The launcher is idempotent (DB
+    // proposal guard), so firing from both paths is safe and never self-recurses.
     if (event.type === "RunStateChanged" && event.to === "done") {
-      await this.onS1Confirmed(cycle, ctx);
-    }
-  }
-
-  /**
-   * US-08 AC-2: S1 確定(role-less S1 run reaching `done` = 人間がレビュー承認)を
-   * 検知して再構成提案ランを 1 回だけ自動起動する。ベストエフォート(失敗しても
-   * S1 完了に影響しない)。
-   *
-   * 再帰ガード: 自分が起動した reconstruction run(role-less S1)が承認されて done に
-   * なっても再起動しない(reconstructionRuns で除外)。これが live 無限ループの根治。
-   *
-   * hearingScope="reconstruction" を RunLaunch に乗せることで scripted adapter が
-   * 単発の reconstruction シナリオを選択できる。live adapter は同フィールドを読んで
-   * aidlc-reconstruction ブロックを求めるプロンプトを生成する(live は additive / §4)。
-   *
-   * 新フェーズは作成しない — S1 の phase/step 文脈でそのまま起動する。
-   * run の DB 永続化はここでは行わない(scripted は状態機械内部に保持 / live は launch
-   * 後に DB を書かないアーキテクチャが存在する場合の互換性確保のため)。
-   */
-  private async onS1Confirmed(cycle: Cycle, ctx: RunContext): Promise<void> {
-    if (!sameStep(ctx.step, "S1" as Step)) return;
-    // Recursion guard: never spawn reconstruction-of-reconstruction (the live loop).
-    if (this.reconstructionRuns.has(ctx.runId as string)) return;
-
-    const project = this.ports.repos.projects.findById(cycle.projectId);
-    if (!project) return;
-
-    const runId = this.ports.ids.runId();
-    // Mark BEFORE launching so the new run's own terminal `done` is recognized and
-    // skipped — even if its events arrive before this method returns.
-    this.reconstructionRuns.add(runId as string);
-    const phaseId =
-      cycle.phases.find((p) => sameStep(p.step, ctx.step))?.id ?? ctx.phaseId;
-
-    try {
-      await this.ports.orchestrator.launch({
-        runId,
-        projectId: cycle.projectId,
-        cycleId: cycle.id,
-        phaseId,
-        step: ctx.step,
-        repoPath: project.repoPath,
-        hearingScope: "reconstruction",
-      });
-    } catch (err) {
-      logError("EngineService.onS1Confirmed: reconstruction launch failed", {
-        cycleId: ctx.cycleId as string,
-        step: ctx.step as string,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      await launchReconstructionForS1(this.ports, cycle, ctx.step, ctx.phaseId);
     }
   }
 

@@ -65,7 +65,7 @@ function setup() {
     orchestrator
       .ofMethod("launch")
       .filter((c) => c.args.hearingScope === "reconstruction");
-  return { engine, ctx, reconLaunches };
+  return { engine, ctx, reconLaunches, ports, cycleId: CID };
 }
 
 describe("reconstruction trigger — S1 確定 only + recursion guard (live loop fix)", () => {
@@ -94,8 +94,8 @@ describe("reconstruction trigger — S1 確定 only + recursion guard (live loop
     expect(reconLaunches()[0]!.args.step).toBe(Step("S1"));
   });
 
-  test("a reconstruction run reaching done does NOT re-launch (recursion guard)", async () => {
-    const { engine, ctx, reconLaunches } = setup();
+  test("once a proposal exists, S1 done does NOT re-launch (idempotency / no self-recursion)", async () => {
+    const { engine, ctx, reconLaunches, ports, cycleId } = setup();
 
     // S1 確定 → exactly one reconstruction run launched.
     await engine.handle({
@@ -105,13 +105,18 @@ describe("reconstruction trigger — S1 確定 only + recursion guard (live loop
     expect(reconLaunches()).toHaveLength(1);
     const reconRunId = reconLaunches()[0]!.args.runId;
 
-    // The reconstruction run is itself a role-less S1 run; when the human approves
-    // it, it reaches done. It must NOT spawn another reconstruction (the loop).
+    // The reconstruction run emits ReconstructionProposalEmitted (SAVING a proposal
+    // for the cycle) BEFORE its terminal `done`. Simulate that, then deliver the
+    // recon run's own `done`: the DB proposal guard must skip it — reconstruction
+    // never self-recurses, and is restart-safe (no in-memory per-run set).
+    ports.uow.run(() =>
+      ports.repos.reconstructionProposals.save(cycleId, { scope: "cycle", steps: [] }),
+    );
     await engine.handle({
       ctx: { ...ctx, runId: reconRunId },
       event: { type: "RunStateChanged", runId: reconRunId, to: "done" },
     });
 
-    expect(reconLaunches()).toHaveLength(1); // still 1 — guard held
+    expect(reconLaunches()).toHaveLength(1); // still 1 — DB proposal guard held
   });
 });

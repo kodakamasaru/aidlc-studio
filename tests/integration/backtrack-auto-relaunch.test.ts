@@ -214,9 +214,15 @@ describe("auto-relaunch after backtrack (US-13 UX)", () => {
       { verdict: "approve" },
     );
 
-    // Approve path must NOT trigger an extra launch — it finalizes via domain funcs.
-    const launchesAfter = h.orchestrator.ofMethod("launch").length;
-    expect(launchesAfter).toBe(launchesBefore);
+    // Approve must NOT trigger a backtrack RELAUNCH of the step (F-4 is backtrack-only;
+    // approve finalizes via domain funcs). It MAY launch the US-08 reconstruction run
+    // when the approved step is S1 確定 — that is a separate, expected launch carrying
+    // hearingScope:"reconstruction", which this test allows.
+    const newLaunches = h.orchestrator.ofMethod("launch").slice(launchesBefore);
+    const nonReconLaunches = newLaunches.filter(
+      (c) => c.args.hearingScope !== "reconstruction",
+    );
+    expect(nonReconLaunches).toHaveLength(0);
 
     // Phase should be done (approved).
     const updatedCycle = h.ports.repos.cycles.findById(CycleId(cycle.id))!;

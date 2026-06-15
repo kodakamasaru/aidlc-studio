@@ -6,6 +6,7 @@ import type { Ports } from "../ports/composition";
 import { fail, isServiceError, messageOf, type ServiceError } from "./errors";
 import { compensateRun } from "./compensate";
 import { locatePhaseOfRun } from "./cycle-helpers";
+import { launchReconstructionForS1 } from "./reconstruction-launch";
 import { CycleService } from "./cycle-service";
 import { applyHearingAnswerToContracts } from "./hearing-service";
 import { parseAnswersBlock, validateReconstructionProposal } from "../../wire/aidlc-wire";
@@ -219,7 +220,7 @@ export class InboxService {
           // orchestrator.resume() — the live adapter's in-memory context Map
           // is lost on server restart, making resume fragile. Domain functions
           // operate on the DB-backed cycle aggregate, which is always available.
-          this.finalizeApprovedReview(question, command.runId);
+          await this.finalizeApprovedReview(question, command.runId);
           return;
         case "retryLaunch":
           await this.dispatchRetry(question, command.runId);
@@ -451,7 +452,7 @@ export class InboxService {
    * risk. Errors are thrown so the outer catch in dispatch() can surface them
    * as a 502 to the frontend (the user sees the error instead of silent failure).
    */
-  private finalizeApprovedReview(question: Question, runId: RunId): void {
+  private async finalizeApprovedReview(question: Question, runId: RunId): Promise<void> {
     const cycle = this.loadCycle(question);
     const phase = locatePhaseOfRun(cycle, runId);
 
@@ -486,6 +487,12 @@ export class InboxService {
     const finalCycle = isOk(completed) ? completed.value : approved.value;
 
     this.ports.uow.run(() => this.ports.repos.cycles.save(finalCycle));
+
+    // US-08: S1 確定 = 人間がレビューを承認した今この瞬間。AI-emits-done と同じ共有
+    // ランチャを叩いて reconstruction を起動する(idempotent / DB proposal guard なので
+    // 二重起動・自己再発火しない)。finalizeApprovedReview は engine sink を通らないため、
+    // ここで明示的に呼ばないと正規の human-in-the-loop で reconstruction が起動しない。
+    await launchReconstructionForS1(this.ports, finalCycle, phase.step, phase.id);
   }
 
   /** Pure: load the cycle and compute the backtracked state (saved by caller). */
