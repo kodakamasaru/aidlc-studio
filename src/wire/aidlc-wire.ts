@@ -185,9 +185,24 @@ export const validateAidlcQuestion = (q: unknown): Result<AidlcQuestion, WireErr
     });
   }
 
-  // options — must be a non-empty array
-  if (!Array.isArray(raw["options"]) || raw["options"].length === 0) {
-    return err({ code: "schema", detail: "question.options must be a non-empty array" });
+  const answerKind = raw["answerKind"] as AidlcAnswerKind;
+  const isFreeText = answerKind === "free";
+
+  // options — must be an array. Choice questions (single/multi) require a
+  // non-empty list; a free-text question (answerKind="free") carries NO options
+  // (the human types the answer), so an empty array is valid there. Rejecting
+  // empty options for "free" was sinking otherwise-valid envelopes into the
+  // legacy visual_review path — the real-AI "質問でこない" bug (S10 実機 F-11).
+  if (!Array.isArray(raw["options"])) {
+    return err({ code: "schema", detail: "question.options must be an array" });
+  }
+  if (!isFreeText && raw["options"].length === 0) {
+    return err({
+      code: "schema",
+      detail:
+        'question.options must be a non-empty array for answerKind "single"/"multi" ' +
+        '(use answerKind "free" for a free-text question with no options)',
+    });
   }
 
   const validatedOptions: AidlcOption[] = [];
@@ -197,13 +212,16 @@ export const validateAidlcQuestion = (q: unknown): Result<AidlcQuestion, WireErr
     validatedOptions.push(optResult.value);
   }
 
-  // Exactly-one-recommended rule — surface loudly, never silently pass
-  const recommendedCount = validatedOptions.filter((o) => o.recommended === true).length;
-  if (recommendedCount !== 1) {
-    return err({
-      code: "schema",
-      detail: `question "${raw["id"]}": exactly 1 option must have recommended=true; found ${recommendedCount}`,
-    });
+  // Exactly-one-recommended rule applies to CHOICE questions only — a free-text
+  // question has no options to recommend. Surface violations loudly.
+  if (!isFreeText) {
+    const recommendedCount = validatedOptions.filter((o) => o.recommended === true).length;
+    if (recommendedCount !== 1) {
+      return err({
+        code: "schema",
+        detail: `question "${raw["id"]}": exactly 1 option must have recommended=true; found ${recommendedCount}`,
+      });
+    }
   }
 
   // background — optional string

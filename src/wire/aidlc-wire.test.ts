@@ -177,8 +177,8 @@ describe("parseQuestionBlock", () => {
     }
   });
 
-  test("empty options array -> err schema", () => {
-    // Arrange
+  test("empty options array (single) -> err schema", () => {
+    // Arrange — single-choice with no options is invalid
     const q = makeQuestion({ options: [] });
     const text = fenceQuestion({ questions: [q] });
 
@@ -190,6 +190,32 @@ describe("parseQuestionBlock", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("schema");
     }
+  });
+
+  test("free-text question with empty options -> ok (no options, no recommended)", () => {
+    // Arrange — answerKind "free" legitimately has no options. Rejecting this was
+    // the "質問でこない" bug: one free question sank the whole envelope to legacy.
+    const q = makeQuestion({ answerKind: "free", options: [] });
+    const text = fenceQuestion({ questions: [q] });
+
+    // Act
+    const result = parseQuestionBlock(text);
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (result.ok && result.value !== null) {
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0]!.answerKind).toBe("free");
+      expect(result.value[0]!.options).toHaveLength(0);
+    }
+  });
+
+  test("free-text question does NOT require exactly-one-recommended", () => {
+    // Arrange — free with zero recommended must pass (the recommended rule is
+    // choice-only). A regression here re-breaks real-AI free questions.
+    const q = makeQuestion({ answerKind: "free", options: [] });
+    const result = parseQuestionBlock(fenceQuestion({ questions: [q] }));
+    expect(result.ok).toBe(true);
   });
 
   test("missing prompt -> err schema naming the field", () => {
