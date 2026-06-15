@@ -45,7 +45,7 @@
 
 | # | 問題 | 根本原因 | 出典 |
 |---|------|---------|------|
-| P10 | **live orchestrator の composition-root 配線漏れが連続露呈**。① reconstruction 自己再発火による無限ループ ② 隔離フラグ欠如で headless claude が対象リポの CLAUDE.md/フック/memory を読み英語ハイジャック ③ `sessionRepo` 未配線で session_id が保存されず回答後 resume が停止 ④ resume が `process.cwd()` 起動で別 cwd のセッションを見失う — いずれも**決定論テスト緑のまま実機でのみ露呈**。 | `LiveClaudeOptions` 等が**任意フィールド(`foo?:`)主体 → server.ts で渡し忘れても tsc 通過 → 決定論テストは依存をモック直接注入するので composition-root の漏れを構造的に検出できない**。実機の縦経路(launch→question→answer→resume)を一度も通していなかった。 | S10 実機 live + 配線監査 |
+| P10 | **live orchestrator の composition-root 配線漏れが連続露呈**。① reconstruction 自己再発火による無限ループ ② 隔離フラグ欠如で headless claude が対象リポの CLAUDE.md/フック/memory を読み英語ハイジャック ③ `sessionRepo` 未配線で session_id が保存されず回答後 resume が停止 ④ resume が `process.cwd()` 起動で別 cwd のセッションを見失う ⑤ reconstruction トリガが engine.react(AI-emits-done)だけに配線され、正規の human-in-the-loop(人間が S1 レビュー承認=finalizeApprovedReview は DB 直書きで sink を通らない)では一切起動しなかった — いずれも**決定論テスト緑のまま実機でのみ露呈**。 | `LiveClaudeOptions` 等が**任意フィールド(`foo?:`)主体 → server.ts で渡し忘れても tsc 通過 → 決定論テストは依存をモック直接注入するので composition-root の漏れを構造的に検出できない**。実機の縦経路(launch→question→answer→resume)を一度も通していなかった。 | S10 実機 live + 配線監査 |
 
 - T6: **composition-root を仕様(インターフェース)起点で監査する**。adapter のオプション/ポートは「任意フィールドでも本番必須なら必須化、できなければ未配線時 loud-log(原則④)」。決定論テストは mock 注入で composition を見ないので、**live の縦経路は実機 e2e を1本通すまで「未配線かもしれない」前提**で扱う([completeness-checks-anchor-on-spec] の composition 版)。
 - T7: **プロセス問題は発生時にこの S11 へ即メモする**(ユーザー指示 2026-06-15)。サイクル末でまとめて思い出すのでなく、起きた時点で Problem 表に追補する。
