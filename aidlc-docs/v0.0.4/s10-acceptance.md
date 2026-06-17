@@ -80,6 +80,7 @@
 
 ### D-02 — モック注入の 3 状態(enlarged/gallery/completed)は「承認可否の判断材料」として正直開示し、隠さない
 - **理由**: 責務契約③(mock で実シナリオ代替して通ったとしない)。フロント描画は実証済だが実 backend 到達が未済の 3 状態を honest に開示し、あなたの判断に委ねる(次サイクル carried)。
+- **更新(2026-06-17)**: **gallery / enlarged は実 backend で到達・目視確認済み**。live で S1→S2→S3 を回し、S3 が実 AI でデザイン html 3枚(scr-01/scr-02/tokens)を生成 → ハーネスの新規 `captureDesignBlocks` が各 html を Playwright でレンダリング → レビューに **screenshot ブロック3枚(ギャラリー)** として描画されることを実機確認(`verify:shot` + 配信 png 目視)。残るモック注入は `completed`(cycle done バナー)のみ。この配線は本サイクルのコミット de6da30 に含む。
 - **判断**(あなた記入): 承認 / 上書き / 保留 →
 
 ---
