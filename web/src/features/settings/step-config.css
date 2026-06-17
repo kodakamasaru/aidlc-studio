@@ -169,6 +169,10 @@
   margin: 0;
   max-height: 460px;
   overflow: auto;
+  /* Contain scroll overflow (invariant: every overflow:auto container is
+   * position:relative so it can't leak into documentElement / cause focus-scroll
+   * jumps — see app-shell .content). */
+  position: relative;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 12.5px;

@@ -486,80 +486,98 @@ export function composeStructuredContext(
     };
   }
 
-  // ── Section 9: 差し戻しフィードバック(backtrack feedback) ────────────────
-  // Present only when a visual_review was rejected with a reason in this cycle.
-  // Injected here (after section 4) so the AI sees WHY before reading prior artifacts.
+  // ── Section 9: 差し戻しフィードバック(backtrack feedback / 全件累積・ledger 昇格) ──
+  // Present when ≥1 visual_review was rejected with a reason in this cycle.
+  // Injected after section 4 so the AI sees WHY before reading prior artifacts.
   // Source: questions.listByCycle → visual_review+answered → facts.listByCycle → reject±reason.
-  // We pick the most recent rejection by confirmedAt (latest backtrack = most relevant).
-  // Design: query by cycleId (not runId) so history across runs is captured; the
-  // human-provided reason is what matters regardless of which run raised the question.
+  //
+  // Durability (ユーザー指摘 2026-06-16「永続的に考慮されるべき」):
+  //  • 全件累積: we inject EVERY rejection reason in the cycle, not just the latest
+  //    (each is a hard-won constraint; dropping older reasons loses lessons).
+  //  • 正しいステップ帰属: each reject is attributed to its own review.step (not the
+  //    current step), so an S8 rejection is never mislabelled onto S9.
+  //  • 現ステップ優先: the current step's own rejections are listed first.
+  //  • ledger 昇格: the injected text instructs the AI to promote these reasons into
+  //    ledger.yml (done/carried) so they survive cross-cycle — delivered IN the prompt,
+  //    not via a link (the AI must SEE the directive, not be trusted to read a rule file).
   //
   // Logic:
-  //  1. Collect all answered visual_review question IDs for this cycle.
-  //  2. Find facts for those question IDs. Keep only facts with verdict=reject.
-  //  3. If any reject fact has a reason → emit section 9 with the latest reason.
-  //  4. If reject fact exists but has NO reason (should not happen per domain
-  //     invariant INV-4, but guard defensively) → emit visible marker (原則④).
-  //  5. No reject facts at all (approve, or no visual_review) → section 9 absent.
+  //  1. Map answered visual_review questionId → its rejected step (review.step).
+  //  2. Find reject facts for those questions; keep verdict=reject.
+  //  3. With a reason → accumulate all (current-step-first). No reason → defensive marker (原則④).
+  //  4. No reject facts → section 9 absent.
   let backtrackFeedback: ContextSection | undefined;
   if (deps.questions && deps.facts && deps.cycleId) {
     const cycleQuestions = deps.questions.listByCycle(deps.cycleId);
-    const answeredReviewIds = new Set(
-      cycleQuestions
-        .filter((q) => q.kind === "visual_review" && q.state === "answered")
-        .map((q) => q.id as string),
-    );
+    // questionId → rejected step, from the review payload (correct attribution).
+    const reviewStepById = new Map<string, string>();
+    for (const q of cycleQuestions) {
+      if (
+        q.kind === "visual_review" &&
+        q.state === "answered" &&
+        q.payload.kind === "visual_review"
+      ) {
+        reviewStepById.set(q.id as string, q.payload.review.step as string);
+      }
+    }
 
-    if (answeredReviewIds.size > 0) {
+    if (reviewStepById.size > 0) {
       const cycleFacts = deps.facts.listByCycle(deps.cycleId);
-      // Narrow to facts for answered visual_review questions with verdict=reject.
-      const factsWithRevs = cycleFacts
-        .filter((f) => answeredReviewIds.has(f.questionId as string))
-        .map((f) => ({ fact: f, rev: effectiveRevision(f) }))
+      const rejectFacts = cycleFacts
+        .filter((f) => reviewStepById.has(f.questionId as string))
+        .map((f) => ({
+          rev: effectiveRevision(f),
+          step: reviewStepById.get(f.questionId as string) as string,
+          confirmedAt: f.confirmedAt,
+        }))
         .filter(({ rev }) => rev.verdict === "reject");
 
-      if (factsWithRevs.length > 0) {
-        // Partition: reject+reason (normal backtrack) vs reject+no-reason (defensive).
-        const withReason = factsWithRevs
-          .filter(({ rev }) => rev.reason !== undefined && rev.reason.trim().length > 0)
-          .sort((a, b) =>
-            // Descending by confirmedAt (ISO string lex = chronological order).
-            b.fact.confirmedAt > a.fact.confirmedAt ? 1 : b.fact.confirmedAt < a.fact.confirmedAt ? -1 : 0,
-          );
+      // Reject facts that carry a usable reason, chronological (oldest → newest).
+      const withReason = rejectFacts
+        .filter(({ rev }) => rev.reason !== undefined && rev.reason.trim().length > 0)
+        .sort((a, b) =>
+          a.confirmedAt < b.confirmedAt ? -1 : a.confirmedAt > b.confirmedAt ? 1 : 0,
+        );
 
-        const latestReject = withReason.length > 0 ? withReason[0] : undefined;
-        if (latestReject !== undefined) {
-          // Normal path: most recent rejection with reason.
-          const rev = latestReject.rev;
-          const q = cycleQuestions.find(
-            (q) => (q.id as string) === (latestReject.fact.questionId as string),
-          );
-          const stepCtx =
-            q?.payload.kind === "visual_review"
-              ? `このステップ(${currentStepId})の前回成果物`
-              : "前回の成果物";
+      if (withReason.length > 0) {
+        // Current step's own rejections first, then other steps (each chronological).
+        const own = withReason.filter((r) => r.step === currentStepId);
+        const others = withReason.filter((r) => r.step !== currentStepId);
+        const ordered = [...own, ...others];
 
-          backtrackFeedback = {
-            id: "section-9-backtrack-feedback",
-            label: "【重要】差し戻し理由(前回却下の理由を必ず反映せよ)",
-            content: [
-              "【差し戻し理由】",
-              `${stepCtx}は人間レビューで却下されました。以下の理由を踏まえて今回の成果物を修正せよ。`,
-              "",
-              `却下理由: ${rev.reason as string}`,
-            ].join("\n"),
-          };
-        } else {
-          // Defensive: reject facts exist but all lack a reason (domain invariant violation).
-          // Emit visible marker so the AI knows a rejection occurred (原則④).
-          backtrackFeedback = {
-            id: "section-9-backtrack-feedback",
-            label: "【重要】差し戻し理由(前回却下の理由を必ず反映せよ)",
-            content:
-              "【差し戻し理由】※ 差し戻し記録が存在しますが却下理由が取得できませんでした。慎重に前回との差異を分析せよ。",
-            missing: true,
-          };
-        }
+        const lines: string[] = [
+          "【差し戻し理由 — 全件】このサイクルで人間がレビューで却下した理由の全件。" +
+            "**該当ステップの成果物に必ず反映**せよ(却下は苦労して得た制約)。",
+          "",
+        ];
+        ordered.forEach((r, i) => {
+          const lbl =
+            r.step === currentStepId ? `このステップ(${r.step})` : `${r.step}`;
+          lines.push(`${i + 1}. [${lbl}] 却下理由: ${r.rev.reason as string}`);
+        });
+        lines.push("");
+        lines.push(
+          "【恒久化(必須・ledger 昇格)】これらの却下理由は ledger.yml に台帳化して恒久化せよ。" +
+            "このサイクルで修正完了したら state: done(closed_in: 反映先)で、" +
+            "次サイクルへ持ち越すなら state: carried(into: 渡し先バージョン)で記録する。" +
+            "リンク参照でなく成果物=ledger に焼くこと(スキーマ: kit/rules/ledger.md)。",
+        );
+
+        backtrackFeedback = {
+          id: "section-9-backtrack-feedback",
+          label: "【重要】差し戻し理由(却下の全理由を必ず反映 + ledger 昇格)",
+          content: lines.join("\n"),
+        };
+      } else if (rejectFacts.length > 0) {
+        // Defensive: reject facts exist but none carry a reason (INV-4 violation).
+        // Emit a visible marker so the AI knows a rejection occurred (原則④).
+        backtrackFeedback = {
+          id: "section-9-backtrack-feedback",
+          label: "【重要】差し戻し理由(却下の全理由を必ず反映 + ledger 昇格)",
+          content:
+            "【差し戻し理由】※ 差し戻し記録が存在しますが却下理由が取得できませんでした。慎重に前回との差異を分析せよ。",
+          missing: true,
+        };
       }
       // No reject facts → all answered visual_reviews were approved → section 9 absent.
     }

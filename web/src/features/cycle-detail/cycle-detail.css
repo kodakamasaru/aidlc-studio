@@ -324,6 +324,9 @@ a.crumb:hover {
   line-height: var(--leading-log);
   max-height: 280px;
   overflow-y: auto;
+  /* Contain scroll overflow (invariant: every overflow:auto container is
+   * position:relative — prevents leak to documentElement / focus-scroll jump). */
+  position: relative;
   color: var(--color-text-mid);
 }
 .run-log__line {

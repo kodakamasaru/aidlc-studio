@@ -174,11 +174,19 @@ function buildOrchestrator(
         ? raw
         : undefined;
     // AIDLC_STALL_TIMEOUT_MS bounds how long a live run may run with no result
-    // before it's treated as STALLED (retriable). Defaults to the adapter's
-    // built-in 120s; set a small value to demo/test the stall surface quickly.
-    const tRaw = process.env.AIDLC_STALL_TIMEOUT_MS?.trim();
+    // before it's treated as STALLED (retriable). Default = adapter's 60 min.
+    // "0"/"off"/"none"/"never" → DISABLE the wall-clock kill entirely (no timeout;
+    // the run only ends on real exit, human can still cancel/retry). A positive int
+    // sets the ms (e.g. a tiny value to demo the stall surface).
+    const tRaw = process.env.AIDLC_STALL_TIMEOUT_MS?.trim().toLowerCase();
+    const tDisabled =
+      tRaw === "0" || tRaw === "off" || tRaw === "none" || tRaw === "never";
     const tParsed = tRaw ? Number.parseInt(tRaw, 10) : NaN;
-    const timeoutMs = Number.isInteger(tParsed) && tParsed > 0 ? tParsed : undefined;
+    const timeoutMs = tDisabled
+      ? 0
+      : Number.isInteger(tParsed) && tParsed > 0
+        ? tParsed
+        : undefined;
     // AIDLC_MAX_TURNS caps claude's agentic turns (`--max-turns`). UNSET = no cap
     // (the agent can finish a phase); set a positive int only to bound it.
     const mtRaw = process.env.AIDLC_MAX_TURNS?.trim();

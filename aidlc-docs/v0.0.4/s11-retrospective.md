@@ -53,6 +53,43 @@
 
 ---
 
+### Problem 追補 — 成果物 md 編集を人間に求める「IDE-driver 前提」の残存(S10 実機 live 検証 / 2026-06-16)
+
+| # | 問題 | 根本原因 | 出典 |
+|---|------|---------|------|
+| P11 | **live S1 の AI 出力が「各 md を IDE で開き、回答/判断行に直接書き込んでください」と人間に md 編集を要求した**。プロダクトの魂は Human Inbox(人間は IDE を触らずカード/会話だけで捌く)なのに、AI は旧 IDE-driver モデルを復唱した。`qd-resolved-conversationally` / `self-contained-review-questions` に反する。 | ① **前提ルールが live プロンプトに無い**: 合成プロンプトは role + skill 本文 + 構造化コンテキスト + 出力契約のみで、「人間は md を編集しない/AI が唯一の書き手」という対人契約をどこにも注入していなかった。② **skill 本文 12 件すべてが旧モデルを明示的に教えていた**(「ユーザーが IDE で md を直接編集」「(ユーザー記入)」「判断行で…直接書く」)。AI は本文の支配的ナラティブを復唱した。 | S10 実機 live |
+
+- 対処(本サイクルで根治): ① `kit/rules/aidlc-operating-model.md` に最上位の対人契約節「人間は md を編集しない — AI が唯一の書き手(全 surface 共通)」を新設。② `prompt-composer.ts` の `OUTPUT_CONTRACT_INSTRUCTION` 先頭に「対人契約(最上位)」ブロックを追加し、全 live プロンプトに焼き込み(skill 本文の旧ナラティブを上書き)。③ 12 skill 本文の md 編集誘導とテンプレ「(ユーザー記入)」を「AI が質問→人間はカード/会話で回答→AI が md に代筆」へ全件掃除。
+- T9: **道具で直らない対人契約は skill 本文 + operating-model + composer の 3 箇所に焼く**。「人間が md を編集する」前提は IDE/web どちらの surface でも禁止。質問・判断・レビューは必ずカード/会話で受け、md は AI が代筆する([completeness-checks-anchor-on-spec] の対人契約版 — 仕様=「人間は md を触らない」を全注入点で潰す)。
+- T9 追補(ユーザー指摘): ラベルを「(人間の回答を AI が記入)」に変えるだけでは不十分だった。D-NN テンプレが `判断: 承認 | 上書き | 保留` という**未入力メニュー**(人間が md で選ぶ前提の形)のままで、かつ全 AI 決定に人間 verdict を付けて責務契約②(技術判断=AI 自走確定 / 事業判断のみ human-gate)に反していた。12 skill の D-NN を **AI自走ログ型**に再設計(`種別`: 技術判断=AI自走確定 / 事業判断=要 human-gate、`上書き`: レビューで人間が覆したときのみ AI 記録)。**ラベルだけでなくフォーマットの「形」自体が旧パラダイムを残していないか**を点検する。
+
+| # | 問題 | 根本原因 | 出典 |
+|---|------|---------|------|
+| P12 | **最上位 binding の `responsibility-contract.md`(4 ゲート: ①内部コード非前提 ②human-gateのみ停止 ③done=納品 ④US+mock最上位)が live プロンプトに一切注入されていなかった**。契約ファイル自身が「将来の live prompt 組立はここを指すだけ」と宣言しているのに、composer は role+skill本文+構造化コンテキスト+出力契約のみで契約本文を載せていなかった。skill からの相対リンク参照は headless AI が読む保証がなく、4 ゲートが事実上効いていなかった。 | P11 と同根 = **binding ルールがリンク参照止まりで live コンテキストに届いていない**。「リンクで指す」≠「プロンプトに入る」。headless 実行は別プロセスの `claude -p` で、リンク先を自発的に読む保証がない。 | ユーザー指摘(responsibility-contract が効いてる気がしない) |
+
+- 対処(本サイクルで根治): `prompt-composer.ts` に `contractLayer()` を追加し、正本 `kit/rules/responsibility-contract.md` を Fs 経由で読んで**全 live プロンプト(generator/evaluator/legacy/reconstruction)の先頭**(最上位=衝突時に勝つ位置・skill 本文より前)に注入。不在時は loud 可視マーカー(原則④)。複製でなく正本 1 ファイルの runtime 描画。実プロンプト合成で 4 ゲート全件含有を probe で確認・決定論 611 green。
+- T10: **binding ルールは「リンクで指す」でなく「プロンプトに本文注入」で効かせる**。最上位契約・operating-model の対人契約など、全工程必達の規範は composer が正本を読んで全 live プロンプトに焼く(リンク参照は人間用の単一正本維持であって、headless AI への配送手段ではない)。新しい binding ルールを足したら「どの注入点で AI に届くか」を必ず確認する。
+
+| # | 問題 | 根本原因 | 出典 |
+|---|------|---------|------|
+| P13 | **差し戻し(却下)理由が「恒久的に考慮」されていなかった**。context-resolver Section 9 は配線済みで却下理由を live AI に届けてはいたが、(a) **最新 1 件しか注入せず**過去の却下理由を捨てる、(b) **どの却下も現ステップ名でラベル**し S8 却下を S9 に誤帰属しうる、(c) **サイクル単位**(facts)で次サイクルへ carry されない、の 3 点で“恒久”でなかった。却下理由=苦労して得た制約なのに揮発していた。 | 「その場の再起動 1 回に効けばよい」という単発前提のままで、却下理由を D決定/ledger のような durable 記録に昇格していなかった。store が最新 1 件・サイクル scope だと教訓が構造的に脱落する([completeness-checks-anchor-on-spec] の教訓版)。 | ユーザー指摘(差し戻し理由が永続的に考慮されるべき) |
+
+- 対処(本サイクルで根治): ① **app(context-resolver Section 9)**: 却下理由を `review.step` で正しく帰属し、**全件・現ステップ優先**で注入。誤帰属を解消(test 2 本追加)。② **ledger 昇格を注入テキストに同梱**: Section 9 が「これらの却下理由を ledger.yml に done/carried で台帳化せよ」を**プロンプト内で直接指示**(リンクでなく配送)。③ **`kit/rules/ledger.md`** に「差し戻し理由の台帳化」節(`BT-NN` エントリ・done=closed_in / carried=into)を新設。サイクル跨ぎは reconcile ゲートが強制。決定論 612 green。
+- T11: **苦労して得た制約(却下理由・手戻り教訓)は単発でなく durable に持つ**。store が「最新 1 件 / サイクル scope」だと教訓は構造的に脱落する。app は全件を確実に注入し、跨サイクルは ledger 昇格 + reconcile ゲートで恒久化する。新しい「AI に効かせたい記録」を足したら〈全件か?・正しい帰属か?・サイクルを越えて残るか?〉を点検する。
+
+### Problem 追補 — 運用モデルが headless に届かず / mock 突合が自己採点(2026-06-17)
+
+| # | 問題 | 根本原因 | 出典 |
+|---|------|---------|------|
+| P14 | **固めた運用ゲートが AI に届いていなかった**。`aidlc-operating-model.md`(PhaseGroup / S3↔S7 境界 / Rule A・B / mock 突合の完全性ゲート / 視覚証拠ゲートの正本)が composer・context-resolver から **0 参照の孤児**で、headless worker の prompt に一切入っていなかった(IDE は SKILL.md のリンク頼りで運次第)。「運用として固めたのに AI に伝わらない」の物理的正体。 | 責務契約は composer が正本注入する doctrine([[T10]])が確立済なのに、operating-model だけ同 doctrine から漏れていた。リンクは headless に届かない。 | ユーザー指摘(運用として固めてるものが AI に伝わらない) |
+| P15 | **mock 突合が自己採点で偽の一致が通る**。S8 手順5 はビルダー AI が自分の実機画面を自分で「一致」と表に書く自己申告で、実機がモックから大きく乖離していても「26/26 一致」が通っていた。唯一の比較器が人間の目になり、人間が乖離を一つずつ指摘する pixel-diff 機械をやらされていた。 | ビルド完了とモック一致を切り分けず、視覚 oracle(独立した比較器)を harness に持たせていなかった([[mock-match-before-human-review]] の自動化欠落)。capture は出来ていたが比較が未自動化。 | ユーザー指摘(画面モックから大きく乖離し細かく一つずつ指摘) |
+
+- 対処(本サイクルで根治): ① **composer に `operatingModelLayer()` 追加** — 責務契約の直後に operating-model 全文を全 compose 経路へ注入(headless)+ **12 SKILL.md 冒頭に必読プリアンブル**(IDE 直接起動)で両 surface パリティ。注入を test 固定。② **独立 vision evaluator ハーネス `scripts/s8-visual-eval.ts`(`bun run verify:visual`)新設** — モック PNG と 実機 PNG をペアにし **ビルダーとは別 run** の vision モデルで 1 状態ずつ厳格判定 → 機械生成の突合表(`s8/visual-eval.json`)+ exit-code ゲート(parse 不能/未実装は fail-closed=乖離)。純粋ロジックは `src/app/services/visual-eval.ts`(11 test)。S8 SKILL手順5 + operating-model 視覚証拠ゲートを「自己採点禁止 / 独立 evaluator が握る」に改訂。決定論 627 green。
+- T12: **「固めた = 効く」ではない。固めたルールは "どの注入点で AI に届くか" を必ず確認する**([[T10]] の operating-model 版)。新しい `kit/rules/*.md` を足したら headless(composer 注入)と IDE(skill 本文 or リンク)の両経路で実際に届くかを点検する。リンクは人間用の単一正本維持であって headless への配送手段ではない。
+- T13: **AI に「自分の成果物を自分で採点」させない**。mock 突合・視覚判断のような oracle はビルダーとは別 run の evaluator が握り、人間は最後に OK を出すだけにする。自己採点は偽の合格を構造的に生む。capture(撮る)が出来ていても compare(比較)が自己申告なら品質ゲートは機能しない。
+
+---
+
 ## 品質メトリクス
 （S10 完了後に S11 本実行で記入。S9 = バグ CRITICAL 0 / HIGH 1(O6 検出・本サイクル修正) / MEDIUM 2(O3/O5 carried) ほか。決定論 505 + E2E 33 + live 8 green。）
 

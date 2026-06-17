@@ -365,7 +365,11 @@ export function ConversationThread({
             </>
           ) : null}
           <span className="crumb__current">{titleLabel}</span>
-          {cycleName !== "…" ? (
+          {cycleName !== "…" && cycleName !== (backLabel ?? "") ? (
+            // Show the cycle version as trailing context ONLY when the back link
+            // isn't already showing it — otherwise the crumb duplicates (e.g.
+            // "v0.0.1 / 要件 v0.0.1"). In hearing mode backLabel is "設定", so the
+            // version still shows there.
             <span className="crumb crumb--meta">{cycleName}</span>
           ) : null}
         </span>
@@ -373,7 +377,7 @@ export function ConversationThread({
       right: runBadge,
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [titleLabel, isDone, isStalled, isRunning, hasHistory, allOpenQuestions.length, backTo, cycleName],
+    [titleLabel, isDone, isStalled, isRunning, hasHistory, allOpenQuestions.length, backTo, backLabel, cycleName],
   );
 
   // ── Render ────────────────────────────────────────────────────

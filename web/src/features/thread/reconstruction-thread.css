@@ -170,6 +170,9 @@
   line-height: var(--leading-log);
   max-height: 120px;
   overflow-y: auto;
+  /* Contain scroll overflow (invariant: every overflow:auto container is
+   * position:relative — prevents leak to documentElement / focus-scroll jump). */
+  position: relative;
 }
 
 /* ── Footer dock ─────────────────────────────────────────────── */

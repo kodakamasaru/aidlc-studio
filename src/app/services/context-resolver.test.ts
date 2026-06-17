@@ -582,7 +582,11 @@ function makeRejectFact(
 }
 
 /** A synthetic answered visual_review Question (the reject case). */
-function makeRejectedVisualReviewQuestion(id: QuestionId, runId: RunId): Question {
+function makeRejectedVisualReviewQuestion(
+  id: QuestionId,
+  runId: RunId,
+  step: Step = Step("S8"),
+): Question {
   return {
     id,
     runId,
@@ -595,7 +599,7 @@ function makeRejectedVisualReviewQuestion(id: QuestionId, runId: RunId): Questio
       review: {
         runId,
         cycleId: "cyc-1" as CycleId,
-        step: Step("S8"),
+        step,
         taskId: null,
         blocks: [{ type: "summary", title: "前回成果物" as never, body: "内容" as never }],
         producedAt: "2026-01-01T00:00:00Z" as never,
@@ -763,7 +767,7 @@ describe("composeStructuredContext — F-5 backtrack feedback (section 9)", () =
     expect(ctx.backtrackFeedback?.content).toContain("取得できませんでした");
   });
 
-  test("section 9 picks the MOST RECENT rejection when multiple rejections exist", () => {
+  test("section 9 accumulates ALL rejection reasons (not just the latest) in chronological order + ledger directive", () => {
     const cycle = makeCycle("v0.0.4", [makePhase("S8", "running", 0)]);
     const fs = makeFsWithBrief();
 
@@ -786,8 +790,45 @@ describe("composeStructuredContext — F-5 backtrack feedback (section 9)", () =
       deps,
     );
 
-    expect(ctx.backtrackFeedback?.content).toContain(NEW_REASON);
-    expect(ctx.backtrackFeedback?.content).not.toContain(OLD_REASON);
+    const content = ctx.backtrackFeedback?.content ?? "";
+    // 全件累積: BOTH reasons present (older one is not dropped).
+    expect(content).toContain(OLD_REASON);
+    expect(content).toContain(NEW_REASON);
+    // Chronological: older reason appears before the newer one.
+    expect(content.indexOf(OLD_REASON)).toBeLessThan(content.indexOf(NEW_REASON));
+    // ledger 昇格 directive is delivered IN the prompt text.
+    expect(content).toContain("ledger");
+    expect(content).toContain("恒久化");
+  });
+
+  test("section 9 attributes each rejection to its own step (no mislabel onto the current step)", () => {
+    // S8 was rejected; we are now launching S9. The S8 reason must be labelled [S8],
+    // never "このステップ(S9)" — an unrelated step's rejection must not be mis-owned.
+    const cycle = makeCycle("v0.0.4", [
+      makePhase("S8", "done", 0),
+      makePhase("S9", "running", 1),
+    ]);
+    const fs = makeFsWithBrief();
+
+    const Q_ID = "q-review-s8" as QuestionId;
+    const S8_REASON = "S8 の配線が未実装";
+    const qS8 = makeRejectedVisualReviewQuestion(Q_ID, RUN_ID, Step("S8"));
+    const factS8 = makeRejectFact(Q_ID, S8_REASON, { confirmedAt: "2026-03-01T00:00:00Z" });
+
+    const questions = makeQuestionRepo([qS8]);
+    const facts = makeFactRepo([factS8]);
+    const deps: StructuredContextDeps = { fs, questions, facts, cycleId: CYCLE_ID };
+
+    const ctx = composeStructuredContext(
+      { cycle, step: Step("S9"), repoPath: REPO },
+      deps,
+    );
+
+    const content = ctx.backtrackFeedback?.content ?? "";
+    expect(content).toContain(S8_REASON);
+    expect(content).toContain("[S8]");
+    // Must NOT mislabel the S8 rejection as belonging to the current step S9.
+    expect(content).not.toContain("このステップ(S9)");
   });
 
   // ── invariant 15: renderStructuredContext ordering ─────────────────────────

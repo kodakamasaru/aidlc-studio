@@ -244,10 +244,12 @@ const ISOLATION_ARGS: readonly string[] = [
   ...HEADLESS_SETTINGS_ARGS,
 ];
 // Wall-clock backstop for a live run producing no result. A real AI-DLC step
-// (e.g. S1 generating brief + US docs) routinely runs several minutes, so the
-// old 2-min default tripped stalls too easily (S10 実機指摘 F-8). 10 min gives
-// real runs headroom; override per-deploy via AIDLC_STALL_TIMEOUT_MS (server.ts).
-const DEFAULT_TIMEOUT_MS = 600_000;
+// (e.g. S1 generating brief + US docs) routinely runs many minutes, so a short
+// cap trips stalls too easily (S10 実機指摘 F-8 / 「上限きびしい」). 60 min default
+// gives even long agentic runs plenty of headroom. Override per-deploy via
+// AIDLC_STALL_TIMEOUT_MS (server.ts); set timeoutMs <= 0 (env "0"/"off") to DISABLE
+// the wall-clock kill entirely (no timer) — the run then only ends on real exit.
+const DEFAULT_TIMEOUT_MS = 3_600_000;
 /** Grace period after SIGTERM before SIGKILL, so a process ignoring TERM still dies. */
 const HARD_KILL_GRACE_MS = 2_000;
 /** Sentinel thrown when extractResultText sees an `is_error:true` result event. */
@@ -676,19 +678,24 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     const startedAt = Date.now();
     let timedOut = false;
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      this.killChild(child);
-      // SIGTERM may be ignored; escalate to SIGKILL after a short grace so a
-      // stubborn process can't keep child.exited (and this run) pending forever.
-      hardKillTimer = setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {
-          // best-effort; nothing more we can do.
-        }
-      }, HARD_KILL_GRACE_MS);
-    }, this.timeoutMs);
+    // timeoutMs <= 0 = DISABLED: no wall-clock kill, the run only ends on real exit
+    // (the human can still cancel/retry from the Inbox). Otherwise arm the backstop.
+    const timer =
+      this.timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            this.killChild(child);
+            // SIGTERM may be ignored; escalate to SIGKILL after a short grace so a
+            // stubborn process can't keep child.exited (and this run) pending forever.
+            hardKillTimer = setTimeout(() => {
+              try {
+                child.kill("SIGKILL");
+              } catch {
+                // best-effort; nothing more we can do.
+              }
+            }, HARD_KILL_GRACE_MS);
+          }, this.timeoutMs)
+        : undefined;
 
     try {
       // Drain stdout, stderr, and the exit concurrently. Draining stdout fully
@@ -887,7 +894,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         logError("LiveClaudeOrchestrator: terminal-emit threw", sinkErr);
       }
     } finally {
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
       if (hardKillTimer !== undefined) clearTimeout(hardKillTimer);
       this.children.delete(ctx.runId);
     }

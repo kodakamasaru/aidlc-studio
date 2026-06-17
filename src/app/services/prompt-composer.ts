@@ -61,11 +61,46 @@ export const briefBodyPath = (repoPath: string): string =>
   join(repoPath, "aidlc-docs", "brief.md");
 
 /**
+ * 最上位 binding contract (責務契約). Canonical single source — injected verbatim
+ * into EVERY live prompt's head so the 4 gates (①内部コード非前提 ②human-gateのみ停止
+ * ③done=納品 ④US+mock最上位) actually reach the headless AI. The file itself declares
+ * "将来の live prompt 組立はここを指すだけ" — referencing it by link does not reach a
+ * headless run, so the composer reads the one canonical file and renders it (NOT a
+ * duplicate of the text — same source-of-truth file rendered at runtime).
+ */
+export const responsibilityContractPath = (repoPath: string): string =>
+  join(repoPath, "kit", "rules", "responsibility-contract.md");
+
+/**
+ * 運用モデル(AI-DLC v2 の実行規範)。PhaseGroup 構造 / S3↔S7 境界 / mock 突合の完全性
+ * ゲート / Rule A・B / AC 起点レビュー pipeline / 視覚証拠ゲート など、全工程に binding な
+ * 実行規範の正本。責務契約と同じ doctrine(リンクでは headless run に届かない → 正本ファイル
+ * を runtime 描画)で、責務契約の直後(= 契約に次ぐ上位層)に注入する。これが無いと headless
+ * worker には固めた運用ゲートが一切届かない(従来 0 参照の孤児ファイルだった)。
+ */
+export const operatingModelPath = (repoPath: string): string =>
+  join(repoPath, "kit", "rules", "aidlc-operating-model.md");
+
+/**
  * §C7.4 output-contract instruction appended to ALL structured prompts.
  * AI must emit a single ```aidlc-result``` minified-JSON envelope as its final output.
  * Schema: {artifacts[], questions[], decisions[], completeness{requirements,addressed}, status}.
  */
 export const OUTPUT_CONTRACT_INSTRUCTION = [
+  "── 対人契約(最上位・必須) ──",
+  "人間は aidlc-docs の md を開かない・編集しない。md の唯一の書き手は AI(=あなた)。",
+  "人間への質問・確認・選択・レビュー・承認は、すべて下記 questions[](= 人間が見るカード)で求めよ。",
+  "**禁止**: 「md を IDE で開いて回答/判断行に記入してください」「各 md を確認して直接書き込んでください」",
+  "のように人間に md 編集を求める誘導。人間はボード/受信箱しか見ない。回答が要るものは必ず questions[] に入れ、",
+  "人間の回答が返ったら AI 自身が md の該当箇所(回答/確定/判断 等)に代筆する。",
+  "人間は web のカード/受信箱しか見ず **ファイルを開けない**。質問・レビューの中身は questions[] の",
+  "prompt/background に**全文インラインで**載せよ。「○○.md を参照」「aidlc-docs/… を見て」のような",
+  "ファイル名/パス参照で代用するな(人間はそのファイルを開けない)。成果物はプラットフォームが描画するので、",
+  "指すなら『要件一覧』等の事業語で指す。",
+  "**サーバ内部情報は秘匿**: ファイルパス・内部 ID・関数/型名・Run/worktree/Phase・DB フィールド・",
+  "aidlc-docs のディレクトリ構造などを、人間が読む文(prompt/background/options/decisions 等)に出すな",
+  "(判断に必要なら事業語へ翻訳する)。",
+  "",
   "── 言語(必須) ──",
   "成果物・質問(prompt/background/options のラベル等)・decisions・説明など、人間が読む文章は",
   "**すべて日本語**で書け。コード・識別子・ファイルパス・固有名詞はそのままでよいが、地の文は日本語。",
@@ -143,6 +178,9 @@ export class PromptComposer {
     return [
       "あなたは AI-DLC の工程再構成器です。S1(要件)が確定した直後に、このサイクルの工程を US に合わせて1回だけ組み直します(US-08)。",
       "",
+      this.contractLayer(repoPath),
+      this.operatingModelLayer(repoPath),
+      "",
       "── 入力(自分のツールで読め) ──",
       `- ${docsDir} 配下の最新バージョンの s1/(index + US 群)を Glob/Read で読む。brief(${docsDir}/ 直下の brief)も読む。`,
       "- 既定工程は S1〜S12(Discovery/Design/Build/Validation/Improvement)。skillRef は aidlc-sN-* 形式。",
@@ -201,6 +239,8 @@ export class PromptComposer {
       const obs = (input.verification ?? []).map((o) => `- ${o as string}`).join("\n");
       return [
         core("evaluator", input.step, skillRef),
+        this.contractLayer(input.repoPath),
+        this.operatingModelLayer(input.repoPath),
         payloadHeader("検証の基準(スキル本文)"),
         body.trim(),
         "",
@@ -216,6 +256,8 @@ export class PromptComposer {
 
     return [
       core("generator", input.step, skillRef),
+      this.contractLayer(input.repoPath),
+      this.operatingModelLayer(input.repoPath),
       payloadHeader("あなたが従う方法論(スキル本文)"),
       body.trim(),
       "",
@@ -233,6 +275,46 @@ export class PromptComposer {
    * surfaced as a visible marker (never silently dropped / 原則④). Returns "" when
    * the caller opts out with an empty list.
    */
+  /**
+   * 最上位 binding contract layer — read the canonical responsibility-contract.md via
+   * Fs and render it at the HEAD of every prompt (it wins on conflict with skills, so
+   * it must be seen first). Missing = loud visible marker (原則④): the supreme contract
+   * silently absent would let the AI run un-gated, so we surface it rather than drop it.
+   */
+  private contractLayer(repoPath: string): string {
+    const path = responsibilityContractPath(repoPath);
+    const body = this.fs.read(path);
+    const header = payloadHeader(
+      "最上位契約 — AI 開発部 ⇄ 事業部(全工程 binding / 他ルールと衝突したらこれが勝つ)",
+    );
+    if (body !== undefined && body.trim().length > 0) {
+      return [header, body.trim(), ""].join("\n");
+    }
+    return [header, `※ 最上位契約が見つかりません(${path})— 出力前に 4 ゲートを自問せよ`, ""].join(
+      "\n",
+    );
+  }
+
+  /**
+   * 運用モデル layer — canonical aidlc-operating-model.md を Fs 経由で読み、責務契約の直後に
+   * 描画する(契約に次ぐ binding な実行規範)。headless run はリンクを辿れない前提なので、
+   * contractLayer と同じく正本ファイルを runtime 注入する(複製ではない)。不在は loud な可視
+   * マーカー(原則④): 運用ゲートが黙って抜けると mock 突合・S3/S7 境界等が効かなくなるため。
+   */
+  private operatingModelLayer(repoPath: string): string {
+    const path = operatingModelPath(repoPath);
+    const body = this.fs.read(path);
+    const header = payloadHeader(
+      "運用モデル — AI-DLC v2 実行規範(全工程 binding / 責務契約に次ぐ上位 / 運用ゲートの正本)",
+    );
+    if (body !== undefined && body.trim().length > 0) {
+      return [header, body.trim(), ""].join("\n");
+    }
+    return [header, `※ 運用モデルが見つかりません(${path})— 運用ゲート不在のまま進めるな`, ""].join(
+      "\n",
+    );
+  }
+
   private contextLayer(input: ComposeInput): string {
     const paths = input.contextPaths ?? [briefBodyPath(input.repoPath)];
     if (paths.length === 0) return "";
@@ -254,6 +336,8 @@ export class PromptComposer {
   ): string {
     return [
       core("generator", input.step, skillRef),
+      this.contractLayer(input.repoPath),
+      this.operatingModelLayer(input.repoPath),
       payloadHeader("あなたが従う方法論(スキル本文)"),
       body.trim(),
       "",
@@ -271,6 +355,8 @@ export class PromptComposer {
     const obs = (input.verification ?? []).map((o) => `- ${o as string}`).join("\n");
     return [
       core("evaluator", input.step, skillRef),
+      this.contractLayer(input.repoPath),
+      this.operatingModelLayer(input.repoPath),
       payloadHeader("検証の基準(スキル本文)"),
       body.trim(),
       "",

@@ -9,7 +9,7 @@
 // so the web's projects[0] is automatically that sandbox. No UI change needed.
 //
 // Reset to a clean sandbox any time: delete /tmp/aidlc-sandbox and /tmp/aidlc-sandbox.db*.
-import { existsSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, cpSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd(); // studio repo root (run via `bun run` from there)
@@ -17,6 +17,16 @@ const SANDBOX = "/tmp/aidlc-sandbox";
 const DB = "/tmp/aidlc-sandbox.db";
 const PORT = "8787"; // same port as verify:watch (mutually exclusive — kills it first)
 const BASE = `http://127.0.0.1:${PORT}`;
+
+// `--reset` (via `bun run clear:test`): wipe the throwaway repo + isolated DB for a
+// clean slate before seeding. Paths live ONLY here, so this is the single source of
+// truth for "what gets reset" — no duplicated rm in package.json that could drift.
+// Only ever touches /tmp/aidlc-sandbox* — never the studio repo's real aidlc-docs/DB.
+if (process.argv.includes("--reset")) {
+  rmSync(SANDBOX, { recursive: true, force: true });
+  for (const suffix of ["", "-wal", "-shm"]) rmSync(`${DB}${suffix}`, { force: true });
+  console.log(`[verify:test] --reset: ${SANDBOX} と ${DB}* を削除しました(再 seed します)`);
+}
 
 // 1. Seed the throwaway repo (kit + brief) once. Persisted so you can iterate; the
 //    S1 generator reads the brief — edit it to test different requirements.
@@ -43,7 +53,15 @@ Bun.spawnSync(["sh", "-c", `lsof -ti:${PORT} | xargs -I{} kill {} 2>/dev/null`])
 // 3. Start the backend against the ISOLATED DB (live orchestrator).
 const backend = Bun.spawn(["bun", "--watch", "run", "src/main.ts"], {
   cwd: ROOT,
-  env: { ...process.env, AIDLC_ORCHESTRATOR: "live", AIDLC_DB: DB, PORT },
+  env: {
+    ...process.env,
+    AIDLC_ORCHESTRATOR: "live",
+    AIDLC_DB: DB,
+    PORT,
+    // No wall-clock timeout in the sandbox — long agentic runs shouldn't trip the
+    // stall surface during manual testing. Override by exporting the env var.
+    AIDLC_STALL_TIMEOUT_MS: process.env.AIDLC_STALL_TIMEOUT_MS ?? "0",
+  },
   stdout: "inherit",
   stderr: "inherit",
 });

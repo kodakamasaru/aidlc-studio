@@ -4,9 +4,30 @@
  */
 
 /* ── Page container ──────────────────────────────────────────── */
+/* The thread is a full-bleed "app screen": its own internal scroll
+ * (.thread-container) + a pinned submit bar. It lives inside the shell's
+ * .content, which already offsets the topbar AND adds sp-6 padding — so
+ * recomputing `100vh - topbar-h` here overflowed .content by 2×sp-6 and
+ * produced a page-level scroll + dead space at the bottom. Fill the parent
+ * instead, and cancel .content's padding/scroll for this screen so the
+ * submit bar sits flush at the bottom. */
+.content:has(.thread-page) {
+  /* The thread is a full-bleed app screen; cancel the shell's content padding so the
+   * thread fills the pane and the submit bar sits flush at the bottom. */
+  padding: 0;
+  overflow: hidden;
+}
 .thread-page {
   display: flex;
   flex-direction: column;
+  /* Viewport-DEFINITE height: depends on nothing in the parent chain (no percentage
+   * resolution, no flex-grow). `height:100%`/`flex:1` collapse to content-height on
+   * engines that don't treat a flex-item parent's height as definite — which left a
+   * big void below the submit bar. MUST use the SAME unit as the shell (.app-shell /
+   * .main-col use 100vh): with `dvh` here, when dvh≠vh (DevTools docked, mobile chrome)
+   * the thread is shorter than the vh-sized shell → the shell overflows, the document
+   * scrolls, and a void opens below. The :has rule above removes .content's padding so
+   * this fills the content area exactly. */
   height: calc(100vh - var(--topbar-h));
   overflow: hidden;
 }
@@ -14,6 +35,15 @@
 /* ── Scrollable thread body ──────────────────────────────────── */
 .thread-container {
   flex: 1 1 auto;
+  /* min-height:0 is REQUIRED for a flex-item scroll container — without it the
+   * default min-height:auto sizes to content (a tall bubble), so it never scrolls
+   * and the overflow leaks to the document. */
+  min-height: 0;
+  /* position:relative is REQUIRED so this scroll container's overflow is contained
+   * and does NOT propagate into documentElement.scrollHeight. Without it, a tall
+   * bubble inflated the document ~2× and clicking a radio (focus → scrollIntoView)
+   * programmatically jumped the window into the phantom void below the fold. */
+  position: relative;
   overflow-y: auto;
   padding: var(--sp-6) var(--sp-6) var(--sp-4);
   display: flex;
@@ -23,6 +53,12 @@
   width: 100%;
   align-self: center;
 }
+
+/* NOTE: an earlier `.thread-container > :first-child { margin-top: auto }` (to
+ * bottom-anchor short conversations) was REMOVED — on a first child taller than the
+ * scroll container, the auto top-margin broke overflow containment and leaked height
+ * up to <html>, inflating the document to ~2× the viewport (phantom scroll → big void
+ * below the submit bar). Top-aligned content is the safe default here. */
 
 /* ── Empty state ─────────────────────────────────────────────── */
 .thread-empty {
