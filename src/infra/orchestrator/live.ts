@@ -143,6 +143,32 @@ export function screenshotBlockFrom(
 }
 
 /**
+ * F-10 / 契約①: a review block's title is human-facing — it must NOT leak a file path
+ * or aidlc-docs directory structure (人間は web カードしか見ず、ファイルを開けない).
+ * Derive a business-language title from the artifact's own first markdown heading
+ * (already 日本語 per the language contract, e.g. "# US-01 メニュー閲覧" → "US-01 メニュー閲覧");
+ * fall back to a de-pathified filename when the body carries no heading.
+ */
+export function artifactBlockTitle(body: string, rel: string): string {
+  for (const line of body.split("\n")) {
+    const heading = line.match(/^#{1,6}\s+(.+?)\s*$/)?.[1]?.trim();
+    if (heading && heading.length > 0) return heading;
+  }
+  const base = (rel.split("/").pop() ?? rel).replace(/\.md$/i, "");
+  return base.replace(/[-_]/g, " ").trim();
+}
+
+/**
+ * Caption for a design screenshot block (契約①): de-pathified, de-extensioned,
+ * de-slugged label for a screen `.html` artifact — never a path / filename.
+ * e.g. "aidlc-docs/v0.0.5/s3/scr-01-browse-menu.html" → "scr 01 browse menu".
+ */
+export function screenLabel(rel: string): string {
+  const base = (rel.split("/").pop() ?? rel).replace(/\.html?$/i, "");
+  return base.replace(/[-_]/g, " ").trim();
+}
+
+/**
  * Unit-03: Extract the session_id from the stream-json init line.
  * Pure, standalone, exported so Unit-04 can import without touching the drain loop.
  *
@@ -814,7 +840,17 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
           result.status === "needs_human"
             ? this.readArtifactBlocks(ctx.runId as string, result.artifacts)
             : [];
-        const events = aidlcResultToEvents(ctx.runId, result, contentBlocks);
+        // 視覚デザイン証拠 (S3 等): render the AI's .html screens to images so the
+        // design surfaces in the review gallery — the human judges the UI THROUGH the
+        // platform's browser as images, never by opening files (原則#1 視覚確認 / 契約①).
+        const designBlocks =
+          result.status === "needs_human"
+            ? await this.captureDesignBlocks(ctx.runId as string, result.artifacts)
+            : [];
+        const events = aidlcResultToEvents(ctx.runId, result, [
+          ...contentBlocks,
+          ...designBlocks,
+        ]);
         for (const event of events) {
           await this.emit(ctx, event);
         }
@@ -926,13 +962,59 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         if (!existsSync(abs)) continue;
         const body = readFileSync(abs, "utf8");
         if (body.trim().length === 0) continue;
-        blocks.push({ type: "summary", title: rel as Text, body: body as Text });
+        blocks.push({ type: "summary", title: artifactBlockTitle(body, rel) as Text, body: body as Text });
       } catch (err) {
         logError("LiveClaudeOrchestrator.readArtifactBlocks: read failed", {
           artifact: rel,
           error: err instanceof Error ? err.message : String(err),
         });
       }
+    }
+    return blocks;
+  }
+
+  /**
+   * 視覚デザイン証拠 (S3 等): the platform renders the AI's design screens THROUGH a
+   * browser and shows them to the human as images — the human never opens files
+   * (契約①), so visual judgement (原則#1) actually happens in the review. For each
+   * `.html` screen artifact, capture a full-page png with the SAME Playwright capturer
+   * used for verify-ui (file:// URL), and emit a `screenshot` block so 2+ screens land
+   * in the review gallery. Best-effort: missing capturer / repoPath / file, or a
+   * capture failure, is logged + skipped — never thrown (the md review still stands).
+   */
+  private async captureDesignBlocks(
+    runId: string,
+    artifacts: readonly string[],
+  ): Promise<ReviewBlock[]> {
+    if (this.capturer === undefined) return [];
+    const repoPath = this.repoPaths.get(runId);
+    if (repoPath === undefined) return [];
+    const htmls = artifacts.filter((a) => a.endsWith(".html"));
+    const blocks: ReviewBlock[] = [];
+    let i = 0;
+    for (const rel of htmls) {
+      const abs = isAbsolute(rel) ? rel : join(repoPath, rel);
+      if (!existsSync(abs)) continue;
+      const file = `${runId}-design-${i++}.png`;
+      const outPath = join(this.shotsDir, file);
+      let result: CaptureResult;
+      try {
+        result = await this.capturer.capture({ url: `file://${abs}`, outPath });
+      } catch (err) {
+        result = { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
+      }
+      if (!result.ok) {
+        logError("LiveClaudeOrchestrator.captureDesignBlocks: capture failed", {
+          artifact: rel,
+          reason: result.reason,
+        });
+        continue;
+      }
+      blocks.push({
+        type: "screenshot",
+        src: `${this.shotUrlBase}/${file}` as Text,
+        caption: screenLabel(rel) as Text,
+      });
     }
     return blocks;
   }

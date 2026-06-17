@@ -65,7 +65,7 @@ PDF 強調: 「実 PJ と乖離したスタック情報を渡すと AI が的外
 - 工程: S6 (Domain Model)
 - 役割: ドメインモデラー
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s1/index.md](../s1/index.md), [s5/index.md](../s5/index.md) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
+- 入力参照: このサイクルの要件一覧(US 群) / 作業単位の分割
 - 作成日: YYYY-MM-DD
 - 更新日: YYYY-MM-DD
 
@@ -141,7 +141,7 @@ stateDiagram-v2
 # 集約: {Aggregate 名}
 
 ## メタ
-- 親: [s6/index.md](./index.md)
+- 親: ドメインモデルの一覧
 - 対応 US: [US-01](../s1/us-01-{slug}.md), [US-04](../s1/us-04-{slug}.md)
 - 所属 Unit: [Unit-02](../s5/unit-02-{slug}.md)
 - ステータス: 進行中 | レビュー待ち | 確定

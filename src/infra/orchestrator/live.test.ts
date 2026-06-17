@@ -13,6 +13,8 @@ import { test, expect, describe } from "bun:test";
 import {
   extractSessionId,
   aidlcQuestionToEvent,
+  artifactBlockTitle,
+  screenLabel,
 } from "./live";
 import type { RunId } from "../../domain/shared/ids";
 import type { AidlcQuestion, AidlcOption } from "../../wire/aidlc-wire";
@@ -289,5 +291,58 @@ describe("aidlcQuestionToEvent", () => {
     if (event.payload.kind !== "question") throw new Error("unexpected kind");
     expect(event.payload.options![0]!.hint).toBeUndefined();
     expect(event.payload.options![1]!.hint).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// artifactBlockTitle — F-10: review block titles must be business language,
+// never a raw file path / aidlc-docs directory (人間はファイルを開けない / 契約①).
+// ---------------------------------------------------------------------------
+
+describe("artifactBlockTitle (F-10)", () => {
+  test("uses the artifact's markdown H1 as the human title", () => {
+    const body = "# US-01 メニュー閲覧\n\n社員が翌日のメニューを見る。";
+    expect(artifactBlockTitle(body, "aidlc-docs/v0.0.2/s1/us-01-browse-menu.md")).toBe(
+      "US-01 メニュー閲覧",
+    );
+  });
+
+  test("never leaks the file path or aidlc-docs structure", () => {
+    const rel = "aidlc-docs/v0.0.2/s1/us-01-browse-menu.md";
+    const title = artifactBlockTitle("# Brief — オフィスランチ予約\n本文", rel);
+    expect(title).not.toContain("aidlc-docs");
+    expect(title).not.toContain("/");
+    expect(title).not.toContain(".md");
+  });
+
+  test("falls back to a de-pathified filename when the body has no heading", () => {
+    const title = artifactBlockTitle("見出しのない本文だけ", "aidlc-docs/v0.0.2/s1/us-02-place-order.md");
+    expect(title).toBe("us 02 place order");
+    expect(title).not.toContain("/");
+  });
+
+  test("prefers the first non-empty heading", () => {
+    const body = "#\n##    実際の見出し   \n本文";
+    expect(artifactBlockTitle(body, "x/y.md")).toBe("実際の見出し");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// screenLabel — caption for a design screenshot block. Must NOT leak the path
+// or .html filename (契約①); de-slugs the screen name.
+// ---------------------------------------------------------------------------
+
+describe("screenLabel (S3 視覚証拠)", () => {
+  test("de-paths, drops .html, and de-slugs a screen artifact", () => {
+    expect(screenLabel("aidlc-docs/v0.0.5/s3/scr-01-browse-menu.html")).toBe(
+      "scr 01 browse menu",
+    );
+  });
+
+  test("never leaks the path or extension", () => {
+    const label = screenLabel("aidlc-docs/v0.0.5/s3/tokens.html");
+    expect(label).not.toContain("/");
+    expect(label).not.toContain(".html");
+    expect(label).not.toContain("aidlc-docs");
   });
 });

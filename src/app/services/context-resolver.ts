@@ -86,6 +86,14 @@ export interface StructuredContext {
   readonly dialogState?: ContextSection;
   /** Section 8: output contract for this step. */
   readonly outputContract?: ContextSection;
+  /**
+   * Write-destination instruction (F-11): the cycle's RESOLVED version + this step's
+   * canonical artifact dir. Always present — the headless AI has no other way to learn
+   * the cycle version (the static output-contract example carries only a `{version}`
+   * placeholder), so without this it guesses (e.g. v0.0.1) and artifacts miss the
+   * cycle's artifactGlob. AI-facing, so a real path here is correct (not a 契約① leak).
+   */
+  readonly targetArtifact: ContextSection;
 }
 
 /** Optional DB deps for sections 7+8+9. Pass to enable DB-sourced sections. */
@@ -280,8 +288,18 @@ const STEP_DIRECT_DEPS: Readonly<Record<string, Readonly<Record<string, readonly
  * e.g. stepArtifactDir("/repo", "v0.0.4", "S1") → "/repo/aidlc-docs/v0.0.4/s1"
  */
 export function stepArtifactDir(repoPath: string, version: string, stepId: string): string {
-  const dir = stepId.toLowerCase(); // "S1" → "s1", "S12" → "s12"
-  return join(repoPath, "aidlc-docs", version, dir);
+  return join(repoPath, stepArtifactDirRel(version, stepId));
+}
+
+/**
+ * Repo-relative canonical artifact dir for a step within the cycle's version dir.
+ * Convention: stepId "SN" → lowercase "sN". e.g. ("v0.0.4","S1") → "aidlc-docs/v0.0.4/s1".
+ * This is the AI-facing write destination injected into the prompt (F-11): the cycle's
+ * resolved version must reach the headless run, else the AI guesses (e.g. v0.0.1) and
+ * artifacts land outside the cycle's artifactGlob.
+ */
+export function stepArtifactDirRel(version: string, stepId: string): string {
+  return `aidlc-docs/${version}/${stepId.toLowerCase()}`;
 }
 
 /** index.md path for a given step within the cycle's aidlc-docs version dir. */
@@ -678,17 +696,40 @@ export function composeStructuredContext(
       const stepDef = (phase as { readonly stepDef?: Record<string, unknown> } | undefined)
         ?.stepDef;
       if (stepDef && stepDef["contracts"] !== undefined) {
+        // Resolve {version} → the cycle's real version so the contract shown to the
+        // AI matches the actual target dir (F-11): a literal `{version}` here let the
+        // AI invent its own version.
+        const contracts = JSON.stringify(stepDef["contracts"], null, 2).replace(
+          /\{version\}/g,
+          version,
+        );
         outputContract = {
           id: "section-8-output-contract",
           label: "出力契約(StepContracts)",
-          content: `【StepContracts】\n${JSON.stringify(stepDef["contracts"], null, 2)}`,
+          content: `【StepContracts】\n${contracts}`,
         };
       }
     }
   }
 
+  // ── 成果物の書き込み先(F-11 / ALWAYS present) ─────────────────────────────
+  // The cycle's resolved version + this step's canonical dir, stated as a hard
+  // instruction. Always emitted (independent of deps) so every headless run knows
+  // exactly where to write — never a {version} placeholder, never a guessed version.
+  const relDir = stepArtifactDirRel(version, currentStepId);
+  const targetArtifact: ContextSection = {
+    id: "section-target-artifact",
+    label: "成果物の書き込み先(必須)",
+    content:
+      `このサイクルの版数 = ${version}。この工程(${currentStepId})の成果物は必ず次のディレクトリ配下に書け:\n` +
+      `  ${relDir}/\n` +
+      `index.md と各成果物ファイルをこの配下に作成し、aidlc-result の artifacts[] も全てこの配下の実パスにせよ。\n` +
+      `禁止: 版数プレースホルダ {version} のまま書く / 別の版数(例 v0.0.1)・別ディレクトリに書く。`,
+  };
+
   return {
     productInvariant,
+    targetArtifact,
     ...(requirements !== undefined ? { requirements } : {}),
     ...(backtrackFeedback !== undefined ? { backtrackFeedback } : {}),
     ...(priorArtifacts !== undefined ? { priorArtifacts } : {}),
@@ -716,6 +757,9 @@ export function renderStructuredContext(ctx: StructuredContext): string {
     ...(ctx.decisionsLedger !== undefined ? [ctx.decisionsLedger] : []),
     ...(ctx.dialogState !== undefined ? [ctx.dialogState] : []),
     ...(ctx.outputContract !== undefined ? [ctx.outputContract] : []),
+    // Write-destination LAST so it's the final instruction the AI reads before the
+    // appended output-contract — maximally salient where it emits artifacts (F-11).
+    ctx.targetArtifact,
   ];
 
   return sections

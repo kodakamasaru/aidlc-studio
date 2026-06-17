@@ -641,8 +641,10 @@ interface ArtifactsSectionProps {
 }
 
 /**
- * 成果物セクション — AI がこの工程で書き出したファイル一覧。
- * パス全体を表示すると長くなりすぎるため、ファイル名(basename)を表示する。
+ * 成果物セクション — AI がこの工程で作ったものの一覧。
+ * 契約①: 人間は web しか見ずファイルを開けない。**パス / ファイル名 / .md を出さない** —
+ * basename も full path も内部構造の露出になるため、パスを事業ラベルへ言い換えて表示する
+ * (例 us-09-order-history.md → 「US-09 order history」、index.md → 「一覧」)。
  * 人間がコードを読まず「何が作られたか」を確認できる中核ビュー(原則#3)。
  */
 export function ArtifactsSection({ artifacts }: ArtifactsSectionProps) {
@@ -654,23 +656,25 @@ export function ArtifactsSection({ artifacts }: ArtifactsSectionProps) {
         <span className="artifacts-section__count">{artifacts.length} 件</span>
       </header>
       <ul className="artifacts-section__list">
-        {artifacts.map((path, i) => {
-          const filename = path.split("/").pop() ?? path;
-          return (
-            <li key={i} className="artifacts-section__item">
-              <span className="artifacts-section__icon" aria-hidden="true">📄</span>
-              <span className="artifacts-section__filename" title={path}>
-                {filename}
-              </span>
-              <span className="artifacts-section__path" aria-label={`ファイルパス: ${path}`}>
-                {path}
-              </span>
-            </li>
-          );
-        })}
+        {artifacts.map((path, i) => (
+          <li key={i} className="artifacts-section__item">
+            <span className="artifacts-section__icon" aria-hidden="true">📄</span>
+            <span className="artifacts-section__filename">{artifactLabel(path)}</span>
+          </li>
+        ))}
       </ul>
     </section>
   );
+}
+
+/**
+ * Path → human label (契約①): strip the directory + `.md`, de-slug separators, and
+ * map the bare `index` to 「一覧」. Never returns a path / filename / extension.
+ */
+function artifactLabel(path: string): string {
+  const base = (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+  if (base === "index") return "一覧";
+  return base.replace(/[-_]/g, " ").trim();
 }
 
 // ── BU-2: Decisions section (AI が決めたこと) ────────────────────────────────

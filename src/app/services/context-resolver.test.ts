@@ -28,6 +28,7 @@ import { describe, test, expect } from "bun:test";
 import {
   resolveContextPaths,
   stepArtifactDir,
+  stepArtifactDirRel,
   composeStructuredContext,
   renderStructuredContext,
   briefPath,
@@ -103,6 +104,42 @@ describe("stepArtifactDir", () => {
 
   test("maps S12 → s12 directory segment", () => {
     expect(stepArtifactDir(REPO, "v0.0.4", "S12")).toBe("/repo/aidlc-docs/v0.0.4/s12");
+  });
+});
+
+// ── stepArtifactDirRel (F-11: repo-relative write destination) ────────────────
+
+describe("stepArtifactDirRel", () => {
+  test("returns the repo-relative version dir for a step", () => {
+    expect(stepArtifactDirRel("v0.0.4", "S1")).toBe("aidlc-docs/v0.0.4/s1");
+    expect(stepArtifactDirRel("v0.0.2", "S10")).toBe("aidlc-docs/v0.0.2/s10");
+  });
+});
+
+// ── F-11: targetArtifact injects the RESOLVED cycle version ───────────────────
+
+describe("composeStructuredContext — targetArtifact (F-11)", () => {
+  test("targetArtifact is ALWAYS present and carries the resolved version + step dir", () => {
+    const cycle = makeCycle("v0.0.2", [makePhase("S1", "running", 0)]);
+    const fs = makeFsWithBrief();
+    const input: StructuredContextInput = { cycle, step: Step("S1"), repoPath: REPO };
+    const ctx = composeStructuredContext(input, { fs });
+
+    expect(ctx.targetArtifact).toBeDefined();
+    expect(ctx.targetArtifact.content).toContain("aidlc-docs/v0.0.2/s1");
+    expect(ctx.targetArtifact.content).toContain("v0.0.2");
+    // The unresolved placeholder must NOT survive as the write target.
+    expect(ctx.targetArtifact.content).not.toContain("{version}/s1");
+  });
+
+  test("renderStructuredContext emits the resolved write destination", () => {
+    const cycle = makeCycle("v0.0.7", [makePhase("S1", "running", 0)]);
+    const fs = makeFsWithBrief();
+    const input: StructuredContextInput = { cycle, step: Step("S1"), repoPath: REPO };
+    const rendered = renderStructuredContext(composeStructuredContext(input, { fs }));
+
+    expect(rendered).toContain("成果物の書き込み先");
+    expect(rendered).toContain("aidlc-docs/v0.0.7/s1");
   });
 });
 

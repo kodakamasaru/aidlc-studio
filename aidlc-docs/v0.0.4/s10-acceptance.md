@@ -151,9 +151,23 @@
 - **コード確認**: 完了検知は `child.exited` で即解決(タイムアウト待ちではない)。claude 不在は spawn 同期 throw。structuredContext は launch に渡っており構造化経路(F-6/F-7 の日本語・契約込み)を使う。→ **コード上は検知できるはずで、原因は実行時要因**(claude がハング/即死/プロンプト過大 等)。推測の連鎖を断つため**計測を投入**。
 - **対応①(計測)**: `live.ts` に診断ログ追加 — launch 時(prompt 文字数 / model / timeoutMs / pid)+ 終了時(exitCode / timedOut / durationMs / stdout・stderr 文字数)。`stdoutChars=0 && timedOut` ⇒ claude がハングして無出力、`exitCode≠0` ⇒ 即エラー、を切り分け可能に。
 - **対応②(最有力の即効策)**: **F-6/F-8/本計測はバックエンド(src/)の変更 → `serve` の再起動が必須**。web のみ再ビルドでバックエンド未再起動だと、旧プロンプト(英語/2分タイムアウト)のまま走る。「まだ英語」はこれで説明がつく可能性大。
-- **判定**: 調査中。バックエンド再起動後の slow/失敗 run のログ(上記診断)を見て実原因を確定 → 修正。
+- **判定**: **解消(2026-06-17 / 再現せず)**。使い捨て sandbox(/tmp/aidlc-sandbox)で最新コードの backend に対し実 S1 live を起動し、診断ログを採取:`exitCode=0 / timedOut=false / durationMs=93,203(~93秒で正常完了)/ stdoutChars=66,080(実出力)/ stderrChars=0`。ハング・timeout・即死いずれも無し。→ 真因は **対応②の仮説どおり旧 backend の 120s timeout**(F-8 緩和前 + 未再起動)。最新コード(timeout 60分 + 再起動)では S1 はクリーン完了。**同時に F-6(出力は全文日本語)/ F-7(質問は question カード化 — 再検証 run で実機確認)も live 実証**。
 
-> F-1/F-2/F-4/F-5/F-6/F-7/F-8 修正済 + F-3 unblock 済 + F-9 計測投入(要バックエンド再起動・ログで原因特定)。US 判定は F-9 確定後に再開。
+### F-10 (実機 live / 修正済 + 検証済): レビューカードの見出しが生のファイルパス
+- **現象**: F-9 検証 live の visual_review カードで、block の見出しが `aidlc-docs/brief.md`・`aidlc-docs/v0.0.1/s1/us-01-browse-menu.md` … と**ファイルパスそのまま**。人間は web カードしか見ずファイルを開けないのに、サーバ内部のディレクトリ構造を露出 → **責務契約①違反**(人間向け出力にパス/ディレクトリ構造を出すの禁止・事業語で指す)。
+- **根本原因**: live ハーネスが成果物 `.md` を review block 化する際、block の `title` に成果物の相対パスをそのまま入れていた(`readArtifactBlocks`)。
+- **修正**: パス由来 title を廃止し、**成果物本文の先頭見出し(H1 / 既に日本語の事業語)を title に採用**する純関数 `artifactBlockTitle(body, rel)` を新設(見出しが無ければ脱パス化したファイル名へフォールバック)。唯一の生成サイトに適用。同種サイトを全数棚卸し済(他に該当なし — scripted は固定の事業語 fixture / live の step 表記はパスでない)。
+- **検証**: 実入力(`# US-01 メニュー閲覧` / `# Brief — …`)のユニットテスト4件 green(パス・`.md`・`/` を露出しないことを assert)。決定論 634 / src tsc clean。
+- **判定**: 修正済(ユニット + 横展開棚卸しで確証。live visual_review での最終目視は次の承認 run で兼ねる)。
+
+### F-11 (実機 live / 修正済 + live 実証済): サイクルの version が live プロンプトに注入されない
+- **現象**: cycle=**v0.0.2** なのに AI が全成果物を `aidlc-docs/**v0.0.1**/s1/…` として書く(ディスク着地も v0.0.1)。契約の artifactGlob は `aidlc-docs/{version}/s1/**`(=v0.0.2)を期待 → **着地先がサイクル版数と食い違い、このサイクルの成果物解決が空になる配線欠陥**。前段文脈注入(US-01)も同じ版数前提なので波及しうる。
+- **根本原因**: プロンプトのどこにも実版数が解決注入されていなかった。出力契約の例は `aidlc-docs/{version}/sN/…` という**未解決プレースホルダのまま**で、Section 8(StepContracts)の artifactGlob も `{version}` リテラルのまま。AI は実版数を知るすべが無く、自分で v0.0.1 を選んでいた。
+- **修正**: structured context に**常時 present の「成果物の書き込み先」節**を追加 — このサイクルの解決済み版数 + この工程の正準ディレクトリ(例 `aidlc-docs/v0.0.3/s1/`)を明示し「別の版数・別ディレクトリに書くな / {version} のまま書くな」と binding 指示。Section 8 の `{version}` も実版数へ解決。出力契約文も補強。
+- **検証(live 実証)**: 修正後の backend(`--watch` 自動リロード)で新 cycle(version=**v0.0.3**)の S1 を live 起動 → ① launch プロンプトに「成果物の書き込み先」+ `aidlc-docs/v0.0.3/s1` が含まれることを確認、② 成果物が **`aidlc-docs/v0.0.3/s1/index.md` に正しく着地**(v0.0.1 誤着地は消滅)、③ AI 自身の質問文も「v0.0.3 で…」と正しい版数を参照。決定論 634 + 新規回帰テスト3件(targetArtifact が解決版数を載せる / render に出る / stepArtifactDirRel)green。
+- **判定**: 修正済(live 実証済)。
+
+> F-1/F-2/F-4/F-5/F-6/F-7/F-8 修正済 + F-3 unblock(v0.0.5 carried)+ **F-9 解消(再現せず・診断確定)** + **F-10 修正済(ユニット+棚卸し)** + **F-11 修正済(live 実証)**。**US 判定の再開ブロッカーは解消**。残るは US-01〜08 の人間判定のみ。
 
 ## サイクル全体の成果物サマリー (確定時に記入)
 - (全 US 判定が揃ったら記入)

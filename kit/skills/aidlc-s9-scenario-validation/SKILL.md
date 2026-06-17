@@ -72,7 +72,7 @@ S7 ドメインコード + S8 統合コードが、**ユーザーストーリー
 - 工程: S9 (Validation)
 - 役割: QA エンジニア
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s8-integration.md](./s8-integration.md), [s1/](./s1/), [s3/](./s3/) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
+- 入力参照: 実装統合の結果 / 要件一覧 / UIデザイン
 - テストコード出力先: `tests/e2e/`
 - 視覚証拠出力先: `aidlc-docs/{version}/s9/screenshots/`
 - 作成日: YYYY-MM-DD

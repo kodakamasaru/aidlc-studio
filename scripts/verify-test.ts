@@ -47,6 +47,13 @@ if (!existsSync(SANDBOX)) {
   console.log(`[verify:test] サンドボックス repo を作成: ${SANDBOX}`);
 }
 
+// ALWAYS re-sync kit/ on every launch (not just first seed). The live composer
+// reads skill bodies + responsibility-contract.md + operating-model.md from the
+// SANDBOX's kit copy (repoPath/kit/...), so a stale copy makes edits to the studio's
+// kit/ silently invisible to live runs — you'd test old methodology and not know it.
+// Re-copying is cheap and keeps the sandbox's methodology identical to the studio's.
+cpSync(join(ROOT, "kit"), join(SANDBOX, "kit"), { recursive: true });
+
 // 2. Free the port (mutually exclusive with verify:watch).
 Bun.spawnSync(["sh", "-c", `lsof -ti:${PORT} | xargs -I{} kill {} 2>/dev/null`]);
 

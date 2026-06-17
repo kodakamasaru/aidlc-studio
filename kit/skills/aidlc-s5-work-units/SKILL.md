@@ -70,7 +70,7 @@ AI 提案は叩き台。Unit の粒度、責務、依存方向を 1 つ 1 つ吟
 - 工程: S5 (Work Units)
 - 役割: ソフトウェアアーキテクト
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s1/index.md](../s1/index.md), [s2/index.md](../s2/index.md), [s4-tech-spec.md](../s4-tech-spec.md) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
+- 入力参照: このサイクルの要件一覧(US 群) / 画面要素 / 技術仕様(あれば)
 - 作成日: YYYY-MM-DD
 - 更新日: YYYY-MM-DD
 
@@ -188,7 +188,7 @@ flowchart TB
 # Unit-NN: {Unit 名}
 
 ## メタ
-- 親: [s5/index.md](./index.md)
+- 親: 作業単位の一覧
 - 所属 US: [US-01](../s1/us-01-{slug}.md), [US-04](../s1/us-04-{slug}.md)
 - ステータス: 進行中 | レビュー待ち | 確定
 

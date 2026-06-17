@@ -74,7 +74,7 @@ PDF 強調: 「S5 の I/F 契約との整合性を必ず確認する」。S5 で
 - 工程: S8 (Integration)
 - 役割: アプリケーションエンジニア(統合)
 - ステータス: 進行中 | レビュー待ち | 確定
-- 入力参照: [s7-domain-code.md](./s7-domain-code.md), [s5/](./s5/) ※相対パスは `aidlc-docs/{version}/` 内での位置関係
+- 入力参照: ドメインコード / 作業単位の分割
 - コード出力先: `src/`(domain 配下は触らない)
 - 作成日: YYYY-MM-DD
 - 更新日: YYYY-MM-DD
