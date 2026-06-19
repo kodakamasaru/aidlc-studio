@@ -22,4 +22,7 @@ export default function globalSetup(): void {
 
   const shotsDir = join(repoRoot, "aidlc-docs", "s7", "screenshots");
   mkdirSync(shotsDir, { recursive: true });
+
+  const shotsS9v004Dir = join(repoRoot, "aidlc-docs", "v0.0.4", "s9", "screenshots");
+  mkdirSync(shotsS9v004Dir, { recursive: true });
 }

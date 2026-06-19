@@ -17,7 +17,30 @@
 .step-config__meta {
   font-size: var(--text-caption);
   color: var(--color-text-low);
-  max-width: 60ch;
+  /* 幅はコンテナ(.step-config = 860px)に委ねる。独自の半幅キャップは置かない
+     (カード列と揃わず不自然になるため)。 */
+}
+/* US-02 / S3 scr-02: snapshot 注記。作成時点に固定される旨を控えめに明示。 */
+.step-config__snapshot-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-caption);
+  line-height: 1.7;
+  color: var(--color-text-low);
+  background: var(--color-surface-2);
+  border-left: 2px solid var(--color-info);
+  border-radius: var(--radius-md);
+}
+.step-config__snapshot-icon {
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+/* 各文は語中(「サイクル」等)で折り返さない。<wbr> を置いた文間でのみ改行する。 */
+.step-config__snapshot-line {
+  white-space: nowrap;
 }
 .step-config__list {
   display: flex;
@@ -146,6 +169,10 @@
   margin: 0;
   max-height: 460px;
   overflow: auto;
+  /* Contain scroll overflow (invariant: every overflow:auto container is
+   * position:relative so it can't leak into documentElement / cause focus-scroll
+   * jumps — see app-shell .content). */
+  position: relative;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 12.5px;
@@ -155,6 +182,48 @@
   border: 1px solid var(--color-border-muted, #2a2a33);
   border-radius: 10px;
   padding: 16px 18px;
+}
+
+/* SCR-06: 空の指示本文ブロック(no-instruction 状態)。 */
+.step-spec__no-instruction {
+  text-align: center;
+  padding: var(--sp-6, 24px) var(--sp-4, 16px);
+  color: var(--color-text-low, #6c6c7a);
+}
+
+/* SCR-06 loading skeleton ブロック。skel-line は step-config-readback.css と共有。 */
+.step-spec__skel-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 12px);
+  padding: var(--sp-4, 16px) 0;
+}
+/* skel-line--long / skel-line--full: step-config-readback.css 未定義分の補完 */
+.skel-line--long {
+  height: 14px;
+  width: 75%;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-2, #16161c);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.skel-line--full {
+  height: 14px;
+  width: 100%;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-2, #16161c);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-line--long,
+  .skel-line--full {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /* US-06 対話式編集（scr-01.settings の AI 相談）。 */

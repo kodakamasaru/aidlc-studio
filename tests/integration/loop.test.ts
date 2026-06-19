@@ -107,10 +107,15 @@ describe("full loop — happy path", () => {
     expect(answerRes.json.data.fact.id).toBeDefined();
     expect(answerRes.json.data.question.state).toBe("answered");
 
-    // The visual_review question is now the only open one.
+    // After answering the "question" kind: the scripted orchestrator emits
+    // ResultEmitted → visual_review card. Reconstruction does NOT fire yet — it is
+    // triggered only on S1 確定 (the run reaching `done` at approve, below), so at
+    // this pre-approval point the inbox holds the visual_review card.
     const inbox2 = await get(h.app, `/api/projects/${projectId}/inbox`);
-    expect(inbox2.json.data).toHaveLength(1);
-    const reviewQ = inbox2.json.data[0];
+    expect(inbox2.json.data.length).toBeGreaterThanOrEqual(1);
+    // The visual_review card is present among the open questions.
+    const reviewQ = inbox2.json.data.find((q: any) => q.kind === "visual_review");
+    expect(reviewQ).toBeDefined();
     expect(reviewQ.kind).toBe("visual_review");
 
     // Its payload carries the Review with the 4 MVP block types.
@@ -139,17 +144,38 @@ describe("full loop — happy path", () => {
     expect(cycleGet.status).toBe(200);
     expect(runStates(cycleGet.json.data)).toContain("done");
 
-    // Inbox is now empty (both questions answered).
+    // Inbox: visual_review and original question are answered/closed.
+    // Approving S1 reached `done`, which now triggers the reconstruction run
+    // (US-08 AC-2) → its reconstruction card (US-08 F-1) is open here and remains
+    // open until the human approves/rejects it via /cycles/:id/reconstruction.
     const inbox3 = await get(h.app, `/api/projects/${projectId}/inbox`);
-    expect(inbox3.json.data).toHaveLength(0);
+    const remainingOpen: any[] = inbox3.json.data.filter((q: any) => q.state === "open");
+    // No visual_review or question cards remain open.
+    expect(remainingOpen.filter((q: any) => q.kind === "visual_review")).toHaveLength(0);
+    expect(remainingOpen.filter((q: any) => q.kind === "question")).toHaveLength(0);
 
-    // The S1 phase is "done" (the approved review completed it) — so the NEXT
-    // phase is startable. Regression guard: approving used to mark only the run
-    // done, leaving the phase stuck in "review", which blocked startPhase(S2)
-    // with PrevPhaseNotDone and froze the loop on S1.
+    // The S1 phase is "done" (the approved review completed it). Regression guard:
+    // approving used to mark only the run done, leaving the phase stuck in "review".
     const phasesAfter = (await get(h.app, `/api/cycles/${cycle.id}`)).json.data
       .phases;
     expect(phasesAfter.find((p: any) => p.step === "S1").state).toBe("done");
+
+    // F-17 gate: a reconstruction card is open (raised at S1-確定) → the NEXT step is
+    // BLOCKED until the human resolves it (要件→ステップ構成→後続). Starting S2 now 409s.
+    const reconCard = remainingOpen.find((q: any) => q.kind === "reconstruction");
+    expect(reconCard).toBeDefined();
+    const blocked = await post(h.app, `/api/cycles/${cycle.id}/phases/S2/start`);
+    expect(blocked.status).toBe(409);
+
+    // Resolve the reconstruction (reject = keep the default pipeline) → card closes.
+    const rejectRes = await post(
+      h.app,
+      `/api/questions/${reconCard.id}/answer`,
+      { verdict: "reject" },
+    );
+    expect(rejectRes.status).toBe(200);
+
+    // Now the gate is clear → the next step is startable.
     const startS2 = await post(
       h.app,
       `/api/cycles/${cycle.id}/phases/S2/start`,

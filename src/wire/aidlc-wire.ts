@@ -1,0 +1,673 @@
+/**
+ * aidlc-wire — wire-format conversion for aidlc-question / aidlc-answers fenced blocks.
+ *
+ * PURE module: no I/O, no framework imports, no side effects.
+ * Only imports from shared/result.
+ */
+
+import { type Result, ok, err } from "../domain/shared/result";
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+export type AidlcOption = {
+  readonly id: string;
+  readonly label: string;
+  readonly hint?: string;
+  readonly recommended?: boolean;
+};
+
+export type AidlcAnswerKind = "single" | "multi" | "free";
+
+export type AidlcQuestion = {
+  readonly id: string;
+  readonly prompt: string;
+  readonly background?: string;
+  readonly options: readonly AidlcOption[];
+  readonly answerKind: AidlcAnswerKind;
+  /**
+   * BU-3: config-hearing target. When present, the answer handler writes the
+   * human's choice directly into StepContracts (deterministic write / §C7.6).
+   * Absent on normal hearing questions (backward-compatible).
+   */
+  readonly target?: AidlcTarget;
+};
+
+export type AidlcAnswer = {
+  readonly questionId: string;
+  readonly choiceIds: readonly string[];
+  readonly note?: string;
+};
+
+export type WireError = {
+  readonly code: "no-block" | "bad-json" | "schema";
+  readonly detail: string;
+};
+
+/**
+ * BU-3: config-hearing target. When a config-hearing run emits questions, each
+ * question may carry a `target` that tells the answer handler WHICH StepContracts
+ * field to write the answer into deterministically (§C7.6 / s4-tech-spec.md).
+ *
+ * `step` — the step id (e.g. "S1", "S8").
+ * `field` — a StepContracts dotted path:
+ *   "output.profileKind" | "output.artifactGlob" |
+ *   "humanGate.mode" |
+ *   "escalation.onStall" | "escalation.maxRetry" |
+ *   "verification.observations"
+ *
+ * Absence of `target` means the question is a normal hearing question (no
+ * contract write on answer — backward-compatible).
+ */
+export type AidlcTarget = {
+  readonly step: string;
+  readonly field: string;
+  /**
+   * Write destination scope: "global" (project.pipelineDef) or "cycle:{id}"
+   * (phase snapshot). When absent in wire, the answer-handler infers the scope
+   * from the question's cycleId (i.e. "cycle:{question.cycleId}").
+   */
+  readonly scope?: string;
+};
+
+/** Allowed StepContracts dotted-path fields for config-hearing targets. */
+export const ALLOWED_TARGET_FIELDS: ReadonlySet<string> = new Set([
+  "output.profileKind",
+  "output.artifactGlob",
+  "humanGate.mode",
+  "escalation.onStall",
+  "escalation.maxRetry",
+  "verification.observations",
+]);
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const QUESTION_FENCE_OPEN = "```aidlc-question";
+const ANSWERS_FENCE_OPEN = "```aidlc-answers";
+const FENCE_CLOSE = "```";
+
+const VALID_ANSWER_KINDS: readonly AidlcAnswerKind[] = ["single", "multi", "free"];
+
+// ---------------------------------------------------------------------------
+// Internal fence extraction
+// ---------------------------------------------------------------------------
+
+type FenceScan =
+  | { readonly kind: "absent" }
+  | { readonly kind: "unclosed" }
+  | { readonly kind: "content"; readonly content: string };
+
+/**
+ * Scan the first fenced block that starts with `openTag`.
+ * - "absent"   — the open tag was never found
+ * - "unclosed" — the open tag was found but no closing fence followed
+ * - "content"  — block found and closed; `content` holds the inner text
+ */
+const scanFence = (text: string, openTag: string): FenceScan => {
+  const lines = text.split("\n");
+  let inBlock = false;
+  const contentLines: string[] = [];
+
+  for (const line of lines) {
+    if (!inBlock) {
+      if (line.trimEnd() === openTag) {
+        inBlock = true;
+      }
+      continue;
+    }
+    if (line.trimEnd() === FENCE_CLOSE) {
+      return { kind: "content", content: contentLines.join("\n") };
+    }
+    contentLines.push(line);
+  }
+
+  return inBlock ? { kind: "unclosed" } : { kind: "absent" };
+};
+
+// ---------------------------------------------------------------------------
+// Internal option validation
+// ---------------------------------------------------------------------------
+
+const validateOption = (opt: unknown, index: number): Result<AidlcOption, WireError> => {
+  if (typeof opt !== "object" || opt === null) {
+    return err({ code: "schema", detail: `options[${index}] must be an object` });
+  }
+
+  const o = opt as Record<string, unknown>;
+
+  if (typeof o["id"] !== "string" || o["id"].length === 0) {
+    return err({ code: "schema", detail: `options[${index}].id must be a non-empty string` });
+  }
+  if (typeof o["label"] !== "string" || o["label"].length === 0) {
+    return err({ code: "schema", detail: `options[${index}].label must be a non-empty string` });
+  }
+  if (o["hint"] !== undefined && typeof o["hint"] !== "string") {
+    return err({ code: "schema", detail: `options[${index}].hint must be a string when present` });
+  }
+
+  return ok({
+    id: o["id"] as string,
+    label: o["label"] as string,
+    ...(o["hint"] !== undefined ? { hint: o["hint"] as string } : {}),
+    ...(o["recommended"] === true ? { recommended: true } : {}),
+  });
+};
+
+// ---------------------------------------------------------------------------
+// validateAidlcQuestion
+// ---------------------------------------------------------------------------
+
+export const validateAidlcQuestion = (q: unknown): Result<AidlcQuestion, WireError> => {
+  if (typeof q !== "object" || q === null) {
+    return err({ code: "schema", detail: "question must be a non-null object" });
+  }
+
+  const raw = q as Record<string, unknown>;
+
+  // id
+  if (typeof raw["id"] !== "string" || raw["id"].length === 0) {
+    return err({ code: "schema", detail: "question.id must be a non-empty string" });
+  }
+
+  // prompt
+  if (typeof raw["prompt"] !== "string" || raw["prompt"].length === 0) {
+    return err({ code: "schema", detail: "question.prompt must be a non-empty string" });
+  }
+
+  // answerKind
+  if (!VALID_ANSWER_KINDS.includes(raw["answerKind"] as AidlcAnswerKind)) {
+    return err({
+      code: "schema",
+      detail: `question.answerKind must be one of: ${VALID_ANSWER_KINDS.join(", ")}. Got: ${JSON.stringify(raw["answerKind"])}`,
+    });
+  }
+
+  const answerKind = raw["answerKind"] as AidlcAnswerKind;
+  const isFreeText = answerKind === "free";
+
+  // options — must be an array. Choice questions (single/multi) require a
+  // non-empty list; a free-text question (answerKind="free") carries NO options
+  // (the human types the answer), so an empty array is valid there. Rejecting
+  // empty options for "free" was sinking otherwise-valid envelopes into the
+  // legacy visual_review path — the real-AI "質問でこない" bug (S10 実機 F-11).
+  if (!Array.isArray(raw["options"])) {
+    return err({ code: "schema", detail: "question.options must be an array" });
+  }
+  if (!isFreeText && raw["options"].length === 0) {
+    return err({
+      code: "schema",
+      detail:
+        'question.options must be a non-empty array for answerKind "single"/"multi" ' +
+        '(use answerKind "free" for a free-text question with no options)',
+    });
+  }
+
+  const validatedOptions: AidlcOption[] = [];
+  for (let i = 0; i < raw["options"].length; i++) {
+    const optResult = validateOption(raw["options"][i], i);
+    if (!optResult.ok) return optResult;
+    validatedOptions.push(optResult.value);
+  }
+
+  // Exactly-one-recommended rule applies to CHOICE questions only — a free-text
+  // question has no options to recommend. Surface violations loudly.
+  if (!isFreeText) {
+    const recommendedCount = validatedOptions.filter((o) => o.recommended === true).length;
+    if (recommendedCount !== 1) {
+      return err({
+        code: "schema",
+        detail: `question "${raw["id"]}": exactly 1 option must have recommended=true; found ${recommendedCount}`,
+      });
+    }
+  }
+
+  // background — optional string
+  if (raw["background"] !== undefined && typeof raw["background"] !== "string") {
+    return err({ code: "schema", detail: "question.background must be a string when present" });
+  }
+
+  // target — optional BU-3 config-hearing write target
+  let target: AidlcTarget | undefined;
+  if (raw["target"] !== undefined) {
+    if (typeof raw["target"] !== "object" || raw["target"] === null) {
+      return err({ code: "schema", detail: "question.target must be an object when present" });
+    }
+    const t = raw["target"] as Record<string, unknown>;
+    if (typeof t["step"] !== "string" || t["step"].length === 0) {
+      return err({ code: "schema", detail: "question.target.step must be a non-empty string" });
+    }
+    if (typeof t["field"] !== "string" || t["field"].length === 0) {
+      return err({ code: "schema", detail: "question.target.field must be a non-empty string" });
+    }
+    if (!ALLOWED_TARGET_FIELDS.has(t["field"])) {
+      return err({
+        code: "schema",
+        detail: `question.target.field "${t["field"]}" is not an allowed contract field. Allowed: ${[...ALLOWED_TARGET_FIELDS].join(", ")}`,
+      });
+    }
+    // scope is optional; when present must be a string
+    if (t["scope"] !== undefined && typeof t["scope"] !== "string") {
+      return err({ code: "schema", detail: "question.target.scope must be a string when present" });
+    }
+    target = {
+      step: t["step"] as string,
+      field: t["field"] as string,
+      ...(t["scope"] !== undefined ? { scope: t["scope"] as string } : {}),
+    };
+  }
+
+  return ok({
+    id: raw["id"] as string,
+    prompt: raw["prompt"] as string,
+    answerKind: raw["answerKind"] as AidlcAnswerKind,
+    options: validatedOptions,
+    ...(raw["background"] !== undefined ? { background: raw["background"] as string } : {}),
+    ...(target !== undefined ? { target } : {}),
+  });
+};
+
+// ---------------------------------------------------------------------------
+// parseQuestionBlock
+// ---------------------------------------------------------------------------
+
+export const parseQuestionBlock = (text: string): Result<AidlcQuestion[] | null, WireError> => {
+  const scan = scanFence(text, QUESTION_FENCE_OPEN);
+
+  // No block is normal — signals the visual_review path, not an error
+  if (scan.kind === "absent") {
+    return ok(null);
+  }
+
+  // Open tag seen but never closed — AI started a block it did not finish; surface loudly
+  if (scan.kind === "unclosed") {
+    return err({ code: "schema", detail: "unclosed aidlc-question fence" });
+  }
+
+  const content = scan.content;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return err({ code: "bad-json", detail });
+  }
+
+  // S10 F-20: accept the three shapes a live model naturally emits for an
+  // ```aidlc-question``` block, not only the {questions:[...]} wrapper:
+  //   (a) {questions:[...]}        — the documented wrapper
+  //   (b) [ {...}, {...} ]         — a bare array of questions
+  //   (c) { id, prompt, options }  — a bare SINGLE question object
+  // (c) is what the contract's "aidlc-question schema: id/prompt/..." wording
+  // invites, and was the real S3 stall: the old parser demanded the wrapper and
+  // rejected the bare object → malformed → retried 3× into the same shape. Being
+  // strict here broke valid-intent output (F-13/T20 class); normalize instead.
+  let rawQuestions: unknown[];
+  if (Array.isArray(parsed)) {
+    rawQuestions = parsed;
+  } else if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    Array.isArray((parsed as Record<string, unknown>)["questions"])
+  ) {
+    rawQuestions = (parsed as Record<string, unknown>)["questions"] as unknown[];
+  } else if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "id" in (parsed as Record<string, unknown>) &&
+    "prompt" in (parsed as Record<string, unknown>)
+  ) {
+    // Bare single question object.
+    rawQuestions = [parsed];
+  } else {
+    return err({
+      code: "schema",
+      detail:
+        "aidlc-question block must parse to { questions: AidlcQuestion[] }, " +
+        "a bare AidlcQuestion[] array, or a single { id, prompt, ... } question object",
+    });
+  }
+  const questions: AidlcQuestion[] = [];
+
+  for (const raw of rawQuestions) {
+    const result = validateAidlcQuestion(raw);
+    if (!result.ok) return result;
+    questions.push(result.value);
+  }
+
+  return ok(questions);
+};
+
+// ---------------------------------------------------------------------------
+// serializeAnswers
+// ---------------------------------------------------------------------------
+
+export const serializeAnswers = (answers: readonly AidlcAnswer[]): string =>
+  [ANSWERS_FENCE_OPEN, JSON.stringify({ answers }, null, 2), FENCE_CLOSE].join("\n");
+
+// ---------------------------------------------------------------------------
+// Internal answer validation
+// ---------------------------------------------------------------------------
+
+const validateAnswer = (a: unknown, index: number): Result<AidlcAnswer, WireError> => {
+  if (typeof a !== "object" || a === null) {
+    return err({ code: "schema", detail: `answers[${index}] must be an object` });
+  }
+
+  const raw = a as Record<string, unknown>;
+
+  if (typeof raw["questionId"] !== "string" || raw["questionId"].length === 0) {
+    return err({
+      code: "schema",
+      detail: `answers[${index}].questionId must be a non-empty string`,
+    });
+  }
+
+  if (
+    !Array.isArray(raw["choiceIds"]) ||
+    !raw["choiceIds"].every((c): c is string => typeof c === "string")
+  ) {
+    return err({
+      code: "schema",
+      detail: `answers[${index}].choiceIds must be an array of strings`,
+    });
+  }
+
+  // After the element-type guard above, TypeScript knows choiceIds is string[]
+  const choiceIds: readonly string[] = raw["choiceIds"];
+
+  if (raw["note"] !== undefined && typeof raw["note"] !== "string") {
+    return err({
+      code: "schema",
+      detail: `answers[${index}].note must be a string when present`,
+    });
+  }
+
+  // FIX 2 — reject a truly blank answer (no choices AND no meaningful note)
+  const hasChoice = choiceIds.length > 0;
+  const hasNote = typeof raw["note"] === "string" && raw["note"].trim().length > 0;
+  if (!hasChoice && !hasNote) {
+    return err({
+      code: "schema",
+      detail: `answers[${index}] must have at least one choice or a non-empty note`,
+    });
+  }
+
+  return ok({
+    questionId: raw["questionId"] as string,
+    choiceIds,
+    ...(raw["note"] !== undefined ? { note: raw["note"] as string } : {}),
+  });
+};
+
+// ---------------------------------------------------------------------------
+// parseAnswersBlock
+// ---------------------------------------------------------------------------
+
+export const parseAnswersBlock = (text: string): Result<AidlcAnswer[], WireError> => {
+  const scan = scanFence(text, ANSWERS_FENCE_OPEN);
+
+  // For answers, absence IS an error (unlike questions)
+  if (scan.kind === "absent") {
+    return err({ code: "no-block", detail: "no ```aidlc-answers block found in text" });
+  }
+
+  // Open tag seen but never closed — malformed block
+  if (scan.kind === "unclosed") {
+    return err({ code: "schema", detail: "unclosed aidlc-answers fence" });
+  }
+
+  const content = scan.content;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return err({ code: "bad-json", detail });
+  }
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !Array.isArray((parsed as Record<string, unknown>)["answers"])
+  ) {
+    return err({
+      code: "schema",
+      detail: "aidlc-answers block must parse to { answers: AidlcAnswer[] }",
+    });
+  }
+
+  const rawAnswers = (parsed as Record<string, unknown>)["answers"] as unknown[];
+  const answers: AidlcAnswer[] = [];
+
+  for (let i = 0; i < rawAnswers.length; i++) {
+    const result = validateAnswer(rawAnswers[i], i);
+    if (!result.ok) return result;
+    answers.push(result.value);
+  }
+
+  return ok(answers);
+};
+
+// ---------------------------------------------------------------------------
+// aidlc-reconstruction types
+// ---------------------------------------------------------------------------
+
+/**
+ * US-08: diff tag for a step in a ReconstructionProposal.
+ * "keep"    — step exists in the current pipeline and is unchanged.
+ * "add"     — new step to append.
+ * "delete"  — step to remove (must carry a `reason`).
+ * "current" — global scope alias for "keep" (project-level replace has no diff).
+ */
+export type ReconstructionDiff = "keep" | "add" | "delete" | "current";
+
+/**
+ * One step entry inside a ReconstructionProposal.
+ * Mirrors StepDef but enriched with diff annotation + optional reason.
+ */
+export type ReconstructionStep = {
+  readonly id: string;
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  /**
+   * Per-step customized rule content (the `instruction` field on StepDef).
+   * Replaces the kit/skills/*.md skeleton for this step when present.
+   */
+  readonly instruction: string;
+  /** How this step differs from the current pipeline for this cycle/project. */
+  readonly diff: ReconstructionDiff;
+  /**
+   * Required when diff="delete": human-readable reason for the removal.
+   * Present (but optional) for add/keep/current to carry AI rationale.
+   */
+  readonly reason?: string;
+};
+
+/**
+ * US-08: structured pipeline-reconstruction proposal emitted by the AI as an
+ * ```aidlc-reconstruction``` fenced block. The web reads it via
+ * GET /api/cycles/:id/reconstruction-proposal and presents it to the human for
+ * review before applying via POST /api/cycles/:id/reconstruct.
+ *
+ * scope="cycle"  — proposes changes to this cycle's pending steps only.
+ * scope="global" — proposes a new project-level pipelineDef.
+ */
+export type ReconstructionProposal = {
+  readonly scope: "cycle" | "global";
+  readonly steps: readonly ReconstructionStep[];
+};
+
+const RECONSTRUCTION_FENCE_OPEN = "```aidlc-reconstruction";
+
+const VALID_DIFFS: ReadonlySet<string> = new Set(["keep", "add", "delete", "current"]);
+
+// ---------------------------------------------------------------------------
+// validateReconstructionStep
+// ---------------------------------------------------------------------------
+
+const validateReconstructionStep = (
+  raw: unknown,
+  index: number,
+): Result<ReconstructionStep, WireError> => {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return err({ code: "schema", detail: `steps[${index}] must be a non-null object` });
+  }
+  const s = raw as Record<string, unknown>;
+
+  if (typeof s["id"] !== "string" || s["id"].length === 0) {
+    return err({ code: "schema", detail: `steps[${index}].id must be a non-empty string` });
+  }
+  if (typeof s["label"] !== "string" || s["label"].length === 0) {
+    return err({ code: "schema", detail: `steps[${index}].label must be a non-empty string` });
+  }
+  // S10 F-13(recon): a `diff:"delete"` step is FILTERED OUT before the pipeline is
+  // applied (web sends only non-delete steps to applyCycleReconstruction) and renders
+  // as ✕ with no position — so its `order` is never consumed. Models naturally encode
+  // a removed step with a sentinel (e.g. order:-1); requiring ≥ 0 there rejects an
+  // otherwise-valid proposal and dumps the raw envelope to the human. So delete steps
+  // need `order` to be an integer (type safety) but NOT non-negative. Non-delete steps
+  // (their order DOES drive the pipeline sort) keep the ≥ 0 requirement.
+  const isDelete = s["diff"] === "delete";
+  if (
+    typeof s["order"] !== "number" ||
+    !Number.isInteger(s["order"]) ||
+    (!isDelete && s["order"] < 0)
+  ) {
+    return err({
+      code: "schema",
+      detail: isDelete
+        ? `steps[${index}].order must be an integer`
+        : `steps[${index}].order must be a non-negative integer`,
+    });
+  }
+  if (typeof s["skillRef"] !== "string" || s["skillRef"].length === 0) {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].skillRef must be a non-empty string`,
+    });
+  }
+  if (typeof s["instruction"] !== "string") {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].instruction must be a string`,
+    });
+  }
+  if (!VALID_DIFFS.has(s["diff"] as string)) {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].diff must be one of: ${[...VALID_DIFFS].join(", ")}. Got: ${JSON.stringify(s["diff"])}`,
+    });
+  }
+  const diff = s["diff"] as ReconstructionDiff;
+
+  // delete must carry a reason
+  if (diff === "delete") {
+    if (typeof s["reason"] !== "string" || s["reason"].trim().length === 0) {
+      return err({
+        code: "schema",
+        detail: `steps[${index}].reason is required (non-empty string) when diff="delete"`,
+      });
+    }
+  }
+  // optional reason on other diffs
+  if (s["reason"] !== undefined && typeof s["reason"] !== "string") {
+    return err({
+      code: "schema",
+      detail: `steps[${index}].reason must be a string when present`,
+    });
+  }
+
+  return ok({
+    id: s["id"] as string,
+    label: s["label"] as string,
+    order: s["order"] as number,
+    skillRef: s["skillRef"] as string,
+    instruction: s["instruction"] as string,
+    diff,
+    ...(s["reason"] !== undefined ? { reason: s["reason"] as string } : {}),
+  });
+};
+
+// ---------------------------------------------------------------------------
+// validateReconstructionProposal
+// ---------------------------------------------------------------------------
+
+export const validateReconstructionProposal = (
+  raw: unknown,
+): Result<ReconstructionProposal, WireError> => {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return err({ code: "schema", detail: "reconstruction proposal must be a non-null object" });
+  }
+  const r = raw as Record<string, unknown>;
+
+  if (r["scope"] !== "cycle" && r["scope"] !== "global") {
+    return err({
+      code: "schema",
+      detail: `proposal.scope must be "cycle" or "global". Got: ${JSON.stringify(r["scope"])}`,
+    });
+  }
+  const scope = r["scope"] as "cycle" | "global";
+
+  if (!Array.isArray(r["steps"]) || r["steps"].length === 0) {
+    return err({ code: "schema", detail: "proposal.steps must be a non-empty array" });
+  }
+
+  const steps: ReconstructionStep[] = [];
+  for (let i = 0; i < r["steps"].length; i++) {
+    const result = validateReconstructionStep(r["steps"][i], i);
+    if (!result.ok) return result;
+    steps.push(result.value);
+  }
+
+  return ok({ scope, steps });
+};
+
+// ---------------------------------------------------------------------------
+// parseReconstructionBlock
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan for a single ```aidlc-reconstruction``` fenced block in text.
+ * - ok(null)  = no block present (normal: step did not emit a proposal)
+ * - ok(ReconstructionProposal) = block found, parsed, validated
+ * - err(WireError) = unclosed fence | bad JSON | schema violation
+ */
+export const parseReconstructionBlock = (
+  text: string,
+): Result<ReconstructionProposal | null, WireError> => {
+  const scan = scanFence(text, RECONSTRUCTION_FENCE_OPEN);
+
+  if (scan.kind === "absent") {
+    return ok(null);
+  }
+
+  if (scan.kind === "unclosed") {
+    return err({ code: "schema", detail: "unclosed aidlc-reconstruction fence" });
+  }
+
+  const content = scan.content;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return err({ code: "bad-json", detail });
+  }
+
+  return validateReconstructionProposal(parsed);
+};
+
+// ---------------------------------------------------------------------------
+// serializeReconstructionProposal
+// ---------------------------------------------------------------------------
+
+/**
+ * Produce the minified single-line ```aidlc-reconstruction``` fenced block.
+ * Used by the scripted adapter and tests for round-trip verification.
+ */
+export const serializeReconstructionProposal = (proposal: ReconstructionProposal): string =>
+  [RECONSTRUCTION_FENCE_OPEN, JSON.stringify(proposal), FENCE_CLOSE].join("\n");

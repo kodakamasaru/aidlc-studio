@@ -1,16 +1,16 @@
-// SCR-04 — Review detail (visual_review kind). Renders the Review block-stream
+// SCR-03 — Review detail (visual_review kind). Renders the Review block-stream
 // with two topbar actions: 承認 (approve → next phase) and 差し戻し (reveal the
 // backtrack modal → reject with target step + reason). States: default / backtrack.
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Question } from "../../lib/api";
+import { api, type Question, type ReviewBlock } from "../../lib/api";
 import { useAsync } from "../../lib/useAsync";
 import { useProjectContext } from "../../lib/project-context";
 import { errorMessage } from "../../lib/format";
 import { useSetTopbar } from "../../components/shell/topbar-context";
 import { StateBadge } from "../../components/ui/StateBadge";
 import { CheckIcon, BacktrackIcon } from "../../components/ui/Icon";
-import { ReviewBlocks, CompletenessTable } from "./ReviewBlocks";
+import { ReviewBlocks, CompletenessTable, ArtifactsSection, DecisionsSection } from "./ReviewBlocks";
 import { BacktrackModal, type StepOption } from "./BacktrackModal";
 import { reviewCrumb } from "./review-crumb";
 import { stepLabel } from "../../lib/step-label";
@@ -18,6 +18,30 @@ import "./review.css";
 
 interface ReviewDetailProps {
   readonly question: Question;
+}
+
+// Detect a "missing-context" sentinel block injected by the orchestrator when
+// the prior cycle's artifacts were unavailable. The orchestrator currently
+// encodes this as a summary block with a specific title or body prefix.
+// We normalise it to a `missing-context` pseudo-block so ReviewBlocks can
+// render a clean Japanese warning banner (role="alert") instead of exposing
+// the raw developer token "missing-context" in the UI.
+const MISSING_CTX_TITLE = "コンテキスト欠損警告";
+const MISSING_CTX_BODY_PREFIX = "⚠ missing-context";
+const MISSING_CTX_CLEAN_MSG =
+  "前サイクルの成果物が見つかりません — コンテキストが不完全な状態で実行されています。差し戻して再実行を検討してください。";
+
+function normaliseMissingContext(blocks: readonly ReviewBlock[]): readonly ReviewBlock[] {
+  return blocks.map((b): ReviewBlock => {
+    if (b.type !== "summary") return b;
+    const s = b as { type: "summary"; title: string; body: string };
+    const titleMatch = s.title === MISSING_CTX_TITLE;
+    const bodyMatch = typeof s.body === "string" && s.body.startsWith(MISSING_CTX_BODY_PREFIX);
+    if (!titleMatch && !bodyMatch) return b;
+    // Replace with a missing-context pseudo-block (handled by ReviewBlocks
+    // as a clean Japanese alert banner; no developer strings exposed).
+    return { type: "missing-context", message: MISSING_CTX_CLEAN_MSG } as unknown as ReviewBlock;
+  });
 }
 
 export function ReviewDetail({ question }: ReviewDetailProps) {
@@ -131,15 +155,21 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
     );
   }
 
+  // Normalise blocks: convert orchestrator's missing-context sentinel summaries
+  // to dedicated missing-context pseudo-blocks (clean Japanese, no dev tokens).
+  const normalisedBlocks = normaliseMissingContext(review.blocks);
+
   return (
     <div className="content-inner review-detail">
       <header className="review-detail__head">
-        <StateBadge variant="review" noDot icon={<span aria-hidden="true">◎</span>}>
-          レビュー待ち
-        </StateBadge>
-        <h1 className="review-detail__title">
-          「{stepLabel(review.step)}」のできあがり確認
-        </h1>
+        <div className="review-detail__head-top">
+          <StateBadge variant="review" noDot icon={<span aria-hidden="true">◎</span>}>
+            できあがりの確認
+          </StateBadge>
+          <h1 className="review-detail__title">
+            「{stepLabel(review.step)}」のできあがり確認
+          </h1>
+        </div>
         <p className="review-detail__meta">
           コードを読まずに、できあがりを確認できます。問題なければ「承認」、直しが要るなら「差し戻し」。
         </p>
@@ -154,11 +184,21 @@ export function ReviewDetail({ question }: ReviewDetailProps) {
         {busy ? "送信しています…" : ""}
       </p>
 
+      {/* SCR-03 順: 成果物本文(概要)→ 受け入れ条件 → 成果物 → AI決定。
+          live は本文を summary block として注入(US-02)、scripted は元から block。 */}
+      <ReviewBlocks blocks={normalisedBlocks} />
+
       {review.completeness ? (
         <CompletenessTable completeness={review.completeness} />
       ) : null}
 
-      <ReviewBlocks blocks={review.blocks} />
+      {review.artifacts && review.artifacts.length > 0 ? (
+        <ArtifactsSection artifacts={review.artifacts} />
+      ) : null}
+
+      {review.decisions && review.decisions.length > 0 ? (
+        <DecisionsSection decisions={review.decisions} />
+      ) : null}
 
       {backtracking ? (
         <BacktrackModal

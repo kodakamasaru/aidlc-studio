@@ -23,10 +23,15 @@ const META: Record<QuestionKind, KindMeta> = {
   backtrack: { variant: "review", icon: "↩", label: "手戻りの確認", action: "確認する" },
   stall_retry: { variant: "q", icon: "↻", label: "再開待ち", action: "確認する" },
   descope: { variant: "q", icon: "⊘", label: "見送りの相談", action: "判断する" },
+  // US-08 F-1: 再構成提案カード — 専用画面 /cycles/:id/reconstruction へ誘導。
+  reconstruction: { variant: "review", icon: "⇌", label: "工程の再構成", action: "確認する" },
 };
 
 export function kindMeta(kind: QuestionKind): KindMeta {
-  return META[kind];
+  // Fallback for an unexpected kind from the backend: never return undefined
+  // (InboxCard reads meta.variant — an undefined would throw and white-screen the
+  // WHOLE inbox, hiding every other card / 原則④: degrade visibly, don't crash).
+  return META[kind] ?? { variant: "q", icon: "•", label: String(kind), action: "確認する" };
 }
 
 /** Where a kind opens: review detail (SCR-04) vs answer (SCR-05). */

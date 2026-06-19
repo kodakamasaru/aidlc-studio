@@ -9,6 +9,7 @@ import type { Ports } from "../ports/composition";
 import type { RunEmission, RunContext } from "../ports/orchestrator";
 import {
   raiseQuestion,
+  RECONSTRUCTION_READY_SUMMARY,
   type Question,
 } from "../../domain/question/question";
 import { buildReview } from "../../domain/review/review";
@@ -99,6 +100,9 @@ export class EventApplier {
           ...(event.taskId !== undefined ? { taskId: event.taskId } : {}),
           payload: event.payload,
           createdAt: clock.now(),
+          // BU-3: thread config-hearing target so inbox-service can write
+          // the answer into StepContracts after the human responds (§C7.6).
+          ...(event.target !== undefined ? { target: event.target } : {}),
         });
         repos.questions.save(q);
         raised.push(q);
@@ -117,6 +121,10 @@ export class EventApplier {
           ...(event.completeness !== undefined
             ? { completeness: event.completeness }
             : {}),
+          // BU-2: carry aidlc-result envelope artifacts + decisions so the web
+          // ReviewDetail can render "成果物" and "AI が決めたこと" sections.
+          ...(event.artifacts !== undefined ? { artifacts: event.artifacts } : {}),
+          ...(event.decisions !== undefined ? { decisions: event.decisions } : {}),
         });
         repos.reviews.save(review);
         // S8 gen→gate→eval: role-bearing runs (generator/evaluator) are driven by
@@ -183,6 +191,46 @@ export class EventApplier {
           path: dp.value,
           updatedAt: clock.now(),
         });
+        return;
+      }
+      case "ReconstructionProposalEmitted": {
+        // US-08: persist the proposal keyed by cycleId. One slot per cycle;
+        // latest write wins (re-emission on retry overwrites cleanly).
+        repos.reconstructionProposals.save(ctx.cycleId, event.proposal);
+
+        // US-08 F-1 / S10: surface the reconstruction inbox card with the "ready"
+        // wording. The F-17 gate card was raised UP FRONT (before this run finished)
+        // with a PENDING title that does NOT invite confirmation — there was nothing
+        // to confirm yet. Now the proposal exists, so FLIP that same card's title to
+        // RECONSTRUCTION_READY_SUMMARY (re-save by id; the repo upserts ON CONFLICT)
+        // and notify. We must NOT early-return on the existing card (the old guard
+        // did) — that left it stuck on the misleading "確認してください" wording forever.
+        const existingOpen = repos.questions
+          .listByCycle(ctx.cycleId)
+          .find(
+            (existing) =>
+              existing.state === "open" && existing.kind === "reconstruction",
+          );
+        const q: Question = existingOpen
+          ? {
+              ...existingOpen,
+              payload: {
+                kind: "reconstruction",
+                summary: RECONSTRUCTION_READY_SUMMARY,
+              },
+            }
+          : raiseQuestion({
+              id: ids.questionId(),
+              runId: ctx.runId,
+              cycleId: ctx.cycleId,
+              payload: {
+                kind: "reconstruction",
+                summary: RECONSTRUCTION_READY_SUMMARY,
+              },
+              createdAt: clock.now(),
+            });
+        repos.questions.save(q);
+        raised.push(q);
         return;
       }
     }

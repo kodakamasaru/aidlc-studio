@@ -88,6 +88,9 @@ export function CycleDetailPage() {
     (activeRun === undefined || activeRun.state === "done");
 
   const openQuestions: readonly Question[] = inboxQ.data ?? [];
+  // F-17 gate: while a reconstruction proposal is unresolved, the cycle must show
+  // "工程の再構成を確認" — NOT the next step's start button. 要件→ステップ構成→後続。
+  const reconstructionPending = openQuestions.some((q) => q.kind === "reconstruction");
   const humanWait = rewound
     ? undefined
     : humanWaitingForRun(activeRun, openQuestions);
@@ -134,13 +137,14 @@ export function CycleDetailPage() {
             )
           }
           humanWaitId={humanWait?.question.id}
+          reconstructionPending={reconstructionPending}
           onStart={onStart}
           onRetry={onRetry}
           onRelaunch={onRelaunch}
         />
       ) : undefined,
     },
-    [cycle, phase?.step, runState, rewound, busy, displayState, humanWait?.question.id],
+    [cycle, phase?.step, runState, rewound, busy, displayState, humanWait?.question.id, reconstructionPending],
   );
 
   if (cycleQ.status === "loading") {
@@ -184,7 +188,28 @@ export function CycleDetailPage() {
 
       <PhasePipeline cycle={cycle} humanWaiting={humanWait !== undefined} />
 
-      {phase ? (
+      {reconstructionPending ? (
+        <section className="run-card surface-card" aria-label="工程の再構成の確認待ち">
+          <header className="run-card__head">
+            <h2 className="run-card__title">工程の再構成の確認が必要です</h2>
+            <StateBadge variant="review" icon={<PersonIcon size={13} />}>
+              確認待ち(あなた)
+            </StateBadge>
+          </header>
+          <p className="run-card__body">
+            要件を踏まえて AI がこのサイクルの工程を組み直しています。
+            <strong>確認・承認するまで次のステップは始められません</strong>。
+          </p>
+          <div className="run-card__actions">
+            <Link
+              to={`/cycles/${cycleId}/reconstruction`}
+              className="btn btn--primary"
+            >
+              工程の再構成を確認する →
+            </Link>
+          </div>
+        </section>
+      ) : phase ? (
         <RunPanel
           cycle={cycle}
           phase={phase}
@@ -211,6 +236,7 @@ interface TopbarActionsProps {
   readonly busy: boolean;
   readonly stateBadge: ReactNode;
   readonly humanWaitId: string | undefined;
+  readonly reconstructionPending: boolean;
   readonly onStart: (step: string) => void;
   readonly onRetry: (runId: string) => void;
   readonly onRelaunch: (step: string) => void;
@@ -225,6 +251,7 @@ function TopbarActions({
   busy,
   stateBadge,
   humanWaitId,
+  reconstructionPending,
   onStart,
   onRetry,
   onRelaunch,
@@ -232,7 +259,17 @@ function TopbarActions({
   let action: ReactNode = null;
   const name = step ? stepLabel(step) : "";
 
-  if (humanWaitId) {
+  if (reconstructionPending) {
+    // F-17 gate: route to the reconstruction confirm — NOT the next step's start.
+    action = (
+      <Link
+        to={`/cycles/${encodeURIComponent(cycleId)}/reconstruction`}
+        className="btn btn--primary"
+      >
+        <PersonIcon size={14} /> 工程の再構成を確認 →
+      </Link>
+    );
+  } else if (humanWaitId) {
     action = (
       <Link
         to={`/cycles/${encodeURIComponent(cycleId)}/q/${encodeURIComponent(humanWaitId)}`}

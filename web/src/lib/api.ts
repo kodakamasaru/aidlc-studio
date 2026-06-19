@@ -5,6 +5,25 @@
 import { logError } from "./log";
 
 // ── Wire types (mirror src/domain JSON shapes) ───────────────
+
+// US-08: ReconstructionProposal (mirrors src/wire/aidlc-wire.ts shapes)
+export type ReconstructionDiff = "keep" | "add" | "delete" | "current";
+
+export interface ReconstructionStep {
+  readonly id: string;
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  readonly instruction: string;
+  readonly diff: ReconstructionDiff;
+  readonly reason?: string;
+}
+
+export interface ReconstructionProposal {
+  readonly scope: "cycle" | "global";
+  readonly steps: readonly ReconstructionStep[];
+}
+
 export type RunState = "running" | "stalled" | "done" | "failed";
 export type PhaseState = "pending" | "running" | "review" | "done";
 export type CycleState = "planned" | "active" | "paused" | "done";
@@ -28,6 +47,20 @@ export interface Phase {
   readonly order: number;
   readonly state: PhaseState;
   readonly runs: readonly Run[];
+  /**
+   * S6 phase-step-snapshot: the step config pinned onto this phase at cycle
+   * creation (a copy of the global StepDef taken then). A cycle's settings are
+   * THIS snapshot — fixed at creation — not the live project.pipelineDef.
+   */
+  readonly stepDef?: StepDefSnapshot;
+}
+
+/** Mirror of the domain StepDefSnapshot (pinned at cycle creation). */
+export interface StepDefSnapshot {
+  readonly label: string;
+  readonly order: number;
+  readonly skillRef: string;
+  readonly contracts?: StepContracts;
 }
 
 export interface Cycle {
@@ -109,6 +142,16 @@ export interface CompletenessBlock {
   readonly addressed: readonly string[];
 }
 
+/**
+ * BU-2: A decision from the aidlc-result envelope (§C7.4).
+ * Additive optional — absent on pre-BU-2 reviews.
+ */
+export interface ResultDecision {
+  readonly id: string;
+  readonly decision: string;
+  readonly reason: string;
+}
+
 export interface Review {
   readonly runId: string;
   readonly cycleId: string;
@@ -118,6 +161,16 @@ export interface Review {
   readonly producedAt: string;
   /** evaluator 成果のとき completeness table を描画する元データ(scope K)。 */
   readonly completeness?: CompletenessBlock;
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送された
+   * 成果物パス一覧(aidlc-docs 相対パス)。欠落=従来動作。
+   */
+  readonly artifacts?: readonly string[];
+  /**
+   * BU-2 (v0.0.4 / 加法 optional): aidlc-result エンベロープから搬送された
+   * AI が独自に決めた事項(D-NN)一覧。欠落=従来動作。
+   */
+  readonly decisions?: readonly ResultDecision[];
 }
 
 export type QuestionKind =
@@ -127,7 +180,9 @@ export type QuestionKind =
   | "decision"
   | "backtrack"
   | "stall_retry"
-  | "descope";
+  | "descope"
+  // US-08 F-1: 再構成提案の受信箱カード。
+  | "reconstruction";
 
 export type QuestionState = "open" | "answered" | "dismissed";
 
@@ -155,7 +210,9 @@ export type QuestionPayload =
       readonly aiReason: string;
       readonly recommendedStep?: string;
       readonly requirementKey?: string;
-    };
+    }
+  // US-08 F-1: 再構成提案カード。summary は受信箱での 1 行説明。
+  | { readonly kind: "reconstruction"; readonly summary: string };
 
 export interface Question {
   readonly id: string;
@@ -209,6 +266,19 @@ export interface CreateProjectBody {
   readonly name?: string;
   readonly modelName?: string;
 }
+
+/**
+ * BU-3: Result returned by POST /api/hearing/launch.
+ * cycle-scope: {scope, cycleId, runId, step} — web navigates to cycle thread.
+ * global-scope: {scope:"global", cycleId:"__global_settings__", runId, step}
+ *   — web opens the conversation thread for the system cycle (global hearing).
+ */
+export type HearingLaunchResult = {
+  readonly scope: string;
+  readonly cycleId: string;
+  readonly runId: string;
+  readonly step: string;
+};
 
 // ── Error ────────────────────────────────────────────────────
 export class ApiError extends Error {
@@ -318,6 +388,32 @@ export const api = {
     step: string,
   ): Promise<{ readonly skill: string | null; readonly content: string }> =>
     request(`/steps/${encodeURIComponent(step)}/skill`),
+
+  // BU-3: config-hearing run launcher. scope="global" | "cycle:{id}".
+  // cycle-scope: returns {scope, cycleId, runId, step}; web navigates to thread.
+  // global-scope: returns {scope:"global", cycleId, runId, step}; web opens system cycle thread.
+  // projectId is required for scope="global" (scopes the system cycle).
+  launchHearing: (scope: string, projectId?: string): Promise<HearingLaunchResult> =>
+    request("/hearing/launch", jsonBody({ scope, ...(projectId ? { projectId } : {}) })),
+
+  // US-08: サイクル向け再構成提案を取得。S1 確定後に自動保存される。未生成なら ApiError(404).
+  getReconstructionProposal: (cycleId: string): Promise<ReconstructionProposal> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruction-proposal`),
+
+  // US-08: 承認された工程列でサイクルの pending ステップを置換。
+  // diff!=="delete" の ReconstructionStep を StepDef 形式({id,label,order,skillRef,instruction})
+  // に写して送る。
+  applyCycleReconstruction: (cycleId: string, steps: readonly ReconstructionStep[]): Promise<Cycle> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruct`, jsonBody({ steps })),
+
+  // US-08 会話で修正: 人間のフィードバックで再構成を再提案させる。新しい提案は非同期で
+  // emit されるので、呼び出し側は getReconstructionProposal を polling して差分を待つ。
+  reproposeReconstruction: (cycleId: string, feedback: string): Promise<{ reproposed: boolean }> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruct/repropose`, jsonBody({ feedback })),
+
+  // US-08 AC-7: グローバル既定パイプラインを全置換。
+  replaceProjectPipeline: (projectId: string, steps: readonly ReconstructionStep[]): Promise<Project> =>
+    request(`/projects/${encodeURIComponent(projectId)}/pipeline`, jsonBody({ steps })),
 
   // US-06 対話式編集: 要望から契約の提案を取得(適用はしない / 承認時に updateStepContracts)。
   proposeStepContracts: (

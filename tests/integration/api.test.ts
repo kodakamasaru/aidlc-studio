@@ -14,6 +14,7 @@ import type { QuestionPayload } from "../../src/domain/question/question";
 import { buildReview } from "../../src/domain/review/review";
 import {
   advanceRun,
+  backtrackTo as domainBacktrackTo,
   createCycle as domainCreateCycle,
   startPhase as domainStartPhase,
   version,
@@ -125,8 +126,14 @@ describe("projects", () => {
     expect(json.data).toHaveLength(1);
     expect(json.data[0].id).toBe(id);
     expect(json.data[0].repoPath).toBe(repoPath);
-    // pipeline defaulted from DEFAULT_STEPS (8 steps incl S2.5)
-    expect(json.data[0].pipelineDef).toHaveLength(8);
+    // pipeline defaulted from CANONICAL_STEPS (v2: 12 steps, S2.5 retired)
+    expect(json.data[0].pipelineDef).toHaveLength(12);
+    // US-02: real dir skillRef + 平易ラベル from the single canonical source
+    // (no fake `aidlc-S1`, no `label = "S1"` 死蔵).
+    const s1 = json.data[0].pipelineDef[0];
+    expect(s1.id).toBe("S1");
+    expect(s1.skillRef).toBe("aidlc-s1-requirements");
+    expect(s1.label).toBe("要件");
   });
 
   test("missing repoPath → 400", async () => {
@@ -190,10 +197,16 @@ describe("cycles create/list/get", () => {
     const cycle = await createCycle(h, projectId, "v1.2.3");
     expect(cycle.version).toBe("v1.2.3");
     expect(cycle.state).toBe("planned");
-    expect(cycle.phases).toHaveLength(8);
+    expect(cycle.phases).toHaveLength(12); // v2: 12 steps (S2.5 retired)
     const got = await get(h.app, `/api/cycles/${cycle.id}`);
     expect(got.status).toBe(200);
     expect(got.json.data.id).toBe(cycle.id);
+    // US-02 / S6 snapshot: each phase pins its StepDef (label/skillRef) at creation,
+    // and the snapshot survives the DB round trip (JSON.stringify(cycle)).
+    const s1Phase = got.json.data.phases[0];
+    expect(s1Phase.step).toBe("S1");
+    expect(s1Phase.stepDef.skillRef).toBe("aidlc-s1-requirements");
+    expect(s1Phase.stepDef.label).toBe("要件");
   });
 
   test("duplicate version → 409", async () => {
@@ -409,47 +422,49 @@ describe("startPhase", () => {
     expect(json.error).toBe("StepNotInPipeline");
   });
 
-  test("S2.5 step segment decodes correctly", async () => {
+  test("dotted step segment (retired S2.5) decodes and is evaluated against the pipeline", async () => {
     const h = buildTestApp();
     const projectId = await createProject(h);
     const cycle = await createCycle(h, projectId);
-    // S2.5 is the 3rd default step; can't start before S1/S2 → 409 (not 400).
+    // A step id with a dot must decode through the route (not be mangled). S2.5 is
+    // retired from the v2 default pipeline, so the decoded id evaluates to
+    // StepNotInPipeline (400) — which still proves the dotted segment decoded.
     const { status, json } = await post(
       h.app,
       `/api/cycles/${cycle.id}/phases/S2.5/start`,
     );
-    expect(status).toBe(409);
-    expect(json.error).toBe("PrevPhaseNotDone");
+    expect(status).toBe(400);
+    expect(json.error).toBe("StepNotInPipeline");
   });
 });
 
 describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
   test("success → fresh run launched on the rewound phase", async () => {
+    // Seed the rewound cycle state DIRECTLY via domain functions + repo save,
+    // bypassing the inbox answer flow. This is necessary because inbox.answerQuestion
+    // now auto-relaunches after backtrack (US-13 UX), so a cycle seeded through
+    // the answer flow already has a running run — calling /relaunch again would
+    // hit PhaseAlreadyRunning (409). We isolate the manual /relaunch endpoint test
+    // by seeding the post-backtrack state without triggering auto-relaunch.
     const h = buildTestApp();
-    const projectId = await createProject(h);
+    const repoPath = makeRepoDir();
+    const projectId = await createProject(h, repoPath);
+
+    // Create and start the cycle via API so the cycle is in DB and the project exists.
     const { cycle, runId } = await cycleWithRunningRun(h, projectId);
     const firstStep = cycle.phases[0]!.step as string;
-    const review = buildReview({
-      runId: RunId(runId),
-      cycleId: CycleId(cycle.id),
+
+    // Advance the run to "done" (simulate the AI completing its output), then
+    // backtrack the phase to "running" with no live run — exactly the state that
+    // relaunchPhase requires (PhaseNotRewound if phase is pending; PhaseAlreadyRunning
+    // if a run is still running).
+    const liveDb = h.ports.repos.cycles.findById(CycleId(cycle.id))!;
+    const done = unwrap(advanceRun(liveDb, { runId: RunId(runId), to: "done", at: T0 }));
+    const rewound = unwrap(domainBacktrackTo(done, {
       step: Step(firstStep),
-      taskId: TaskId("task-1"),
-      blocks: [{ type: "summary", title: "x", body: "y" }],
-      producedAt: T0,
-    });
-    const qid = seedQuestion(
-      h,
-      cycle,
-      runId,
-      { kind: "visual_review", review },
-      "task-1",
-    );
-    // Reject → backtrack to the SAME phase: it becomes rewound (running, run done).
-    await post(h.app, `/api/questions/${qid}/answer`, {
-      verdict: "reject",
-      backtrackTo: firstStep,
-      reason: "redo it",
-    });
+      reason: "test-seed: manual backtrack",
+    }));
+    h.ports.repos.cycles.save(rewound);
 
     const { status, json } = await post(
       h.app,
@@ -466,6 +481,7 @@ describe("relaunchPhase (re-run a backtrack-rewound phase)", () => {
     const last = launches[launches.length - 1]!.args;
     expect(last.runId).toBe(newRun.id);
     expect(last.step as string).toBe(firstStep);
+    expect(last.repoPath).toBe(repoPath);
   });
 
   test("relaunch on a pending (non-rewound) phase → 409 PhaseNotRewound", async () => {
@@ -630,10 +646,13 @@ describe("orchestrator failure compensation", () => {
 
 // ── retryRun MaxAttemptExceeded (Fix 10) ─────────────────────────
 describe("retryRun max attempts", () => {
-  test("exhausting maxAttempt=1 → 409 MaxAttemptExceeded", async () => {
+  // F-21: maxAttempt bounds AUTOMATIC retries. The POST /runs/:id/retry endpoint is
+  // the HUMAN pressing 再試行 — a deliberate act that must NOT dead-end at the cap
+  // (ユーザー: 「自動なら上限いるが私からも retry できないのは変」). So even past the cap
+  // the human retry succeeds (200) and spawns the next attempt.
+  test("human retry is NOT capped by maxAttempt — succeeds past the cap (F-21)", async () => {
     const h = buildTestApp();
-    // maxAttempt is a project default (3); override via a project with env=1 by
-    // creating it directly through the repo so we can pin maxAttempt.
+    // Pin maxAttempt=1 so a single retry would exceed the auto cap.
     const repoPath = makeRepoDir();
     const projectId = await createProject(h, repoPath);
     const project = h.ports.repos.projects.findById(
@@ -643,13 +662,20 @@ describe("retryRun max attempts", () => {
     h.ports.repos.projects.save(capped);
 
     const { cycle, runId } = await cycleWithFailedRun(h, projectId);
-    // attempt would become 2 > maxAttempt(1) → MaxAttemptExceeded.
+    // attempt would become 2 > maxAttempt(1) — but this is a HUMAN retry → allowed.
     const { status, json } = await post(
       h.app,
       `/api/cycles/${cycle.id}/runs/${runId}/retry`,
     );
-    expect(status).toBe(409);
-    expect(json.error).toBe("MaxAttemptExceeded");
+    expect(status).toBe(200);
+    // The phase is running again on a fresh attempt (the human is never stranded).
+    const phase = json.data.phases.find((p: any) =>
+      p.runs.some((r: any) => r.id === runId),
+    );
+    expect(phase.state).toBe("running");
+    expect(phase.runs.some((r: any) => r.attempt === 2 && r.state === "running")).toBe(
+      true,
+    );
   });
 });
 
@@ -701,6 +727,36 @@ describe("answerQuestion", () => {
     expect(resumes).toHaveLength(1);
     expect(resumes[0]!.args.runId as string).toBe(runId);
     expect(resumes[0]!.args.body).toBe("sqlite");
+  });
+
+  test("batch hearing — N open questions on one run → exactly ONE resume on the last answer (S2/S6 N問→N答→1 resume)", async () => {
+    const h = buildTestApp();
+    const projectId = await createProject(h);
+    const { cycle, runId } = await cycleWithRunningRun(h, projectId);
+    // Two `question` cards raised by the same run (a batch hearing).
+    const q1 = seedQuestion(h, cycle, runId, { kind: "question", prompt: "Q1?" }, undefined, "-a");
+    const q2 = seedQuestion(h, cycle, runId, { kind: "question", prompt: "Q2?" }, undefined, "-b");
+
+    // Answering the FIRST (a sibling question is still open) must NOT resume yet —
+    // otherwise the live session would be re-spawned once per answer.
+    const r1 = await post(h.app, `/api/questions/${q1}/answer`, { verdict: "answer", body: "batch-block" });
+    expect(r1.status).toBe(200);
+    expect(r1.json.data.question.state).toBe("answered");
+    expect(h.orchestrator.ofMethod("resume")).toHaveLength(0); // deferred.
+
+    // Answering the LAST one (no open question siblings remain) → single resume.
+    const r2 = await post(h.app, `/api/questions/${q2}/answer`, { verdict: "answer", body: "batch-block" });
+    expect(r2.status).toBe(200);
+
+    const resumes = h.orchestrator.ofMethod("resume");
+    expect(resumes).toHaveLength(1);
+    expect(resumes[0]!.args.runId as string).toBe(runId);
+    expect(resumes[0]!.args.body).toBe("batch-block");
+
+    // Both questions ended up answered (each persisted; only resume was deferred).
+    const inbox = await get(h.app, `/api/projects/${projectId}/inbox`);
+    expect(inbox.json.data.find((q: any) => q.id === q1)).toBeUndefined();
+    expect(inbox.json.data.find((q: any) => q.id === q2)).toBeUndefined();
   });
 
   test("visual_review approve → run done + phase done (domain functions, not orchestrator.resume)", async () => {

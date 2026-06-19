@@ -15,7 +15,12 @@ interface InboxCardProps {
 
 export function InboxCard({ question }: InboxCardProps) {
   const meta = kindMeta(question.kind);
-  const href = `/cycles/${question.cycleId}/q/${question.id}`;
+  // US-08 F-1: reconstruction カードは専用の再構成画面へ直接遷移。
+  // 他の kind は通常の question detail ルートへ。
+  const href =
+    question.kind === "reconstruction"
+      ? `/cycles/${question.cycleId}/reconstruction`
+      : `/cycles/${question.cycleId}/q/${question.id}`;
 
   return (
     <article className="inbox-card" role="listitem">

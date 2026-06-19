@@ -47,6 +47,23 @@ export async function shotS9(page: Page, name: string): Promise<void> {
   });
 }
 
+export const SHOTS_DIR_S9V004 = join(
+  REPO_ROOT,
+  "aidlc-docs",
+  "v0.0.4",
+  "s9",
+  "screenshots",
+);
+
+/** Same as `shot`, but writes into the v0.0.4 S9 evidence dir. */
+export async function shotS9v004(page: Page, name: string): Promise<void> {
+  await page.screenshot({
+    path: join(SHOTS_DIR_S9V004, name),
+    fullPage: true,
+    animations: "disabled",
+  });
+}
+
 /**
  * Resolve the first-run state: if the repo-setup form is showing (no project
  * yet), register `EXISTING_REPO_PATH` so the app advances into the cycle list.

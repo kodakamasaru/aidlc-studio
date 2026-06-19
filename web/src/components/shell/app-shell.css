@@ -196,6 +196,11 @@ a.nav-item:hover .nav-item__icon {
 .content {
   flex: 1 1 auto;
   overflow-y: auto;
+  /* position:relative contains this scroll container's overflow so it does NOT
+   * propagate into documentElement.scrollHeight. Without it, a tall page (e.g. the
+   * review detail) inflated the document and focus-scroll (clicking a control below
+   * the fold) jumped the whole window into a phantom region. */
+  position: relative;
   padding: var(--sp-6);
 }
 

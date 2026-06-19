@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-05: サイクル進捗(工程グループ束ね) — v0.0.4 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: 実在ステップを名前で表示(番号なし)。要件 完了 / 設計 進行中 ── -->
+    <section data-state="default" data-screen="scr-05-cycle-progress">
+      <div class="scr-head">
+        <span class="title">サイクル v0.0.5 — 要件ヒアリングを web で</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="pg-track">
+          <div class="pg-band pg-band--done">
+            <div class="pg-band-head"><span class="pg-glyph done">✓</span><span class="pg-name">要件</span><span class="pg-sub">完了</span></div>
+            <div class="pg-dots">
+              <span class="step-dot done"><span class="glyph">✓</span>要件ヒアリング</span>
+              <span class="step-dot done"><span class="glyph">✓</span>画面要素</span>
+            </div>
+          </div>
+          <span class="pg-conn done"></span>
+          <div class="pg-band pg-band--current">
+            <div class="pg-band-head"><span class="pg-glyph current">●</span><span class="pg-name">設計</span><span class="pg-sub">進行中</span></div>
+            <div class="pg-dots">
+              <span class="step-dot current"><span class="glyph">●</span>UIデザイン</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>技術仕様</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">実装</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>作業分割</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインモデル</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインコード</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>実装統合</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">検証</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>シナリオ検証</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>受け入れ</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">改善</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>振り返り</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>改善提案</span>
+            </div>
+          </div>
+        </div>
+        <p class="cycle-legend">凡例: ✓ 緑 = 完了 / ● 青 = 進行中 / ! オレンジ = 行き詰まり / ○ = 未着手 / ↩ オレンジ = 手戻り。各ステップは「AI が作る → 自動でチェック → AI が点検」の順に進みます。</p>
+      </div>
+    </section>
+
+    <!-- ── stall: 現在ステップ(UIデザイン)が行き詰まり ─────────── -->
+    <section data-state="stall" data-screen="scr-05-cycle-progress">
+      <div class="scr-head">
+        <span class="title">サイクル v0.0.5 — 要件ヒアリングを web で</span>
+        <span class="spacer"></span>
+        <span class="pill stalled"><span class="dot"></span>行き詰まり</span>
+      </div>
+      <div class="scr-body">
+        <div class="pg-track">
+          <div class="pg-band pg-band--done">
+            <div class="pg-band-head"><span class="pg-glyph done">✓</span><span class="pg-name">要件</span><span class="pg-sub">完了</span></div>
+            <div class="pg-dots">
+              <span class="step-dot done"><span class="glyph">✓</span>要件ヒアリング</span>
+              <span class="step-dot done"><span class="glyph">✓</span>画面要素</span>
+            </div>
+          </div>
+          <span class="pg-conn done"></span>
+          <div class="pg-band pg-band--current">
+            <div class="pg-band-head"><span class="pg-glyph current">!</span><span class="pg-name">設計</span><span class="pg-sub">行き詰まり</span></div>
+            <div class="pg-dots">
+              <span class="step-dot stalled"><span class="glyph">!</span>UIデザイン</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>技術仕様</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">実装</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>作業分割</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインモデル</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインコード</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>実装統合</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">検証</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>シナリオ検証</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>受け入れ</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">改善</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>振り返り</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>改善提案</span>
+            </div>
+          </div>
+        </div>
+        <p class="cycle-legend">! オレンジ = 行き詰まり。該当ステップで再試行 / 人間の対応待ち。Inbox に対応カードが立ちます。</p>
+      </div>
+    </section>
+
+    <!-- ── backtrack: 手戻り再入(画面要素に一度戻って再開 = ↩)──── -->
+    <section data-state="backtrack" data-screen="scr-05-cycle-progress">
+      <div class="scr-head">
+        <span class="title">サイクル v0.0.5 — 要件ヒアリングを web で</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="pg-track">
+          <div class="pg-band pg-band--done">
+            <div class="pg-band-head"><span class="pg-glyph done">✓</span><span class="pg-name">要件</span><span class="pg-sub">完了 ↩</span></div>
+            <div class="pg-dots">
+              <span class="step-dot done"><span class="glyph">✓</span>要件ヒアリング</span>
+              <span class="step-dot done"><span class="glyph">✓</span>画面要素<span class="bt">↩</span></span>
+            </div>
+          </div>
+          <span class="pg-conn done"></span>
+          <div class="pg-band pg-band--current">
+            <div class="pg-band-head"><span class="pg-glyph current">●</span><span class="pg-name">設計</span><span class="pg-sub">進行中</span></div>
+            <div class="pg-dots">
+              <span class="step-dot current"><span class="glyph">●</span>UIデザイン</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>技術仕様</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">実装</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>作業分割</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインモデル</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインコード</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>実装統合</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">検証</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>シナリオ検証</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>受け入れ</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">改善</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>振り返り</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>改善提案</span>
+            </div>
+          </div>
+        </div>
+        <p class="cycle-legend">↩ オレンジ = 手戻り履歴(該当ステップへ一度戻って再開した)。「画面要素」に戻り再確定してから「UIデザイン」へ進行中。</p>
+      </div>
+    </section>
+
+    <!-- ── variable: 実在ステップだけを描く。設計に「技術仕様」が無いサイクルでも崩れない ── -->
+    <section data-state="variable" data-screen="scr-05-cycle-progress">
+      <div class="scr-head">
+        <span class="title">サイクル v0.0.6 — 軽量な追加機能</span>
+        <span class="spacer"></span>
+        <span class="pill running"><span class="dot"></span>実行中</span>
+      </div>
+      <div class="scr-body">
+        <div class="pg-track">
+          <div class="pg-band pg-band--done">
+            <div class="pg-band-head"><span class="pg-glyph done">✓</span><span class="pg-name">要件</span><span class="pg-sub">完了</span></div>
+            <div class="pg-dots">
+              <span class="step-dot done"><span class="glyph">✓</span>要件ヒアリング</span>
+              <span class="step-dot done"><span class="glyph">✓</span>画面要素</span>
+            </div>
+          </div>
+          <span class="pg-conn done"></span>
+          <div class="pg-band pg-band--current">
+            <div class="pg-band-head"><span class="pg-glyph current">●</span><span class="pg-name">設計</span><span class="pg-sub">進行中</span></div>
+            <div class="pg-dots">
+              <span class="step-dot current"><span class="glyph">●</span>UIデザイン</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">実装</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>作業分割</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインモデル</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>ドメインコード</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>実装統合</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">検証</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>シナリオ検証</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>受け入れ</span>
+            </div>
+          </div>
+          <span class="pg-conn"></span>
+          <div class="pg-band pg-band--upcoming">
+            <div class="pg-band-head"><span class="pg-glyph upcoming">○</span><span class="pg-name">改善</span><span class="pg-sub">未着手</span></div>
+            <div class="pg-dots">
+              <span class="step-dot upcoming"><span class="glyph">○</span>振り返り</span>
+              <span class="step-dot upcoming"><span class="glyph">○</span>改善提案</span>
+            </div>
+          </div>
+        </div>
+        <p class="cycle-legend">ステップ数はサイクルにより異なります。各サイクルに実在するステップだけを名前で表示します(このサイクルの「設計」は 1 ステップ)。横並びは崩れません。</p>
+      </div>
+    </section>
+  </body>
+</html>

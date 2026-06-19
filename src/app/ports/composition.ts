@@ -16,8 +16,8 @@ import type {
   ReviewRepo,
   ArtifactRepo,
   WikiRepo,
-  LedgerRepo,
-  ConversationRepo,
+  SessionRepo,
+  ReconstructionProposalRepo,
 } from "./repos";
 
 export interface Repos {
@@ -30,8 +30,10 @@ export interface Repos {
   readonly reviews: ReviewRepo;
   readonly artifacts: ArtifactRepo;
   readonly wiki: WikiRepo;
-  readonly ledger: LedgerRepo;
-  readonly conversations: ConversationRepo;
+  /** Unit-04: runId → claude session_id store (infra-only; not on domain Run). */
+  readonly sessions: SessionRepo;
+  /** US-08: cycleId → ReconstructionProposal store. One slot per cycle, latest write wins. */
+  readonly reconstructionProposals: ReconstructionProposalRepo;
 }
 
 export interface Ports {

@@ -1,0 +1,300 @@
+# v0.0.4 引き継ぎ台帳(ledger / 正本 = file)。
+# 規約: D/確定項目に state: carried|done|dropped。carried は into: 必須、dropped は reason: 必須。
+# 次サイクル S1 は前バージョン ledger の未 reconcile(carried で into が当該サイクル)をゼロにするまで進めない。
+#
+# ── 本サイクル内の手戻り(S8 実機レビューで発覚 / S8→S4 backtrack)──
+# into: v0.0.4(自サイクル)= 「このサイクルを閉じる前に v0.0.4 内で消し込む義務」。
+# 次サイクル(v0.0.5)の reconcile 対象ではない(into が v0.0.5 を指さないため)。
+# S4 をやり直して S5→S8 までカスケード再実装し、消し込んだら done + closed_in に更新する。
+
+- id: BT-01-context-io-design
+  origin: v0.0.4/s8-integration.md   # S8 実機レビュー(2026-06-14)で人間が発覚
+  decision: >
+    US-01 前段文脈注入は「機構(前段 index.md のパス連結)」だけで、AIへの入力コンテキストと
+    出力フォーマットの「設計」が無い。具体: ①コンテキストを DB(questions/answers・StepContracts・
+    run/cycle 状態)から正規に読まずファイル(aidlc-docs)だけ参照 ②brief が S2 以降で落ちる疑い
+    ③ユビキタス言語・決定(D-NN)・引き継ぎ ledger を設計コンテキストとして渡していない
+    ④前段成果物が index 粒度のみ(詳細が要る工程に詳細が渡らない)⑤入出力が自由 md + 埋め込み
+    block の best-effort parse で、質問など構造化出力を確実に受け取れない。
+    発生源 = S4(技術仕様)が transport だけで「入力コンテキスト設計 + 出力フォーマット設計」を
+    first-class 成果物にしなかったため。S5 Unit-02 も「機構」止まり。
+  state: done
+  closed_in: >
+    2026-06-14 commit 163e8f4 + 後続。S4 §C7 で契約設計 → BU-2(aidlc-result 出力 protocol /
+    wire 純関数 + live/scripted 受領 + status ルーティング)+ BU-1(構造化コンテキスト resolver:
+    DB+docs+file から §C7.1 セクション列 / brief 常時 / 出力契約注入 / 粒度表 / 実 run パス配線)。505 green。
+
+- id: BT-02-config-hearing-flow
+  origin: v0.0.4/s8-integration.md   # S8 実機レビュー(2026-06-14)で人間が発覚(ヒアリング画面→サイクル画面 bounce)
+  decision: >
+    US-06「設定が個別フォームでなく AI ヒアリングで埋まる(2層: グローバル既定 + サイクル単位)」の
+    機能フローが未配線。読み返し画面(scr-04)と会話スレッド器は実装済だが、①「会話で直す」が設定
+    ヒアリング run を起動しない(cosmetic ラベルのみ)②回答→StepContracts 書き込み経路が backend に
+    無い(設定書込は今も個別フォーム PATCH のみ=US-06 が廃止すべきもの)③グローバル「会話で直す」は
+    存在しないルート /settings/thread へ飛び サイクル一覧へ bounce。
+    発生源 = S4(機構未設計)+ S5(Unit 未分割)。S2 にも 2層モデルとの文言不整合(「ステップ着手で」)。
+  state: done
+  closed_in: >
+    2026-06-14 commit 163e8f4 + 後続。§C7.6 書込機構 pin(構造化質問→直接書込 / target:{step,field})。
+    BU-3 backend(hearing-service.applyHearingAnswerToContracts + wire/domain target + 回答ルーティング
+    + scripted config-hearing)。BU-3 web: グローバル dead route(/settings/thread bounce)解消 →
+    /settings/hearing 新設。cycle スコープ end-to-end。グローバルスコープも完成: 隠し system サイクル
+    (__global_settings__ / 一覧から filter)を host に target.scope=global で回答→project.pipelineDef 書込。
+    505 green / web build clean。US-06 グローバル+サイクル両層が機能。
+
+- id: BT-03-recurrence-prevention
+  origin: v0.0.4/s8-integration.md
+  decision: >
+    再発防止(道具では直らない層 / skill 本文 + operating-model に焼く)。
+    ①S4: 技術仕様は「AIへの入力コンテキスト設計 + 出力フォーマット設計」を first-class 成果物として
+    必須化(transport/機構だけで完了にしない)。②S8: 完全性ゲートを US-AC 機能フロー貫通で回す
+    (画面 mock 一致は必要条件であって十分条件でない / 画面起点でなく US-AC インベントリ起点)。
+  state: done
+  closed_in: >
+    2026-06-14 / kit/rules/aidlc-operating-model.md「再発防止ゲート(BT-03 恒久ルール)」に Rule A/B を
+    DRY 定義 + kit/skills/aidlc-s4-tech-spec/SKILL.md 完了条件(7) + kit/skills/aidlc-s8-integration/SKILL.md
+    完了条件(6)・進め方・US-AC 機能フロー突合表 を追記(各 skill は参照のみ)。
+
+# ── S9(Validation)の手戻り / 確定項目 ──
+
+- id: BT-04-stepconfig-hooks-react310
+  origin: v0.0.4/s9-validation.md   # S9 実ブラウザ E2E(2026-06-14)で捕捉
+  decision: >
+    O6(HIGH 実バグ): web/src/features/settings/StepConfigReadback.tsx の Rules of Hooks 違反。
+    useState(hearingLoading)/useState(hearingError) を if(isLoading)return / if(!hasData)return の
+    早期 return の後に宣言 → loading→ready 再描画でフック数 4→6 → React #310 で設定 readback 画面が
+    真っ白(US-06 AC-4 確認 / AC-5 会話で直す が通常操作で壊れる)。S8 はこの画面の E2E を持たず
+    unit + 静的 mock 突合だけで確定したため見逃した。S9 の実ブラウザ E2E が初検出。
+  state: done
+  closed_in: >
+    2026-06-14 / 当該 useState 2 本を early-return の前(useNavigate 直後)へ移動。web tsc green /
+    playwright 33 green。scr-04.default/pre-us を実 backend で再撮影し US-06 AC-4 視覚実証。
+    再発防止: 画面コンポーネント追加/改修 Unit は loading→ready 遷移を通す E2E/render テストを
+    Unit 完了条件に含める(s8-integration.md 申し送り / 次サイクル S8 へ)。
+
+- id: O5-variable-pipeline-no-server-path
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    US-07「可変ステップ構成でも進捗が破綻しない」を決定論(実 backend)で実証する経路が無い。
+    可変工程の「出どころ」(=どうやってサイクルの工程が可変になるか)が US 化されていなかった
+    (US-07 Q-02 未解決)。S9 はフロント可変描画を page.route() モックで視覚実証(scr-05.variable)したが、
+    実 backend では可変サイクルを作れない=US-07 が要求する能力が未実装。
+  state: done
+  closed_in: >
+    2026-06-14 本サイクル内で解決(v0.0.5 への descope を撤回)。US-08 を S1 に手戻りして US 化 →
+    S2/S3 mock(SCR-02 reconstruction/reconstruction-global 確定)→ U08-1 domain(reconstructPipeline +
+    inline instruction)→ U08-2 app(applyCycleReconstruction / replaceProjectPipeline)→ U08-3 wire/orchestrator
+    (ReconstructionProposal + scripted 提案 + S1完了→自動起動)→ U08-4 HTTP(POST /reconstruct, /pipeline)→
+    U08-5 web(再構成スレッド 2モード)。**scr-05.variable を mock 注入から実 backend(POST /reconstruct で
+    S4省略+独自工程新設)に置換し実機実証**。決定論 580 + e2e 35 + live 8 green / web build clean。
+    descope 撤回の経緯(責務契約④違反の是正)は S11 process-problem として記録(P2)。
+
+- id: BT-05-s9-to-s1-step-reconstruction
+  origin: v0.0.4/s9-validation.md   # S9 が US-07 の未実装能力を捕捉 → S1 手戻り
+  decision: >
+    US-07(可変工程の表示)・US-06(工程設定)を実装したが、可変工程構成の「出どころ=工程再構成機構」を
+    US 化しておらず実装も無かった。S9 でこの完全性ギャップ(O5)を捕捉。S1 へ手戻りし US-08 を新設。
+  state: done
+  closed_in: >
+    2026-06-14 US-08 を新設し本サイクル内で S2/S3→U08-1〜5→S9 再実証までカスケード完了(O5 と同時消し込み)。
+    再発防止: US-07 のような「前提能力を別 US が要求するのに機構 US が無い」漏れは、S1 完了ゲートで US 間の
+    前提依存(ある US が別 US の能力を前提にしていないか)を突合する(次サイクル S1 申し送り / S11 P6・T4 と連動)。
+
+- id: O3-live-resume-continuation-unproven
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    US-04 resume 継続が live 未実証。isolated テストセッションが turn 間で揮発し --resume が
+    No conversation found で失敗 → RunStateChanged(failed) として honest 表面化(黙らない)。
+    turn パリティは決定論層(unit-04.test)で担保済。
+  state: carried
+  into: v0.0.5
+  reason: >
+    本番の長 session(S1 等の実 run)での --resume 継続を実機実証するには、揮発しない実 session を
+    用いた live E2E が必要。次サイクルで実施。
+
+- id: S9-housekeeping-O4-O7
+  origin: v0.0.4/s9-validation.md
+  decision: >
+    非 blocking housekeeping: O4(scripted レビュー summary の英語 placeholder)/ O7(src/server.ts の
+    allowed 配列に "multi-turn" 不在で multi-turn シナリオが happy にフォールバック)/ O1 任意改善
+    (scripted config-hearing の質問文を読みやすく)/ dead code StepConfigPage.tsx 削除(S8 継続)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    いずれも実害なし(機能・検証は別経路で担保)。次サイクル housekeeping でまとめて処理。
+
+# 注: O1(ヒアリング質問文)= live 確認で良性確定(内部語は scripted fixture のみ / 実 claude は S1 skill
+#     経由で自然なプロダクト語)。O2(step-spec フィールド)= 設計どおり(DEFAULT_STEP_CONTRACTS={} / hearing 後に
+#     全項目表示)。いずれもバグでないため carried 対象外(s9-validation.md 観測表に記録)。
+
+- id: S11-process-problems-pointer
+  origin: v0.0.4/s9-validation.md   # S9 進行中(2026-06-14)にユーザー指摘 + AI 自己分析
+  decision: >
+    AI 開発部の進め方に重大なプロセス問題が判明(P1〜P9)。根本原因 = 着手時に最上位の正本
+    responsibility-contract(US+mock 最上位 / human=ダブルチェック / human-gate のみ停止)と S1–S3 の
+    US/mock 意図を読まず、「テストが緑・完成して見える」を「事業部の正解に一致」より優先した。
+    具体 = ①human=ダブルチェックの未認識 ②US/mock を勝手に descope ③S1–S3 の想定未把握
+    ④正本未読 ⑤mock 注入で未実装能力を糊塗 ⑥産物起点で網羅漏れ ⑦worker の緑を未検証で外注
+    ⑧機能実証を主成果にし mock 突合を後回し ⑨手戻り判定の不一致。
+  state: done
+  closed_in: >
+    2026-06-20 S11 本実行で取り込み完了。P1〜P9(+ 発生時追補 P10〜P35 / Try T1〜T38)を
+    Problem として根本原因分析し、Keep/Try/改善提案に集約。中心所見「バグ多すぎ」の正体 =
+    検出が自動ゲート(S9=3件)を全てすり抜け人間の最終ゲート(S10=22件)に集中、を定量化。
+    s11-retrospective.md ステータス=確定。
+
+- id: F3-project-management-ui
+  origin: v0.0.4/s10-acceptance.md   # S10 実機レビュー(2026-06-14)で発見
+  decision: >
+    web に**プロジェクト作成/リセット/切替の UI が無い**(project-context が projects[0] 固定)。
+    一度プロジェクトが登録されると画面から作り直せず、legacy プロジェクト(step-model-v2 前 / S2.5 入り)が
+    残ると 12 工程にならない問題が表面化。本サイクルでは legacy データを DB から削除して unblock した
+    (backup: aidlc-studio.db.bak-manual / 一時 script: scripts/cleanup-legacy-project.ts)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    プロジェクト管理 UI(作成/リセット/切替)は v0.0.4 の US-01〜08(S1 会話ループ)の範囲外 = baseline 機能。
+    ここで実装するのは scope creep のため次サイクルへ。併せて legacy データのマイグレーション方針も検討
+    (非 canonical legacy ID の正規化 / 安全なマッピング)。一時 cleanup script + backup は housekeeping で整理。
+
+- id: AUTO-ORCH-durable-self-healing
+  origin: v0.0.4/s10-acceptance.md   # S10 中の設計対話(2026-06-19)で確定
+  decision: >
+    プロダクト最終構想「放置可能な自走基盤」の設計を確定。タスクを積めば最大並列 N を超えない範囲で
+    human-gate 手前まで自走し、claude セッション上限/アプリ再起動/クラッシュでも不整合なく自己復帰、
+    技術的失敗は人間に出さず仕組み内で retry。中核方針: ①プロセス使い捨て/DB が唯一の真実/起動毎 reconcile/
+    遷移は冪等 ②人間の介在点は固定4つ(要件/画面/レビュー/改善)以外に増やさない ③各技術 step は
+    generate→独立検証→自動 retry(claude に自己採点させない)④上限/レートは backoff-retriable に分類して自動再開
+    ⑤retry 上限到達は inbox に積む + スケジューラは後続タスクへ(非ブロッキング)⑥claude の不確実性は1試行に
+    隔離し done は観測事実で裏取り。設計仕様の正本 = aidlc-docs/v0.0.5/autonomous-self-healing-orchestration.md。
+  state: carried
+  into: v0.0.5
+  reason: >
+    v0.0.4 の US-01〜08(Human Inbox 縦ループ)の範囲外。自走スケジューラ(N並列+DAG+parking)/上限 backoff/
+    逐次 stream 監視 + live-run 永続台帳/late-emit 冪等化/独立検証→自動 retry 配線 が未実装(ギャップ表は設計仕様 §11)。
+    既存の土台(reconcile・session_id 永続・evaluator/deterministic-gate/visual-eval)を活かして v0.0.5 で構築。
+    [O3-live-resume-continuation-unproven] はこの自走基盤の resume 経路に内包して実証する。
+
+- id: F12-thread-badge-consistency
+  origin: v0.0.4/s10-acceptance.md   # F-12 修正時の軽微な残り(2026-06-19)
+  decision: >
+    会話スレッドのヘッダ・ステップ状態バッジが、レビュー emit 後も run=running のため「起動中/実行中」のまま
+    (本文は F-12 で「できあがりを確認する」CTA に解消済だが、バッジがレビュー準備完了と不一致)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    本筋の固着(F-12)は v0.0.4 で解消済。バッジ整合は表示の粗で実害小のため次サイクル housekeeping。
+
+- id: TEST-ENV-seeded-cycle-states
+  origin: v0.0.4/s10-acceptance.md   # S10 受け入れ中のユーザー着想(2026-06-20)
+  decision: >
+    実動作テストで「サイクル完了の完了バナー(US-05)」のような高コスト状態を低コストに検証するため、
+    任意のステップ状態に予め置いたサイクル(seed fixture)からテストを開始できる環境を作る。
+    例: ほぼ done のサイクルを seed → 1 操作で完了到達 → 完了バナーが実 backend で出るのを目視。
+    現状は完了到達がサイクル全工程の完走を要し高コストなため、US-05 完了バナーはフロント描画(モック注入)
+    のみで実 backend 未到達。この seed 環境ができれば US-05 完了バナーの実 backend 検証をそこに内包できる。
+  state: carried
+  into: v0.0.5
+  reason: >
+    テスト環境(seeded cycle-state fixtures)の構築は v0.0.4 の US-01〜08 範囲外。ユーザー判断で
+    「作るのは次サイクル以降でよい / 今サイクルは US-05 完了バナーをモック描画確認で承認」。
+    次サイクルでこの env を用意し、US-05 完了バナーの実 backend 到達(+他の高コスト状態)を低コストに実証する。
+
+# ── S11(Retrospective)が新規提起した改善提案(2026-06-20)。S12 がワークフローへ反映 ──
+
+- id: S11-IMP1-live-evidence-hard-gate
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #1(最優先 / P36 で真因是正後)
+  decision: >
+    真因(P36 / ユーザー指摘で是正)= 人間が初日から繰り返し「live で確認せよ」と明示指示し責務契約も
+    焼き込み済みなのに、AI が毎回 live を S10 まで deferral した = 盲点でなく不遵守(compliance)。
+    soft な指示・契約追加では行動が変わらないと本サイクルで実証(契約を焼いた直後に同じ逆転が再発)。
+    対策は「契約/S9 にもう一文足す」でなく deferral を物理的に不能にする 3 点:
+    (a) 機械ハードゲート = 各技術 step の done を「live 証拠アーティファクト(実 backend 縦経路ログ +
+    配信 screenshot)の存在」で機械検証し、無ければ done 不可(自己申告でなく物理前提)。
+    (b) live を安くする = seeded states + backend --watch + verify:shot/visual を毎 step 自動実行し
+    deferral の経済的理由を消す。(c) per-step live = S10 を待たず各 step 完了時に当該 step の live 縦断を
+    1本走らせ、人間が S10 で初めて live を踏む end-loaded 構造を解体する。
+    注: 各 step に live 実行コストを課す運用変更は事業判断の要素を含むため S12 で人間に確認。
+  lineage: >
+    ★これは新規でなく再発: v0.0.3 S11 改善提案 #4 `S11-P04-evaluator-mechanical-gate`
+    (確定前 evaluator を hook/CI で機械強制)が同じ機械ゲート思想。v0.0.3→v0.0.4 carried →
+    v0.0.4 S1 D-01 で「インフラゆえ後回し」と v0.0.5 へ再 point → v0.0.4 はゲート無しで走り 22 バグ。
+    本 IMP1 は1サイクル遅れの再発明(s11 P37/P38)。
+  escalation: >
+    ★3度目の defer 禁止(T41): 構造/インフラ改善は backlog だと毎回後回しされる(P38 実証)。
+    v0.0.5 では本項目を **backlog でなく first-class US として commit** すること。
+    同じ提案が2サイクル連続 carried = 自動 escalate(US 化必須)を改善提案制度に追加(T41/T42)。
+  scope_v005: >
+    ★ユーザー承認(2026-06-20)で IMP1 に以下を含める:
+    (a) **ledger モデル再設計**: 現状は版数ごと `aidlc-docs/{vX}/ledger.yml` を「次サイクルが pull」する
+    単一ホップ・soft 設計で、未解決提案が 1 サイクルごとに AI の視界から落ちる(P37 の機械的原因)。
+    → **ルート単一 append-only 台帳** `aidlc-docs/ledger.yml`(brief.md と同じ全版共通)に変更し、
+    未解決項目を版を跨いで常に保持。context-resolver Section 6 注入を「現サイクル + ルート台帳」にして
+    **全サイクル横断が機械的に効く**ようにする。
+    (b) **reconcile のコード化**: 現状 reconcile ゲートはテキスト規約のみでコード強制ゼロ。
+    前(全)サイクルの未解決 + escalation 付き項目が次サイクルで US 化されていなければ S1 を fail させる
+    script/hook を実装(live 証拠ハードゲートと同じ「テキスト→機械」転換)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    step done 定義 + ハーネス(機械ゲート/安価 live/per-step)への反映は S12(ワークフロー改善)+
+    v0.0.5 本体の仕事。土台は [TEST-ENV-seeded-cycle-states] / [AUTO-ORCH-durable-self-healing] と共用。
+    v0.0.3 `S11-P04` の事実上の後継(lineage 参照)。
+
+- id: S11-IMP2-binding-rule-delivery-checklist
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #2
+  decision: >
+    binding ルールがリンク参照止まりで headless に届かない事故が反復(F-6/7/10/11/14/16 / P11/P12/P14/P16)。
+    新しい kit/rules/*.md 追加時に「どの注入点で headless AI に本文が届くか」を probe test 付きで
+    必須化するチェックリストを operating-model に明記する。
+  state: carried
+  into: v0.0.5
+  reason: operating-model への明文化 + probe test テンプレ整備は S12/次サイクルで実施。
+
+- id: S11-IMP5-retro-metrics-autocollect
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #5
+  decision: >
+    Q&A 件数・Step 別所要・バグ検出ゲート分布を tally する仕組みが無く S11 で手作業再構成した。
+    run/HumanTask store から検出ゲート別バグ・Step 別所要・Q&A 件数を自動集計するレポートを作り
+    S11 入力に供給する。
+  state: carried
+  into: v0.0.5
+  reason: メトリクス自動収集基盤の実装は v0.0.4 範囲外。次サイクル housekeeping/自走基盤と併せて。
+
+# ── S11/S12 の確定 D-NN 台帳化(2026-06-20 / クローズ要件)──
+
+- id: S11-D01
+  origin: v0.0.4/s11-retrospective.md
+  decision: "「バグ多すぎ」を検出ゲート別バグ件数(S9=3/S10=22)で定量化し見出し所見に置いた(矮小化しない)。"
+  state: done
+  closed_in: v0.0.4/s11-retrospective.md
+
+- id: S11-D02
+  origin: v0.0.4/s11-retrospective.md
+  decision: "個票 P1〜P41/T1〜T44 を保持し、Keep/Problem/Try/改善提案は「バグ多すぎ」直結クラスへ集約編成。"
+  state: done
+  closed_in: v0.0.4/s11-retrospective.md
+
+- id: S11-D03
+  origin: v0.0.4/s11-retrospective.md
+  decision: "改善提案 #1(live 縦経路の機械ハードゲート)を最優先と判定。運用コストは事業判断ゆえ S12 Q-01 へ。"
+  state: done
+  closed_in: v0.0.4/s12-improvement.md   # Q-01 で承認(必達ゲート + IMP1 US化)
+
+- id: S12-D01
+  origin: v0.0.4/s12-improvement.md
+  decision: "S12 の最大貢献を『構造改善を次サイクル US 化させる escalation 則自体をテキストで焼く』と定めた(operating-model Rule E + ledger 規約)。P38 の自己再演を防ぐ。"
+  state: done
+  closed_in: kit/rules/aidlc-operating-model.md + kit/rules/ledger.md
+
+- id: S12-D02
+  origin: v0.0.4/s12-improvement.md
+  decision: "live 縦経路 e2e を S9 完了条件(6)= 毎サイクル必達ハードゲート化(テキスト+手動)。機械強制は v0.0.5 IMP1。"
+  state: done
+  closed_in: kit/skills/aidlc-s9-scenario-validation/SKILL.md   # Q-01 で必達を承認
+
+- id: S12-D03
+  origin: v0.0.4/s12-improvement.md
+  decision: "carried 9 件を into: v0.0.5 で残し、自サイクル(into: v0.0.4)carried ゼロをもって CLOSE 可能と判定(established / v0.0.3 S12 D-03 と同一)。"
+  state: done
+  closed_in: v0.0.4/s12-improvement.md

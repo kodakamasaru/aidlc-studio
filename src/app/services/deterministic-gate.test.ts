@@ -10,7 +10,8 @@ import type { Fs } from "../ports/sys";
 
 const fsWith = (present: readonly string[]): Fs => {
   const set = new Set(present);
-  return { exists: (p) => set.has(p) };
+  // The gate only probes existence; read is irrelevant here (US-03 added it to Fs).
+  return { exists: (p) => set.has(p), read: () => undefined };
 };
 
 describe("runDeterministicGate (AI-independent existence gate)", () => {

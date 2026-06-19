@@ -14,7 +14,6 @@ import {
   QuestionId,
   FactId,
   ProposalId,
-  LedgerEntryId,
 } from "../../src/domain/shared/ids";
 
 import { openProject } from "../../src/domain/project/project";
@@ -32,12 +31,9 @@ import type { Review, ReviewBlock } from "../../src/domain/review/review";
 import {
   indexArtifact,
   docPath,
-  makeLedgerEntry,
 } from "../../src/domain/external-memory/external-memory";
 import type {
   ArtifactRef,
-  LedgerEntry,
-  Conversation,
   WikiDoc,
 } from "../../src/domain/external-memory/external-memory";
 
@@ -193,32 +189,4 @@ export function buildArtifact(cycleId: string, rawPath: string): ArtifactRef {
 
 export function buildWikiDoc(rawPath: string): WikiDoc {
   return { section: "ubiquitous", path: unwrap(docPath(rawPath)), updatedAt: T0 };
-}
-
-export function buildLedgerEntry(
-  id: string,
-  cycleFrom: string,
-  state: "carried" | "done" | "dropped",
-): LedgerEntry {
-  return unwrap(
-    makeLedgerEntry({
-      id: LedgerEntryId(id),
-      kind: "D",
-      label: `entry ${id}`,
-      state,
-      ...(state === "carried" ? { into: "next S1" } : {}),
-      ...(state === "dropped" ? { reason: "obsolete" } : {}),
-      cycleFrom: CycleId(cycleFrom),
-    }),
-  );
-}
-
-export function buildConversation(runId: string): Conversation {
-  return {
-    runId: RunId(runId),
-    turns: [
-      { role: "ai", text: "starting", at: T0 },
-      { role: "human", text: "ok", at: T1 },
-    ],
-  };
 }

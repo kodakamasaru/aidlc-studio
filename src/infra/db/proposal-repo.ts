@@ -1,5 +1,5 @@
 // ProposalRepo (SQLite). TaskProposal carries no projectId, so projectId is a
-// persistence-scope param on save (mirrors WikiRepo/ConversationRepo) stored in
+// persistence-scope param on save (mirrors WikiRepo) stored in
 // its own column to make listByProject genuinely project-scoped.
 import type { Database } from "bun:sqlite";
 import type { ProposalRepo } from "../../app/ports/repos";

@@ -14,7 +14,6 @@ export type TaskId = Brand<string, "TaskId">;
 export type QuestionId = Brand<string, "QuestionId">;
 export type FactId = Brand<string, "FactId">;
 export type ProposalId = Brand<string, "ProposalId">;
-export type LedgerEntryId = Brand<string, "LedgerEntryId">;
 
 /** 外部採番された id 文字列をその brand に型付けする(検証はしない / 純粋)。 */
 export const ProjectId = (s: string): ProjectId => s as ProjectId;
@@ -25,4 +24,3 @@ export const TaskId = (s: string): TaskId => s as TaskId;
 export const QuestionId = (s: string): QuestionId => s as QuestionId;
 export const FactId = (s: string): FactId => s as FactId;
 export const ProposalId = (s: string): ProposalId => s as ProposalId;
-export const LedgerEntryId = (s: string): LedgerEntryId => s as LedgerEntryId;

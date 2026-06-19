@@ -14,7 +14,6 @@ import type {
   QuestionId,
   FactId,
   ProposalId,
-  LedgerEntryId,
 } from "../../domain/shared/ids";
 import {
   ProjectId as makeProjectId,
@@ -25,7 +24,6 @@ import {
   QuestionId as makeQuestionId,
   FactId as makeFactId,
   ProposalId as makeProposalId,
-  LedgerEntryId as makeLedgerEntryId,
 } from "../../domain/shared/ids";
 
 const DEFAULT_INSTANT = "2026-01-01T00:00:00.000Z";
@@ -67,11 +65,17 @@ export class FixedClock implements Clock {
  */
 export class FakeFs implements Fs {
   private readonly present: ReadonlySet<string> | undefined;
-  constructor(present?: readonly string[]) {
+  private readonly contents: ReadonlyMap<string, string>;
+  constructor(present?: readonly string[], contents?: Readonly<Record<string, string>>) {
     this.present = present ? new Set(present) : undefined;
+    this.contents = new Map(Object.entries(contents ?? {}));
   }
   exists(path: string): boolean {
     return this.present === undefined ? true : this.present.has(path);
+  }
+  // US-03: returns pinned content for a path, or undefined (= missing/unreadable).
+  read(path: string): string | undefined {
+    return this.contents.get(path);
   }
 }
 
@@ -113,8 +117,5 @@ export class SeqIdGen implements IdGen {
   }
   proposalId(): ProposalId {
     return makeProposalId(this.next("proposal"));
-  }
-  ledgerEntryId(): LedgerEntryId {
-    return makeLedgerEntryId(this.next("ledger"));
   }
 }

@@ -108,8 +108,9 @@
 - id: S8-live-completeness
   origin: v0.0.2/s8-integration.md
   decision: "live evaluator が completeness(addressed)を emit する(stream-json パース)。現状 scripted のみが completeness を出し、live は completeness なし→visual_review fallback。"
-  state: carried
+  state: done
   into: v0.0.3   # ROADMAP v0.0.3 ②「live を本物に」。v0.0.3 S1 が消し込む唯一の carry
+  closed_in: v0.0.3/US-04   # completeness-parse.ts + live.ts(launchEval emit) + 実 claude 評価 run 貫通(tests/e2e-live/live-eval.test.ts)。scripted と同一 app ゲート。
 
 - id: S8-Q02
   origin: v0.0.2/s8-integration.md

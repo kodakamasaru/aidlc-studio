@@ -1,0 +1,51 @@
+# US-01: 外部記憶の正本境界を 1 枚に確定し、死蔵テーブルを削除する
+
+## メタ
+- 親: [s1/index.md](./index.md)
+- 対応 S2 画面 (確定後に追記): —(画面追加なし。内部基盤)
+- ステータス: 確定
+- scope: ①-a
+
+## 3 視点
+
+### なぜするか (Why)
+外部記憶(file / DB)の正本境界が複数箇所で揺れており(artifact=index 模範 / ledger=DB 全文複製で死蔵 / conversation=死蔵 / wiki=内容複製で原則違反)、この揺れが ② の live prompt 合成で「読むソースと表示ソースのズレ」を生み、mock 乖離(S10 却下)と同種の drift を再生産する。**②の前提として境界を 1 枚に固定する。**
+
+### UX へのインパクト
+ユーザー(開発者本人)は直接は見えないが、以降のサイクルで「どのデータがどこに正本を持つか」が 1 枚で判定でき、studio が内容を二重持ちして食い違う事故が起きなくなる。死蔵テーブルが消えてスキーマが製品の実態に一致する。
+
+### 受け入れ条件 (AC)
+- 正本マップ(種別 × `truth` × `DB の役割`)が [aidlc-operating-model.md](../../../kit/rules/aidlc-operating-model.md) にルールとして 1 枚に記載されている(模範=artifact、統一原則=「file=truth / DB=index|state、DB は内容を複製しない」)。
+- `ledger` の DB テーブルと repo(`ledger-repo`)、および**配線層の全波及点**(`app/ports` の LedgerRepo/Repos.ledger/IdGen.ledgerEntryId、`infra` の id-gen/fakes/store/migrations、tests)が**削除**され、`Ledger*` への参照が 0 になることをテストで保証。**業務フロー(services/orchestrator)参照は既に 0**(死蔵 / 削除は機能を壊さない)。正本は `aidlc-docs/{v}/ledger.yml`(規約 path)であることがマップに明記。
+- `conversation` の DB テーブルと関連コードが**削除**され、回帰が割れない。
+- `wiki` は本サイクルでは**方針のみ確定**(マップ上 `truth=file / DB=将来 index / 内容複製は是正対象` と記載)。実装の是正は Wiki サイクルへ送る旨が scope に残る。
+- 既存テスト(235 回帰 + E2E 6)が pass(後方互換 / 削除による参照切れ 0)。
+
+## この US 固有の 質疑応答ログ
+
+### Q-01 — ledger.yml(file)を studio が読む将来用途(照合ゲート等)は規約 path 直読で足りるか、軽い index が要るか
+- **回答**(ユーザー記入):
+  > 
+- **確定**(AI 記入):
+  > (暫定方針: v0.0.5 の ledger 照合ゲートまでは規約 path 直読で足りる想定。index が必要になった時点で artifact と同型に再導入。)
+
+---
+
+## この US 固有の AI が独自に決めたこと と 理由
+
+### D-01 — ledger / conversation は「索引化」ではなく「テーブルごと削除」
+- **理由**: 両者とも app 層参照 0 の死蔵で、artifact のような listing 実需が現状ない。YAGNI に従い削除が最小。将来実需が出たら artifact と同じ path 索引で再導入できる(可逆)。ユーザー回答(index Q-01)と一致。
+- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **上書き内容**(上書き時のみ): 
+
+### D-02 — 正本マップの置き場は kit/rules/aidlc-operating-model.md
+- **理由**: 同 rule が既に AI-DLC の運用ルール(4 層 / md 運用)の正本。外部記憶境界も「運用ルール」なので同居が自然。scope.md は当サイクルの参照、operating-model が恒久ルール。
+- **判断**(ユーザー記入): 承認 | 上書き | 保留
+- **上書き内容**(上書き時のみ): 
+
+---
+
+## この US 固有の 棄却した案
+
+### R-01 — ledger/conversation を index 化して残す
+- **棄却理由**: 現状 listing の実需がなく、残すと「いつか使う」死蔵を温存して原則(複製しない)の判定を曖昧にする。削除の方が境界が明快。

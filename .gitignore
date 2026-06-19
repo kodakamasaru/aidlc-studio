@@ -15,3 +15,7 @@ tests/e2e/.report/
 
 # Ad-hoc live-test scratch (screenshots / one-off scripts during live E2E dev).
 .pw-tmp/
+
+# US-05 runtime verify-ui screenshots (served, not committed)
+.verify-screenshots/
+.claude/worktrees/

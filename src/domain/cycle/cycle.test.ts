@@ -1,7 +1,8 @@
 import { test, expect, describe } from "bun:test";
 import { unwrap, isErr } from "../shared/result";
 import { instant } from "../shared/primitives";
-import { Step } from "../shared/vocab";
+import { Step, SkillRef, sameStep } from "../shared/vocab";
+import type { StepDefSnapshot } from "../project/project";
 import { CycleId, ProjectId, PhaseId, RunId } from "../shared/ids";
 import {
   type Cycle,
@@ -19,6 +20,7 @@ import {
   completeCycle,
   latestRun,
   runningPhase,
+  reconstructPipeline,
 } from "./cycle";
 
 const at = (h: number) =>
@@ -62,6 +64,38 @@ describe("createCycle", () => {
     expect(c.phases.map((p) => p.step as string)).toEqual(["S5", "S6", "S7"]);
     expect(c.phases.map((p) => p.order)).toEqual([0, 1, 2]);
     expect(c.phases.every((p) => p.state === "pending")).toBe(true);
+  });
+
+  test("omitting stepDef leaves Phase.stepDef undefined (backward compatible / INV-S3)", () => {
+    const c = fresh();
+    expect(c.phases.every((p) => p.stepDef === undefined)).toBe(true);
+  });
+
+  test("pins the provided StepDef snapshot onto the matching Phase (INV-S1, copy-through)", () => {
+    const snapshot: StepDefSnapshot = {
+      label: "ドメインモデル",
+      order: 0,
+      skillRef: SkillRef("aidlc-s6-domain-model"),
+      contracts: { humanGate: { mode: "none" } },
+    };
+    const c = unwrap(
+      createCycle({
+        id: CycleId("cyc-2"),
+        projectId: ProjectId("prj-1"),
+        version: unwrap(version("v0.0.3")),
+        title: "snapshot cycle",
+        taskIds: [],
+        createdAt: at(0),
+        pipeline: [
+          { phaseId: PhaseId("ph-s6"), step: Step("S6"), stepDef: snapshot },
+          { phaseId: PhaseId("ph-s7"), step: Step("S7") },
+        ],
+      }),
+    );
+    const s6 = c.phases.find((p) => sameStep(p.step, Step("S6")));
+    const s7 = c.phases.find((p) => sameStep(p.step, Step("S7")));
+    expect(s6?.stepDef).toEqual(snapshot);
+    expect(s7?.stepDef).toBeUndefined();
   });
 
   test("rejects empty title and empty pipeline", () => {
@@ -222,6 +256,29 @@ describe("resumeRun vs retryRun (cycle Q-02)", () => {
       retryRun(c, { runId: RunId("r1"), newRunId: RunId("x"), startedAt: at(3), maxAttempt: 1 }),
     ).toEqual({ ok: false, error: "MaxAttemptExceeded" });
   });
+
+  // S10 実機 F-21: maxAttempt は AUTO retry の暴走止め。人間が明示的に押す「再試行」は
+  // それで dead-end してはいけない(ユーザー: 「自動なら上限いるが私からも retry できないのは変」)。
+  // manual:true は cap を免除する(人間が governor)。
+  test("retryRun manual:true bypasses maxAttempt (human is the governor / F-21)", () => {
+    let c = unwrap(
+      startPhase(fresh(), { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) }),
+    );
+    c = unwrap(advanceRun(c, { runId: RunId("r1"), to: "stalled", at: at(2) }));
+    // attempt 1 → would be MaxAttemptExceeded at maxAttempt:1, but manual bypasses it.
+    const res = retryRun(c, {
+      runId: RunId("r1"),
+      newRunId: RunId("r1b"),
+      startedAt: at(3),
+      maxAttempt: 1,
+      manual: true,
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      const s5 = res.value.phases[0]!;
+      expect(latestRun(s5)).toMatchObject({ attempt: 2, state: "running" });
+    }
+  });
 });
 
 describe("approvePhase (INV-10: review gate)", () => {
@@ -349,5 +406,113 @@ describe("immutability (D-03)", () => {
     const snapshot = JSON.stringify(c0);
     startPhase(c0, { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) });
     expect(JSON.stringify(c0)).toBe(snapshot);
+  });
+});
+
+// ── reconstructPipeline (US-08 D-01) ──────────────────────────────
+// Helper: StepDef with minimal fields for reconstruction tests.
+const stepDef = (id: string, order: number, instruction?: string) => ({
+  id: Step(id),
+  label: `label-${id}` as import("../shared/primitives").Text,
+  order,
+  skillRef: SkillRef(`aidlc-${id.toLowerCase()}`),
+  ...(instruction !== undefined ? { instruction } : {}),
+});
+
+// Helper: cycle with S5 done, S6 running, S7 pending (started = S5/S6, pending = S7).
+const mixedCycle = (): Cycle => {
+  // fresh() gives S5/S6/S7 as pending.
+  let c = fresh();
+  // S5: start → done → approve
+  c = unwrap(startPhase(c, { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) }));
+  c = unwrap(advanceRun(c, { runId: RunId("r1"), to: "done", at: at(2) }));
+  c = unwrap(approvePhase(c, { phaseId: PhaseId("ph-s5"), allTaskReviewsApproved: true }));
+  // S6: start → running (not yet done)
+  c = unwrap(startPhase(c, { step: Step("S6"), runId: RunId("r2"), startedAt: at(3) }));
+  return c;
+  // S5: done, S6: running, S7: pending
+};
+
+describe("reconstructPipeline (US-08 D-01: recompose pending steps)", () => {
+  // TC-1: pending を別構成(独自工程込み)に置換でき、started は不変
+  test("TC-1: replaces all pending phases with new steps; started phases are immutable", () => {
+    const cycle = mixedCycle();
+    // S5(done) S6(running) are started. S7(pending) will be replaced.
+    const newSteps = [stepDef("S8", 0), stepDef("CUSTOM-X", 1)];
+    const result = unwrap(reconstructPipeline(cycle, newSteps));
+
+    // Started phases (S5, S6) are preserved exactly
+    const s5 = result.phases.find((p) => (p.step as string) === "S5");
+    const s6 = result.phases.find((p) => (p.step as string) === "S6");
+    expect(s5?.state).toBe("done");
+    expect(s6?.state).toBe("running");
+    // Old S7 (pending) is gone
+    expect(result.phases.find((p) => (p.step as string) === "S7")).toBeUndefined();
+    // New pending phases are appended
+    const s8 = result.phases.find((p) => (p.step as string) === "S8");
+    const cx = result.phases.find((p) => (p.step as string) === "CUSTOM-X");
+    expect(s8?.state).toBe("pending");
+    expect(cx?.state).toBe("pending");
+    expect(s8?.runs).toEqual([]);
+    expect(cx?.runs).toEqual([]);
+  });
+
+  // TC-2: 並べ替え — 新 pending 列の order が保持 phase 後に連番で付与される
+  test("TC-2: new pending phases receive orders after the last started phase", () => {
+    const cycle = mixedCycle(); // S5(order0,done) S6(order1,running) S7(order2,pending)
+    const newSteps = [stepDef("S9", 0), stepDef("S8", 1)]; // intentionally different order
+    const result = unwrap(reconstructPipeline(cycle, newSteps));
+
+    const phases = result.phases;
+    // Started phases keep their original orders
+    expect(phases.find((p) => (p.step as string) === "S5")?.order).toBe(0);
+    expect(phases.find((p) => (p.step as string) === "S6")?.order).toBe(1);
+    // New phases are ordered 2, 3 (after last started order=1)
+    const s9 = phases.find((p) => (p.step as string) === "S9");
+    const s8 = phases.find((p) => (p.step as string) === "S8");
+    expect(s9?.order).toBe(2);
+    expect(s8?.order).toBe(3);
+  });
+
+  // TC-3: 削除 — pending を 1 つに減らせる
+  test("TC-3: can reduce pending phases (fewer steps than before)", () => {
+    const cycle = fresh(); // all pending: S5/S6/S7
+    const newSteps = [stepDef("S5", 0)]; // keep only S5
+    const result = unwrap(reconstructPipeline(cycle, newSteps));
+    expect(result.phases).toHaveLength(1);
+    expect((result.phases[0]!.step as string)).toBe("S5");
+    expect(result.phases[0]!.state).toBe("pending");
+  });
+
+  // TC-4: 新設 — 独自 id を追加できる
+  test("TC-4: can add a brand-new custom step id not in CANONICAL_STEPS", () => {
+    const cycle = fresh(); // all pending
+    const newSteps = [stepDef("MY-REVIEW", 0), stepDef("MY-BUILD", 1)];
+    const result = unwrap(reconstructPipeline(cycle, newSteps));
+    const ids = result.phases.map((p) => p.step as string);
+    expect(ids).toEqual(["MY-REVIEW", "MY-BUILD"]);
+  });
+
+  // TC-5: 空 newPendingSteps を拒否
+  test("TC-5: rejects empty newPendingSteps (EmptyPipeline)", () => {
+    const cycle = fresh();
+    expect(reconstructPipeline(cycle, [])).toEqual({ ok: false, error: "EmptyPipeline" });
+  });
+
+  // TC-6: 重複 id(保持分含む)を拒否
+  test("TC-6: rejects duplicate step id including already-started phases (DuplicateStep)", () => {
+    const cycle = mixedCycle(); // S5(done) S6(running) S7(pending)
+    // Passing S6 in newSteps duplicates a started phase step id
+    const newSteps = [stepDef("S6", 0), stepDef("S8", 1)];
+    expect(reconstructPipeline(cycle, newSteps)).toEqual({ ok: false, error: "DuplicateStep" });
+  });
+
+  // TC-7: instruction が StepDefSnapshot に写ること
+  test("TC-7: instruction from StepDef is copied to the new pending phase's stepDef snapshot", () => {
+    const cycle = fresh(); // all pending
+    const withInstruction = stepDef("CUSTOM", 0, "## ルール本文\nここに書く");
+    const result = unwrap(reconstructPipeline(cycle, [withInstruction]));
+    const phase = result.phases[0]!;
+    expect(phase.stepDef?.instruction).toBe("## ルール本文\nここに書く");
   });
 });

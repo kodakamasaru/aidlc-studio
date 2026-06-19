@@ -1,7 +1,15 @@
 import { test, expect, describe } from "bun:test";
 import { ok, err, isOk, isErr, map, flatMap, unwrap } from "./result";
 import { instant, nonEmptyText, compareInstant } from "./primitives";
-import { VERDICTS, DEFAULT_STEPS, Step, sameStep } from "./vocab";
+import {
+  VERDICTS,
+  DEFAULT_STEPS,
+  CANONICAL_STEPS,
+  skillRefOf,
+  labelOf,
+  Step,
+  sameStep,
+} from "./vocab";
 
 describe("Result", () => {
   test("ok wraps a value and is recognized by isOk", () => {
@@ -62,17 +70,51 @@ describe("vocab", () => {
     ]);
   });
 
-  test("DEFAULT_STEPS is the AI-DLC S1..S7 pipeline", () => {
+  test("DEFAULT_STEPS is the AI-DLC v2 12-step pipeline (S2.5 retired)", () => {
     expect(DEFAULT_STEPS.map((s) => s as string)).toEqual([
       "S1",
       "S2",
-      "S2.5",
       "S3",
       "S4",
       "S5",
       "S6",
       "S7",
+      "S8",
+      "S9",
+      "S10",
+      "S11",
+      "S12",
     ]);
+    expect(DEFAULT_STEPS.map((s) => s as string)).not.toContain("S2.5");
+  });
+
+  test("DEFAULT_STEPS is the id projection of CANONICAL_STEPS (single source / INV-C1)", () => {
+    expect(DEFAULT_STEPS).toEqual(CANONICAL_STEPS.map((c) => c.id));
+  });
+
+  test("CANONICAL_STEPS maps each step to its real kit/skills dir (INV-C2)", () => {
+    expect(skillRefOf(Step("S1")) as string).toBe("aidlc-s1-requirements");
+    expect(skillRefOf(Step("S6")) as string).toBe("aidlc-s6-domain-model");
+    expect(skillRefOf(Step("S12")) as string).toBe("aidlc-s12-workflow-improvement");
+  });
+
+  test("skillRefOf returns undefined for an unknown step", () => {
+    expect(skillRefOf(Step("S2.5"))).toBeUndefined();
+    expect(skillRefOf(Step("BOGUS"))).toBeUndefined();
+  });
+
+  test("CANONICAL_STEPS carries the 平易ラベル as the machine-readable source (US-02)", () => {
+    // 単一 constant が step×平易ラベル×skillRef を持つ(web step-label はここから導出)。
+    expect(labelOf(Step("S1"))).toBe("要件");
+    expect(labelOf(Step("S6"))).toBe("モデル");
+    // S2.5 退役 → S3 の意味が v2「UIデザイン」に統一(US-02 AC)。
+    expect(labelOf(Step("S3"))).toBe("UIデザイン");
+    expect(CANONICAL_STEPS.every((c) => (c.label as string).length > 0)).toBe(true);
+  });
+
+  test("labelOf returns undefined for an unknown step", () => {
+    expect(labelOf(Step("S2.5"))).toBeUndefined();
+    expect(labelOf(Step("BOGUS"))).toBeUndefined();
   });
 
   test("sameStep compares by value", () => {

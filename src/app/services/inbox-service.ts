@@ -6,6 +6,11 @@ import type { Ports } from "../ports/composition";
 import { fail, isServiceError, messageOf, type ServiceError } from "./errors";
 import { compensateRun } from "./compensate";
 import { locatePhaseOfRun } from "./cycle-helpers";
+import { launchReconstructionForS1 } from "./reconstruction-launch";
+import { CycleService } from "./cycle-service";
+import { applyHearingAnswerToContracts } from "./hearing-service";
+import { parseAnswersBlock, validateReconstructionProposal } from "../../wire/aidlc-wire";
+import type { StepDef, SkillRef } from "../../domain/project/project";
 import {
   applyAnswer,
   type Question,
@@ -22,6 +27,7 @@ import {
   advanceRun,
   resumeRun,
   completeCycle,
+  reconstructPipeline as domainReconstructPipeline,
 } from "../../domain/cycle/cycle";
 import type { Cycle } from "../../domain/cycle/cycle";
 import { Step, type Verdict } from "../../domain/shared/vocab";
@@ -107,9 +113,10 @@ export class InboxService {
     if (isErr(outcome)) throw questionErrorStatus(outcome.error);
     const command = outcome.value.command;
 
-    // backtrack is a pure cycle rollback (no orchestrator side-effect), so it
-    // joins question+fact in the SAME transaction — never a partial commit where
-    // the question is answered but the cycle is not yet rolled back.
+    // backtrack: rollback the cycle in the SAME transaction as question+fact so
+    // the DB is never in a partial state (question answered but cycle not yet
+    // rewound). The orchestrator auto-relaunch fires AFTER this commit (post-commit
+    // side-effect), mirroring the startPhase/relaunchPhase pattern (S7 D-04).
     const backtrackedCycle =
       command.type === "backtrack"
         ? this.computeBacktrack(question, command.toStep, command.reason)
@@ -122,9 +129,42 @@ export class InboxService {
       if (backtrackedCycle) this.ports.repos.cycles.save(backtrackedCycle);
     });
 
-    // AFTER commit: dispatch ONLY the orchestrator side-effects. backtrack is
-    // fully persisted above and needs no post-commit call.
-    if (command.type !== "backtrack") {
+    // BU-3: config-hearing write. When the question carries a target, apply the
+    // answer deterministically to StepContracts (§C7.6). This is additive: normal
+    // dispatch still runs so the hearing turn continues (or finalises) as usual.
+    // Errors here are visible (ServiceError) — they do NOT silently drop (原則④).
+    if (question.target !== undefined && question.kind === "question") {
+      const cycle = this.ports.repos.cycles.findById(question.cycleId);
+      const projectId = cycle?.projectId;
+      if (projectId !== undefined) {
+        const scope =
+          question.target.scope ??
+          `cycle:${question.cycleId}`;
+        // Extract choiceId + note from the answer body. The body may be an
+        // aidlc-answers fenced block (multi-question batch) or a plain string.
+        const { choiceId, note } = this.extractHearingValues(question.id, input.body);
+        applyHearingAnswerToContracts(
+          {
+            scope,
+            projectId: String(projectId),
+            target: { step: question.target.step, field: question.target.field },
+            ...(choiceId !== undefined ? { choiceId } : {}),
+            ...(note !== undefined ? { note } : {}),
+          },
+          this.ports,
+        );
+      }
+    }
+
+    // AFTER commit: dispatch orchestrator side-effects.
+    // backtrack: the cycle rollback is now persisted — auto-relaunch the rewound
+    // phase so the human never needs to press "relaunch" manually (US-13 UX).
+    // If the orchestrator launch fails, compensate the new run to "stalled" (still
+    // retriable via the manual relaunch button) and swallow the error — the
+    // backtrack itself succeeded and returning 502 would be misleading.
+    if (command.type === "backtrack") {
+      await this.autoRelaunchAfterBacktrack(question.cycleId, command.toStep);
+    } else {
       await this.dispatch(question, command);
     }
 
@@ -140,12 +180,39 @@ export class InboxService {
     // surfaces a 502 — the loop stays recoverable.
     try {
       switch (command.type) {
-        case "resumeRun":
+        case "resumeRun": {
+          // Batch hearing (S2/S6: N問→N答→1 resume). One live run may raise
+          // several `question` cards at once; the human answers them as a batch.
+          // Each answer is persisted individually (above), but the session must
+          // be resumed ONCE with the full aidlc-answers body — NOT once per
+          // answer, which would re-spawn `claude --resume` N times on the same
+          // session. So defer the resume while sibling `question`s for this run
+          // are still open; only the FINAL answer (no open question siblings
+          // left — the just-answered one is already persisted as "answered")
+          // triggers the single resume carrying the batched body. The batch
+          // selection is an app-layer responsibility (S6 評価AI S-1), mirroring
+          // resolveDescopedRun's "wait until no open siblings" gate below.
+          if (command.body !== undefined) {
+            const openSiblings = this.ports.repos.questions
+              .listByRun(command.runId)
+              .filter((q) => q.kind === "question" && q.state === "open");
+            if (openSiblings.length > 0) return; // not the last answer → defer.
+          }
+          // Unit-04: when the human answered a `question` (body present), pass
+          // the captured session_id so the live adapter can `claude --resume`.
+          // Absent sessionId with body present → live adapter emits stalled
+          // (session not yet captured / server restarted); the human retries.
+          const sessionId =
+            command.body !== undefined
+              ? (this.ports.repos.sessions.find(command.runId) ?? undefined)
+              : undefined;
           await this.ports.orchestrator.resume({
             runId: command.runId,
             ...(command.body !== undefined ? { body: command.body } : {}),
+            ...(sessionId !== undefined ? { sessionId } : {}),
           });
           return;
+        }
         case "approveTaskReview":
           // Post-review approval: advance the run to "done" (which moves the
           // phase to "review"), then approve the phase (review → done) so the
@@ -153,7 +220,7 @@ export class InboxService {
           // orchestrator.resume() — the live adapter's in-memory context Map
           // is lost on server restart, making resume fragile. Domain functions
           // operate on the DB-backed cycle aggregate, which is always available.
-          this.finalizeApprovedReview(question, command.runId);
+          await this.finalizeApprovedReview(question, command.runId);
           return;
         case "retryLaunch":
           await this.dispatchRetry(question, command.runId);
@@ -167,16 +234,29 @@ export class InboxService {
           // として通し、backlog Task を生成する。DB のみの同期書き込み(orchestrator 不要)。
           this.descopeToBacklog(question, command);
           return;
+        // US-08 F-1: 再構成提案の承認 → applyCycleReconstruction を実行しカードはクローズ。
+        // applyAnswer がカードを "answered" に更新済みなので DB 書き込みはここでは不要。
+        // reject は no-op — カードは applyAnswer で "answered" になっているので自動クローズ済み。
+        case "approveReconstruction":
+          this.approveReconstructionCmd(command.cycleId);
+          return;
+        case "rejectReconstruction":
+          // no-op: the card was already closed by applyAnswer above.
+          return;
       }
     } catch (err) {
       // A ServiceError from a lookup (e.g. 404 ProjectNotFound in dispatchRetry)
       // is a real client/data error → propagate untouched. Anything else is the
       // orchestrator throwing → compensate to "stalled" and surface a 502.
       if (isServiceError(err)) throw err;
+      // approveReconstruction / rejectReconstruction do not invoke the orchestrator,
+      // so they never reach this catch — but if they do, fall back to question.runId.
+      const failedRunId =
+        "runId" in command ? command.runId : question.runId;
       compensateRun(
         this.ports,
         question.cycleId,
-        command.runId,
+        failedRunId,
         "stalled",
         `AI への指示送信に失敗しました: ${messageOf(err)}`,
       );
@@ -255,6 +335,72 @@ export class InboxService {
   }
 
   /**
+   * US-08 F-1: 再構成提案を承認して cycle の pending 工程列を置換する。
+   * reconstruction_proposals テーブルから提案を取得し、delete 以外のステップを
+   * StepDef に変換して domainReconstructPipeline へ渡す。
+   * 既に開始済み(non-pending)フェーズと重複するステップは除外する
+   * (POST /api/cycles/:id/reconstruct と同じ除外ロジック / 後方互換)。
+   * ServiceError をそのまま投げるので dispatch() の catch が 502 化を判別できる。
+   */
+  /**
+   * US-08 F-1: 再構成提案を承認して cycle の pending 工程列を置換する。
+   * reconstruction_proposals テーブルから提案を取得し、delete 以外のステップを
+   * StepDef に変換して domainReconstructPipeline へ渡す。
+   * 既に開始済み(non-pending)フェーズと重複するステップは除外する
+   * (POST /api/cycles/:id/reconstruct の HTTP ルートと同一除外ロジック)。
+   */
+  private approveReconstructionCmd(cycleId: CycleId): void {
+    const cycle = this.ports.repos.cycles.findById(cycleId);
+    if (!cycle) throw fail(404, "CycleNotFound");
+
+    const rawProposal = this.ports.repos.reconstructionProposals.find(cycleId);
+    if (rawProposal === undefined) throw fail(404, "ProposalNotFound");
+
+    const parsed = validateReconstructionProposal(rawProposal);
+    if (!parsed.ok) {
+      throw fail(400, `InvalidReconstruction: ${parsed.error.detail}`);
+    }
+    const proposal = parsed.value;
+
+    // Exclude deleted steps and already-started steps (same filter as the HTTP route).
+    const startedStepIds = new Set(
+      cycle.phases
+        .filter((p) => p.state !== "pending")
+        .map((p) => String(p.step)),
+    );
+    const newSteps: readonly StepDef[] = proposal.steps
+      .filter((s) => s.diff !== "delete" && !startedStepIds.has(s.id))
+      .map((s) => ({
+        id: Step(s.id),
+        label: s.label as Text,
+        order: s.order,
+        skillRef: s.skillRef as SkillRef,
+        ...(s.instruction.trim().length > 0
+          ? { instruction: s.instruction as Text }
+          : {}),
+      }));
+
+    if (newSteps.length === 0) {
+      // All steps are deleted or already started — no pending effect; treat as no-op.
+      return;
+    }
+
+    const result = domainReconstructPipeline(cycle, newSteps);
+    if (isErr(result)) throw fail(400, `ReconstructFailed: ${result.error}`);
+
+    // Assign real PhaseIds to new phases (mirrors CycleService.applyCycleReconstruction).
+    const next: Cycle = {
+      ...result.value,
+      phases: result.value.phases.map((p) =>
+        (p.id as string).startsWith("new-")
+          ? { ...p, id: this.ports.ids.phaseId() }
+          : p,
+      ),
+    };
+    this.ports.uow.run(() => this.ports.repos.cycles.save(next));
+  }
+
+  /**
    * After a descope/defer approval, if the run has no remaining open descope
    * Questions, complete the gen→gate→eval step: the EngineService left the
    * evaluator run "stalled" awaiting this human decision, so resume it → done →
@@ -306,7 +452,7 @@ export class InboxService {
    * risk. Errors are thrown so the outer catch in dispatch() can surface them
    * as a 502 to the frontend (the user sees the error instead of silent failure).
    */
-  private finalizeApprovedReview(question: Question, runId: RunId): void {
+  private async finalizeApprovedReview(question: Question, runId: RunId): Promise<void> {
     const cycle = this.loadCycle(question);
     const phase = locatePhaseOfRun(cycle, runId);
 
@@ -341,6 +487,12 @@ export class InboxService {
     const finalCycle = isOk(completed) ? completed.value : approved.value;
 
     this.ports.uow.run(() => this.ports.repos.cycles.save(finalCycle));
+
+    // US-08: S1 確定 = 人間がレビューを承認した今この瞬間。AI-emits-done と同じ共有
+    // ランチャを叩いて reconstruction を起動する(idempotent / DB proposal guard なので
+    // 二重起動・自己再発火しない)。finalizeApprovedReview は engine sink を通らないため、
+    // ここで明示的に呼ばないと正規の human-in-the-loop で reconstruction が起動しない。
+    await launchReconstructionForS1(this.ports, finalCycle, phase.step, phase.id);
   }
 
   /** Pure: load the cycle and compute the backtracked state (saved by caller). */
@@ -370,9 +522,74 @@ export class InboxService {
     return result.value;
   }
 
+  /**
+   * Auto-relaunch the rewound phase after a backtrack commit (US-13 UX).
+   *
+   * Design decisions:
+   * D-1 REUSE: delegates entirely to CycleService.relaunchPhase — no duplicate
+   *     domainRelaunchPhase + persistThenLaunch logic here. CycleService already
+   *     owns the "persist cycle then launch orchestrator" pattern (S7 D-04).
+   * D-2 SOFT FAILURE: if the orchestrator launch throws, CycleService's internal
+   *     compensateRun drives the new run to "failed" (same as startPhase behavior).
+   *     We catch and swallow the error — do NOT propagate it. The backtrack is
+   *     already committed and returning 502 would mislead the caller about what
+   *     failed. The human uses /retry to create a new attempt or /relaunch to
+   *     restart the rewound phase.
+   * D-3 MANUAL RELAUNCH PRESERVED: the /relaunch HTTP endpoint is NOT removed.
+   *     It is still needed for stall recovery (when auto-relaunch itself stalls).
+   */
+  private async autoRelaunchAfterBacktrack(
+    cycleId: import("../../domain/shared/ids").CycleId,
+    toStep: Extract<import("../../domain/question/question").Unit02Command, { type: "backtrack" }>["toStep"],
+  ): Promise<void> {
+    try {
+      const cycleService = new CycleService(this.ports);
+      await cycleService.relaunchPhase(cycleId as string, toStep as string);
+    } catch (_err) {
+      // CycleService.relaunchPhase already compensates the new run to "failed"
+      // when the orchestrator launch throws (same as startPhase behavior). The
+      // human can use /retry to create a new attempt, or the manual /relaunch
+      // button to restart the whole rewound phase.
+      // Any non-ServiceError (e.g. PhaseNotRewound) is also swallowed: it means
+      // the cycle state didn't allow a relaunch at this moment — the backtrack
+      // is already committed, so the human can use the /relaunch button.
+      // Swallow — do not propagate. The backtrack is committed; auto-relaunch is
+      // best-effort. Returning 502 would mislead the caller about what failed.
+    }
+  }
+
   private loadCycle(question: Question): Cycle {
     const cycle = this.ports.repos.cycles.findById(question.cycleId);
     if (!cycle) throw fail(404, "CycleNotFound");
     return cycle;
+  }
+
+  /**
+   * BU-3: extract (choiceId, note) from an answer body for config-hearing.
+   * If the body is an aidlc-answers fenced block, parse it and find the answer
+   * matching the given questionId. Otherwise treat the plain body string as the
+   * note value (simple direct answer for non-batch config questions).
+   */
+  private extractHearingValues(
+    questionId: import("../../domain/shared/ids").QuestionId,
+    body: Text | undefined,
+  ): { choiceId?: string; note?: string } {
+    if (body === undefined) return {};
+
+    // Try parsing as aidlc-answers block first.
+    const parsed = parseAnswersBlock(body);
+    if (parsed.ok) {
+      const match = parsed.value.find((a) => a.questionId === questionId);
+      if (match) {
+        return {
+          ...(match.choiceIds.length > 0 ? { choiceId: match.choiceIds[0] } : {}),
+          ...(match.note !== undefined ? { note: match.note } : {}),
+        };
+      }
+    }
+
+    // Fallback: treat the whole body string as a plain note value.
+    const plain = (body as string).trim();
+    return plain.length > 0 ? { note: plain } : {};
   }
 }

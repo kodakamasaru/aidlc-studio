@@ -143,11 +143,8 @@ function RunningPanel({ phase, run }: RunPanelProps & { run: Run }) {
   // S6 run-role: evaluator = 検証中(中身を点検)/ generator(or 無) = 進行中(作る)。
   const isEval = run.role === "evaluator";
   const stateWord = isEval ? "検証中" : "進行中";
-  const action = isEval
-    ? "AI が成果の中身を点検中…"
-    : "AI がバックグラウンドで作成中…";
   return (
-    <section className="run-card surface-card" aria-label={`${stateWord}(作業ログ)`}>
+    <section className="run-card surface-card" aria-label={stateWord}>
       <header className="run-card__head">
         <h2 className="run-card__title">{stateWord}</h2>
         <StateBadge variant="running" pulse>
@@ -156,15 +153,11 @@ function RunningPanel({ phase, run }: RunPanelProps & { run: Run }) {
       </header>
       <div className="run-log mono" role="log" aria-live="polite">
         <p className="run-log__line">
-          <span className="run-log__ts">[{shortTime(run.startedAt)}]</span>{" "}
-          「{name}」を{isEval ? "点検開始" : "開始"}しました
-        </p>
-        <p className="run-log__line">
-          <span className="run-log__ts">[{shortTime(run.startedAt)}]</span> {action}
+          「{name}」を{isEval ? "点検" : "作成"}しています
         </p>
         <p className="run-log__line run-log__line--tail">
           <span className="run-log__caret" aria-hidden="true" />
-          次の出力を待っています
+          {isEval ? "成果の中身を確認中…" : "AI がバックグラウンドで作成中…"}
         </p>
       </div>
     </section>
@@ -244,8 +237,3 @@ function DonePanel({
   );
 }
 
-function shortTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "--:--:--";
-  return d.toTimeString().slice(0, 8);
-}

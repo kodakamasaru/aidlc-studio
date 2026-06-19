@@ -13,12 +13,7 @@ import {
   RunId,
   TaskId,
   QuestionId,
-  LedgerEntryId,
 } from "../../src/domain/shared/ids";
-import {
-  unreconciledCount,
-  canStartNextCycleS1,
-} from "../../src/domain/external-memory/external-memory";
 import {
   T0,
   buildProject,
@@ -31,8 +26,6 @@ import {
   buildReviewFor,
   buildArtifact,
   buildWikiDoc,
-  buildLedgerEntry,
-  buildConversation,
 } from "./builders";
 
 let db: Database;
@@ -332,39 +325,6 @@ describe("WikiRepo", () => {
 
     expect(store.repos.wiki.find(ProjectId("p1"), "ubiquitous")).toEqual(doc);
     expect(store.repos.wiki.find(ProjectId("p2"), "ubiquitous")).toBeUndefined();
-  });
-});
-
-describe("LedgerRepo", () => {
-  test("listByCycle + unreconciled / canStartNextCycleS1 over persisted entries", () => {
-    store.repos.ledger.save(buildLedgerEntry("l1", "c1", "carried"));
-    store.repos.ledger.save(buildLedgerEntry("l2", "c1", "done"));
-
-    const entries = store.repos.ledger.listByCycle(CycleId("c1"));
-    expect(entries).toHaveLength(2);
-    expect(unreconciledCount(entries)).toBe(1);
-    expect(canStartNextCycleS1(entries)).toBe(false);
-  });
-
-  test("listByProject joins via cycle and scopes by project", () => {
-    store.repos.cycles.save(buildCycle("p1", "c1", "v1.0.0"));
-    store.repos.cycles.save(buildCycle("p2", "c2", "v1.0.0"));
-    store.repos.ledger.save(buildLedgerEntry("l1", "c1", "done"));
-    store.repos.ledger.save(buildLedgerEntry("l2", "c2", "done"));
-
-    const p1 = store.repos.ledger.listByProject(ProjectId("p1"));
-    expect(p1.map((e) => e.id)).toEqual([LedgerEntryId("l1")]);
-    expect(canStartNextCycleS1(p1)).toBe(true);
-  });
-});
-
-describe("ConversationRepo", () => {
-  test("round-trips a conversation by runId", () => {
-    const conv = buildConversation("r1");
-    store.repos.conversations.save(ProjectId("p1"), conv);
-    const loaded = store.repos.conversations.findByRun(RunId("r1"));
-    expect(loaded).toEqual(conv);
-    expect(loaded?.turns).toHaveLength(2);
   });
 });
 

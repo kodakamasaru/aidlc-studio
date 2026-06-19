@@ -62,6 +62,21 @@ export function StepConfigPage() {
           各ステップの設定(成果物の種類 / 検証の観点 / 人の確認 / 行き詰まり時の対応)を編集します。
           検証の観点を設定したステップは、次回から「作る → 自動チェック → AI が点検」の順で実行されます。
         </p>
+        {/* US-02 / S3 scr-02: snapshot の意味を画面で明示(作成時点に固定される)。
+            折り返しは文の境界(。)でのみ起こし、語中(「サイクル」等)で割れないよう
+            各文を nowrap、文間に <wbr> を置く。 */}
+        <p className="step-config__snapshot-note" role="note">
+          <span className="step-config__snapshot-icon" aria-hidden="true">ⓘ</span>
+          <span className="step-config__snapshot-text">
+            <span className="step-config__snapshot-line">
+              ここでの編集は“これから作る”サイクルに反映されます。
+            </span>
+            <wbr />
+            <span className="step-config__snapshot-line">
+              作成済みのサイクルは作成時点の構成に固定です。
+            </span>
+          </span>
+        </p>
       </header>
       <div className="step-config__list">
         {steps.map((step) => (

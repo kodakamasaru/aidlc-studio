@@ -1,0 +1,87 @@
+# v0.0.3 引き継ぎ台帳(ledger / 正本 = file)。
+# 規約: D/確定項目に state: carried|done|dropped。carried は into: 必須、dropped は reason: 必須。
+# 次サイクル S1 は未 reconcile(carried)をゼロにするまで進めない(kit #5 / operating-model)。
+# US-01 で確定した「ledger は file が正・DB は複製しない」境界に従う。
+
+# ── サイクル内で消し込んだ carry(S9 partial → S10 却下 → ロールバックで done) ──
+- id: S9-US03-brief-source
+  origin: v0.0.3/s9-validation.md
+  decision: "PromptComposer の 3rd source(brief/前段成果物)注入。S9 では未実装(2 層)だった。"
+  state: done
+  closed_in: v0.0.3/US-03   # commit 0d3934c: contextPaths 既定で brief 注入 + 3-source 含有テスト + operating-model に合成契約 doc 化。
+
+- id: S9-US04-live-eval-e2e
+  origin: v0.0.3/s9-validation.md
+  decision: "実 claude evaluator が completeness を出して gate が効く end-to-end。"
+  state: done
+  closed_in: v0.0.3/US-04   # commit 0d3934c: tests/e2e-live/live-eval.test.ts(36s pass)。v0.0.2 S8-live-completeness も done 化。
+
+- id: S9-US05-live-run-shot
+  origin: v0.0.3/s9-validation.md
+  decision: "実 claude 評価 run が verify-ui screenshot を emit する end-to-end。"
+  state: done
+  closed_in: v0.0.3/US-05   # commit 0d3934c: live-eval.test.ts で screenshot block を実撮影で emit。
+
+# ── S10 受け入れ中に人間が発見した新規 carry(後続サイクルのタスク) ──
+- id: S10-live-question-as-review
+  origin: v0.0.3/s10-acceptance.md
+  decision: "live run で実 Claude が(回答を要する)質問を投げているのに、question カードでなく visual_review(レビュー待ち)として Inbox に出る。headless `claude -p` は mid-run 停止せず、live adapter は成功時に常に ResultEmitted→visual_review を出すため、出力に含まれる質問が question 経路に乗らない。Human Inbox の魂(AI→人間の質問はカード化)が live で未成立。"
+  state: carried
+  into: v0.0.4   # 次サイクルで reconcile。実 AI E2E と同枠 / 既存 S8-Q02(v0.0.6, mid-run pause)とは別の「出力質問の経路」問題。
+
+- id: S10-review-md-plaintext
+  origin: v0.0.3/s10-acceptance.md
+  decision: "レビュー画面(ReviewBlocks の summary block)が、実 Claude が返した Markdown 本文を**素のプレーンテキスト**で表示する(見出し/箇条書き/コードが崩れる)。`web/src/features/review/ReviewBlocks.tsx` summary case が body をそのまま <p> に流している。実 AI の成果物が読めるよう Markdown レンダリングが要る(原則③: 人間がコードを見ずに承認できる成果物)。"
+  state: carried
+  into: v0.0.4   # 次サイクルで reconcile。live を本物にしたら成果物本文が md になるため、描画の md 対応が必要に。
+
+- id: S10-full-prior-artifact-context
+  origin: v0.0.3/s10-acceptance.md
+  decision: "US-03 で 3rd source=brief は注入したが、『前段の各ステップ成果物(S1→S2→…の連鎖 = aidlc-docs/{v}/sN/*)を実際に集めて AI に渡す』フル文脈注入は未配線。PromptComposer.contextPaths という受け口はある(既定 brief のみ)が、サイクル文脈に応じて前段成果物 path を解決して渡す呼び出し側(live.ts/engine)が無い。実 AI が前工程を踏まえた本物の成果物を出すには、これが本命の文脈。S10 で人間が指摘。"
+  state: carried
+  into: v0.0.4   # 次サイクルで reconcile。①-c live prompt 合成契約の完成形。contextPaths に前段成果物を載せる解決ロジックを app/engine 側に追加。
+
+# ── S11 レトロスペクティブで確定した分析判断(done / cycle 内クローズ) ──
+- id: S11-D01-bt1-counted
+  origin: v0.0.3/s11-retrospective.md
+  decision: "S6→S8 のラベル所有矛盾を『ステップ内是正』でなくバックトラック(BT-1)として計上。根本原因=設計ステップが確定 binding を逆引きしない。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。再発防止は改善提案 #2(→ S12)。
+
+- id: S11-D02-bug-interpretation
+  origin: v0.0.3/s11-retrospective.md
+  decision: "バグメトリクス解釈=未解決 CRITICAL/HIGH 0、観察 O-01/02/04 はロールバックで解消、残存は O-03(既知 scripted placeholder)のみ。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。
+
+- id: S11-D03-timeline-by-backtrack
+  origin: v0.0.3/s11-retrospective.md
+  decision: "タイムラインを所要日数でなくバックトラック発生点+ステップ進行順で記録(全 Step が 6/12-13 に集中し日次粒度が出ないため)。"
+  state: done
+  closed_in: v0.0.3/s11-retrospective.md   # ユーザー承認 2026-06-13。
+
+# ── S11 改善提案のうち本サイクルで実施しないもの(carried) ──
+- id: S11-P04-evaluator-mechanical-gate
+  origin: v0.0.3/s11-retrospective.md
+  decision: "改善提案 #4: 内部ステップの確定前 evaluator 実行を hook/CI で機械強制。doc でなくインフラ実装ゆえ S12(テキスト根治)範疇外。①②のルールは commit 73249d3 で明文化済。"
+  state: carried
+  into: v0.0.5   # 再 point 2026-06-13: roadmap cut=A で v0.0.4=live会話ループに確定。#4(evaluator 機械ゲート=hook/CI インフラ)は v0.0.5「受入+自走+git自動化」バンドルと同梱が自然ゆえ v0.0.4→v0.0.5 へ送る(黙って消さず理由つき再 point)。元 into=v0.0.4。出典: v0.0.4/scope.md / ユーザー承認 A。
+
+# ── S12 ワークフロー改善で確定した判断(done / サイクル CLOSED) ──
+- id: S12-D01-issue1-split-apply
+  origin: v0.0.3/s12-improvement.md
+  decision: "改善 #1 を分解適用: レビュー突合側は commit 73249d3 で既出ゆえ参照のみ、未対応だった scope.md へのユーザー明示制約の記録義務だけを operating-model に新設。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。
+
+- id: S12-D02-issue2-two-tier
+  origin: v0.0.3/s12-improvement.md
+  decision: "改善 #2(設計ステップ binding 逆引きゲート)を二段で焼き込み: operating-model に横断ルール本体 + S3/S4/S6 SKILL.md 完了条件に 1 行参照(DRY + ローカリティ)。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。
+
+- id: S12-D03-carried-with-into
+  origin: v0.0.3/s12-improvement.md
+  decision: "carried 4 件(S10 発見 3 + #4)を into: v0.0.4 付きで残してサイクル CLOSE。本サイクル scope 外ゆえ done 化せず、次サイクル S1 reconcile ゲートに渡す(v0.0.2→v0.0.3 の established workflow)。"
+  state: done
+  closed_in: v0.0.3/s12-improvement.md   # ユーザー承認 2026-06-13。v0.0.3 CLOSED。

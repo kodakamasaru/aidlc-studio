@@ -14,6 +14,7 @@ import {
   nonEmptyText,
 } from "../shared/primitives";
 import { type Step, sameStep } from "../shared/vocab";
+import type { StepDef, StepDefSnapshot } from "../project/project";
 import type { CycleId, ProjectId, PhaseId, RunId, TaskId } from "../shared/ids";
 
 // ── 状態列挙(S5 状態遷移のみ許可) ───────────────────────────────
@@ -57,6 +58,11 @@ export type Phase = {
   readonly order: number;
   readonly state: PhaseState;
   readonly runs: readonly Run[];
+  /**
+   * S6 phase-step-snapshot: 作成時にピン留めした step 定義の写し(label/skillRef/contracts)。
+   * optional = snapshot 導入前に作られた既存 Phase の後方互換(INV-S3)。作成後不変(INV-S2)。
+   */
+  readonly stepDef?: StepDefSnapshot;
 };
 
 export type Cycle = {
@@ -87,7 +93,9 @@ export type CycleError =
   | "PhaseNotInReview"
   | "TaskReviewsPending"
   | "AlreadyInState"
-  | "PhasesNotAllDone";
+  | "PhasesNotAllDone"
+  /** US-08 reconstructPipeline: 新 pending steps に保持 phase の step id と重複がある。 */
+  | "DuplicateStep";
 
 const RUN_TERMINAL: ReadonlySet<RunState> = new Set(["done", "failed"]);
 const RUN_FROM_RUNNING: ReadonlySet<RunState> = new Set([
@@ -128,8 +136,16 @@ export type CreateCycleCmd = {
   readonly title: string;
   readonly taskIds: readonly TaskId[];
   readonly createdAt: Instant;
-  /** Project の pipelineDef から渡される工程列(順序順)。phase は pending で instantiate。 */
-  readonly pipeline: readonly { readonly phaseId: PhaseId; readonly step: Step }[];
+  /**
+   * Project の pipelineDef から渡される工程列(順序順)。phase は pending で instantiate。
+   * `stepDef` は S6 phase-step-snapshot: app(cycle-service)が正本 + per-cycle 上書きを
+   * 解決した写しを詰める。optional = 未指定なら従来動作(後方互換)。ドメインは写すだけ(S6 D-02)。
+   */
+  readonly pipeline: readonly {
+    readonly phaseId: PhaseId;
+    readonly step: Step;
+    readonly stepDef?: StepDefSnapshot;
+  }[];
 };
 
 /**
@@ -148,6 +164,8 @@ export const createCycle = (cmd: CreateCycleCmd): Result<Cycle, CycleError> => {
     order: index,
     state: "pending",
     runs: [],
+    // S6 INV-S1: 受領した snapshot をそのまま写す(解決は app / ドメインは判断しない)。
+    ...(s.stepDef ? { stepDef: s.stepDef } : {}),
   }));
 
   return ok({
@@ -347,11 +365,18 @@ export type RetryRunCmd = {
   readonly startedAt: Instant;
   /** EnvConfig.maxAttempt(既定 3)。アプリ層が Project から渡す。 */
   readonly maxAttempt: number;
+  /**
+   * F-21: maxAttempt は AUTOMATIC retry の暴走止め。`manual:true`(人間が「再試行」を
+   * 明示的に押した)はこの cap を免除する — 人間の意図的な操作を上限で dead-end させない
+   * (ユーザー方針: 自動 retry には上限が要るが、人間からの retry は常に効くべき)。欠落=従来
+   * 動作(cap 適用)。
+   */
+  readonly manual?: boolean;
 };
 
 /**
  * retryRun: failed|stalled な Run から attempt+1 の新 Run を生成(元 Run は終端のまま履歴に残す)。
- * INV-6: 自動 retry なし(手動)。attempt は maxAttempt を超えない。
+ * INV-6: 自動 retry なし(手動)。attempt は maxAttempt を超えない(ただし manual は cap 免除 / F-21)。
  */
 export const retryRun = (
   cycle: Cycle,
@@ -363,7 +388,8 @@ export const retryRun = (
     return err("RunNotFailedOrStalled");
   }
   const nextAttempt = loc.run.attempt + 1;
-  if (nextAttempt > cmd.maxAttempt) return err("MaxAttemptExceeded");
+  // F-21: a human-initiated retry is never blocked by the auto-retry cap.
+  if (!cmd.manual && nextAttempt > cmd.maxAttempt) return err("MaxAttemptExceeded");
 
   const newRun: Run = {
     id: cmd.newRunId,
@@ -453,3 +479,74 @@ export const latestRun = (phase: Phase): Run | undefined =>
 /** 現在 running な Phase(高々 1。INV-2)。 */
 export const runningPhase = (cycle: Cycle): Phase | undefined =>
   cycle.phases.find((p) => p.state === "running");
+
+// ── US-08: reconstructPipeline ────────────────────────────────────
+
+/**
+ * 「着手済み(started)は固定、未着手(pending)だけを組み直す」操作(US-08 D-01)。
+ *
+ * 意味論:
+ * - started phase(state が pending 以外 = running/review/done)は一切変更しない。
+ * - pending phase は全て破棄し、newPendingSteps から新しい pending Phase 列を生成する。
+ *   各 Phase の order は「最後の started phase の order + 1」から連番。
+ *   stepDef snapshot は StepDef から写す(label/order/skillRef/contracts/instruction)。
+ * - newPendingSteps には 追加・削除・並べ替え・独自工程新設を表現できる(任意 id・任意順)。
+ *
+ * エラー:
+ * - newPendingSteps が空 → EmptyPipeline (全工程消し禁止)
+ * - 結果の step id に重複(started phase 分を含む全体で) → DuplicateStep
+ *
+ * INV-S2「phase 作成後不変」との関係:
+ *   INV-S2 は started(running/review/done)phase の凍結として解釈する。
+ *   pending phase の再構成は US-08 が導入する明示的例外であり、pending は
+ *   まだ実行されていないため不変原則の保護対象外と判断する(US-08 D-02)。
+ */
+export const reconstructPipeline = (
+  cycle: Cycle,
+  newPendingSteps: readonly StepDef[],
+): Result<Cycle, CycleError> => {
+  if (newPendingSteps.length === 0) return err("EmptyPipeline");
+
+  // 保持 phase: pending 以外 (running / review / done)
+  const startedPhases = cycle.phases.filter((p) => p.state !== "pending");
+
+  // 重複チェック: started の step id + newPendingSteps の id が全体で一意
+  const seenIds = new Set<string>(startedPhases.map((p) => p.step as string));
+  for (const s of newPendingSteps) {
+    const key = s.id as string;
+    if (seenIds.has(key)) return err("DuplicateStep");
+    seenIds.add(key);
+  }
+
+  // 新 pending phase の order ベース: 最後の started phase の order + 1(started が無ければ 0)
+  const baseOrder =
+    startedPhases.length === 0
+      ? 0
+      : Math.max(...startedPhases.map((p) => p.order)) + 1;
+
+  const newPendingPhases: Phase[] = newPendingSteps.map((s, i) => {
+    // StepDef → StepDefSnapshot(US-08: instruction を含む全フィールドを写す)
+    const snapshot: StepDefSnapshot = {
+      label: s.label,
+      order: baseOrder + i,
+      skillRef: s.skillRef,
+      ...(s.contracts !== undefined ? { contracts: s.contracts } : {}),
+      ...(s.instruction !== undefined ? { instruction: s.instruction } : {}),
+    };
+    return {
+      // Phase id の採番は app の責務(S6 D-04)。
+      // 再構成では stable な id を付与できないため、step id をベースにした仮 id を生成する。
+      // アプリ層が reconstructPipeline を呼ぶ前に phaseId を採番して渡す設計への拡張余地は残すが、
+      // ドメイン関数シグネチャは最小公倍数(US-08 スコープ)として step id 由来の id を使う。
+      // D-03: 既存の Phase.id はアプリ層が管理するため、新 pending は "new-<step>" と明示する。
+      id: `new-${s.id as string}` as PhaseId,
+      step: s.id,
+      order: baseOrder + i,
+      state: "pending" as PhaseState,
+      runs: [],
+      stepDef: snapshot,
+    };
+  });
+
+  return ok({ ...cycle, phases: [...startedPhases, ...newPendingPhases] });
+};

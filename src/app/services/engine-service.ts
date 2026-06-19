@@ -11,14 +11,18 @@
 //       allow-done    → raise visual_review (human approves the evaluator output)
 //       await-descope → advanceRun(stalled, reason)  [descope Qs already in inbox]
 //       auto-rework   → advanceRun(stalled, reason)  [Q-02: loud, not silent re-gen]
+//   RunStateChanged → "done" for a role-less S1 run → S1 確定 → auto-launch ONE
+//       reconstruction proposal run (US-08 AC-2). Fires on confirmation only, and
+//       never from a reconstruction run itself (recursion guard) — the live loop fix.
 //
-// Role-less runs (v0.0.1 single-run flow) get NO reaction — the applier's own
-// visual_review path handles them unchanged (backward compatible).
+// Role-less runs (v0.0.1 single-run flow) get NO ResultEmitted reaction — the
+// applier's own visual_review path handles them unchanged (backward compatible).
 import type { Ports } from "../ports/composition";
 import type { RunEmission, RunContext } from "../ports/orchestrator";
 import { EventApplier } from "./event-applier";
 import { compensateRun } from "./compensate";
 import { runDeterministicGate } from "./deterministic-gate";
+import { launchReconstructionForS1 } from "./reconstruction-launch";
 import {
   advanceRun,
   launchEval,
@@ -28,6 +32,7 @@ import {
 } from "../../domain/cycle/cycle";
 import { sameStep, type Step } from "../../domain/shared/vocab";
 import { resolveContracts, type StepContracts } from "../../domain/project/step-contracts";
+import { resolveContextPaths } from "./context-resolver";
 import { readPipeline, type Project } from "../../domain/project/project";
 import { lookupProfile, emptyProfile } from "../../domain/review/profile";
 import { evaluateCompleteness, type Requirement } from "../../domain/review/brief";
@@ -54,13 +59,28 @@ export class EngineService {
   // ── reactions ────────────────────────────────────────────────────
   private async react(emission: RunEmission): Promise<void> {
     const { ctx, event } = emission;
-    if (event.type !== "ResultEmitted") return;
     const cycle = this.ports.repos.cycles.findById(ctx.cycleId);
     if (!cycle) return;
-    const role = this.runRole(cycle, ctx.runId);
-    if (role === "generator") await this.onGeneratorResult(cycle, ctx, event);
-    else if (role === "evaluator") await this.onEvaluatorResult(cycle, ctx, event);
-    // role-less → handled by applier's legacy visual_review (no-op here).
+
+    if (event.type === "ResultEmitted") {
+      const role = this.runRole(cycle, ctx.runId);
+      if (role === "generator") await this.onGeneratorResult(cycle, ctx, event);
+      else if (role === "evaluator") await this.onEvaluatorResult(cycle, ctx, event);
+      // role-less ResultEmitted: the applier already raised the visual_review card.
+      // Reconstruction is NOT triggered here anymore — it fires only on S1 確定
+      // (RunStateChanged done) below, so it never runs during the pre-approval
+      // review-waiting state, and a reconstruction run's own role-less ResultEmitted
+      // can no longer re-trigger it (the live infinite-loop root cause).
+      return;
+    }
+
+    // US-08 AC-2: S1 確定 = the run reached `done`. The AI-emits-status:"done" path
+    // hits here; the human-approves-review path triggers the SAME shared launcher
+    // from InboxService.finalizeApprovedReview. The launcher is idempotent (DB
+    // proposal guard), so firing from both paths is safe and never self-recurses.
+    if (event.type === "RunStateChanged" && event.to === "done") {
+      await launchReconstructionForS1(this.ports, cycle, ctx.step, ctx.phaseId);
+    }
   }
 
   /**
@@ -80,9 +100,20 @@ export class EngineService {
       ? lookupProfile(contracts.output.profileKind)
       : emptyProfile("default");
 
+    // Unit-02 前段文脈注入: resolve prior-step artifact paths for the deterministic gate.
+    // These are the same paths that were passed as contextPaths at launch; the gate
+    // checks that the prior-step artifacts actually exist on disk before advancing.
+    const artifactPaths = project
+      ? resolveContextPaths({
+          cycle,
+          step: ctx.step,
+          repoPath: project.repoPath,
+        })
+      : this.artifactPaths();
+
     const gate = runDeterministicGate(
       profile,
-      { artifacts: this.artifactPaths(), blocks: event.blocks },
+      { artifacts: artifactPaths, blocks: event.blocks },
       this.ports.fs,
     );
     if (!gate.ok) {

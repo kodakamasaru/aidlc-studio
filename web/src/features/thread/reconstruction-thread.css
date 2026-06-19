@@ -1,0 +1,213 @@
+/* reconstruction-thread.css — SCR-02 工程の再構成モード(US-08 / D-05)
+ * recon-row / recon-tag / recon-dock / recon-disclosure / recon-modify
+ * class names mirror the S3 HTML mock's .recon-* / .tag-* classes.
+ */
+
+/* ── Step list ────────────────────────────────────────────────── */
+.recon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.recon-row {
+  display: flex;
+  align-items: center;
+  /* Allow the reason note to wrap onto its own full-width line (UX): a delete
+     reason is the human's basis for approving the removal, so it must be fully
+     readable — never truncated. */
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-body);
+  color: var(--color-text-hi);
+  border-bottom: 1px solid var(--color-line);
+  background: transparent;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.recon-row:last-child {
+  border-bottom: none;
+}
+
+/* Fixed (completed, locked) */
+.recon-row.recon-fixed {
+  background: var(--color-surface-2);
+  opacity: 0.7;
+}
+
+/* Deleted step */
+.recon-row.recon-deleted {
+  background: color-mix(in oklab, var(--color-stalled) 6%, transparent);
+}
+
+/* Added step */
+.recon-row.recon-added {
+  background: color-mix(in oklab, var(--color-running) 6%, transparent);
+}
+
+.recon-num {
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--color-text-low);
+  min-width: 1.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.recon-name {
+  flex: 1 1 auto;
+  font-size: var(--text-body);
+  font-weight: 500;
+}
+
+.recon-strike {
+  text-decoration: line-through;
+  color: var(--color-text-low);
+}
+
+/* Diff tags */
+.recon-tag {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  padding: 1px var(--sp-2);
+  border-radius: var(--radius-full);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tag-keep {
+  background: var(--color-surface-2);
+  color: var(--color-text-low);
+  border: 1px solid var(--color-line);
+}
+
+.tag-del {
+  background: color-mix(in oklab, var(--color-stalled) 14%, transparent);
+  color: var(--color-stalled);
+  border: 1px solid color-mix(in oklab, var(--color-stalled) 30%, transparent);
+}
+
+.tag-add {
+  background: color-mix(in oklab, var(--color-running) 12%, transparent);
+  color: var(--color-running);
+  border: 1px solid color-mix(in oklab, var(--color-running) 30%, transparent);
+}
+
+/* Reason / note text — full-width on its own line, wraps fully (never truncated).
+   The row uses flex-wrap, so flex-basis:100% pushes the note below name/tag; the
+   left indent aligns it under the step label (past the num column). */
+.recon-note {
+  font-size: var(--text-caption);
+  color: var(--color-text-mid);
+  flex: 1 1 100%;
+  padding-left: calc(1.5rem + var(--sp-3));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.recon-locked {
+  color: var(--color-text-low);
+  font-style: italic;
+}
+
+/* ── Rules disclosure ─────────────────────────────────────────── */
+.recon-disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.recon-disclosure__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: none;
+  border: none;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-low);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.recon-disclosure__toggle:hover {
+  color: var(--color-text-mid);
+  background: var(--color-surface-2);
+}
+
+.recon-disclosure__toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.recon-disclosure__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--color-surface-2);
+  border-left: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.recon-rule-item__name {
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--color-text-hi);
+  margin-bottom: var(--sp-1);
+}
+
+.recon-rule-item__body {
+  font-size: var(--text-micro);
+  color: var(--color-text-mid);
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  line-height: var(--leading-log);
+  max-height: 120px;
+  overflow-y: auto;
+  /* Contain scroll overflow (invariant: every overflow:auto container is
+   * position:relative — prevents leak to documentElement / focus-scroll jump). */
+  position: relative;
+}
+
+/* ── Footer dock ─────────────────────────────────────────────── */
+.recon-dock {
+  flex: 0 0 auto;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-line-strong);
+  padding: var(--sp-4) var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}
+
+/* ── Modify input row ─────────────────────────────────────────── */
+.recon-modify-row {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-end;
+}
+
+.recon-modify__input {
+  flex: 1 1 auto;
+  min-height: 56px;
+  font-size: var(--text-body);
+  resize: vertical;
+}
+
+.recon-modify__btn {
+  flex-shrink: 0;
+  align-self: flex-end;
+  white-space: nowrap;
+}

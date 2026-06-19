@@ -7,6 +7,7 @@ import type { Ports } from "../../../app/ports/composition";
 import { ProjectService } from "../../../app/services/project-service";
 import type { CreateProjectInput } from "../../../app/services/project-service";
 import type { StepContracts } from "../../../domain/project/step-contracts";
+import type { StepDef, SkillRef } from "../../../domain/project/project";
 import type { Text } from "../../../domain/shared/primitives";
 import { Step } from "../../../domain/shared/vocab";
 import { fail } from "../../../app/services/errors";
@@ -104,6 +105,67 @@ function parseStepContracts(body: unknown): StepContracts {
   };
 }
 
+// ── US-08: StepDef パーサー(pipeline エンドポイント用) ─────────────────────────────────
+
+// Step id は identifier 安全文字のみ(S1-S12 以外の独自工程 id も受け付けるが
+// シェルメタ文字・パス区切り・制御文字は弾く)。
+const STEP_DEF_ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** Validate and parse one element of the `steps` array from an untrusted JSON body. */
+function parsePipelineStepDef(raw: unknown, index: number): StepDef {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw fail(400, `InvalidField:steps[${index}]`);
+  }
+  const b = raw as Record<string, unknown>;
+
+  const idRaw = b["id"];
+  if (typeof idRaw !== "string" || !STEP_DEF_ID_RE.test(idRaw.trim())) {
+    throw fail(400, `MissingField:steps[${index}].id`);
+  }
+  const labelRaw = b["label"];
+  if (typeof labelRaw !== "string" || labelRaw.trim().length === 0) {
+    throw fail(400, `MissingField:steps[${index}].label`);
+  }
+  const orderRaw = b["order"];
+  if (typeof orderRaw !== "number" || !Number.isInteger(orderRaw) || orderRaw < 0) {
+    throw fail(400, `MissingField:steps[${index}].order`);
+  }
+  const skillRefRaw = b["skillRef"];
+  if (typeof skillRefRaw !== "string" || skillRefRaw.trim().length === 0) {
+    throw fail(400, `MissingField:steps[${index}].skillRef`);
+  }
+  const instructionRaw = b["instruction"];
+  const instruction =
+    typeof instructionRaw === "string" && instructionRaw.trim().length > 0
+      ? (instructionRaw.trim() as Text)
+      : undefined;
+
+  return {
+    id: Step(idRaw.trim()),
+    label: labelRaw.trim() as Text,
+    order: orderRaw,
+    skillRef: skillRefRaw.trim() as SkillRef,
+    ...(instruction !== undefined ? { instruction } : {}),
+  };
+}
+
+/** Parse and validate the `steps` array for the pipeline replacement endpoint. */
+function parsePipelineStepDefs(body: Record<string, unknown>): readonly StepDef[] {
+  const raw = body["steps"];
+  if (!Array.isArray(raw)) throw fail(400, "MissingField:steps");
+  if (raw.length === 0) throw fail(400, "EmptyPipeline");
+  const defs = raw.map((item, i) => parsePipelineStepDef(item, i));
+  const seen = new Set<string>();
+  for (const d of defs) {
+    const key = d.id as string;
+    if (seen.has(key)) throw fail(409, "DuplicateStep");
+    seen.add(key);
+  }
+  return defs;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const SKILLS_DIR = "kit/skills";
 const STEP_RE = /^S\d+(?:\.\d+)?$/;
 
@@ -198,6 +260,20 @@ export function projectRoutes(ports: Ports): Hono {
   app.get("/api/steps/:step/skill", (c) => {
     const result = readStepSkill(c.req.param("step"));
     return ok(c, result ?? { skill: null, content: "" });
+  });
+
+  // US-08 (AC-7): グローバル既定パイプラインを任意の StepDef 列で全置換する。
+  // body: { steps: StepDef[] } — id/label/order/skillRef required per element.
+  // Returns the updated Project. Errors: 400 EmptyPipeline / 409 DuplicateStep /
+  // 404 ProjectNotFound.
+  app.post("/api/projects/:projectId/pipeline", async (c) => {
+    const body = await readJson(c);
+    const steps = parsePipelineStepDefs(body);
+    const project = service.replaceProjectPipeline(
+      c.req.param("projectId"),
+      steps,
+    );
+    return ok(c, project);
   });
 
   return app;

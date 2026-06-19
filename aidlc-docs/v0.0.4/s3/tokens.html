@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tokens — S3 視覚カタログ / v0.0.4</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <section data-state="catalog" class="cat">
+      <h1>視覚トークン — v0.0.4 S3</h1>
+      <div class="sub">
+        web/src/styles/tokens.css と一致。dark-first / border-led 階層 / indigo+violet
+        アクセント / 状態色は意味で割り当て。
+      </div>
+
+      <h2>サーフェス(4 段の深さ)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#09090b"></div><div class="nm">bg</div><div class="hx">#09090b</div></div>
+        <div class="sw"><div class="chip" style="background:#131316"></div><div class="nm">surface</div><div class="hx">#131316</div></div>
+        <div class="sw"><div class="chip" style="background:#1a1a20"></div><div class="nm">surface-2</div><div class="hx">#1a1a20</div></div>
+        <div class="sw"><div class="chip" style="background:#212129"></div><div class="nm">surface-3</div><div class="hx">#212129</div></div>
+        <div class="sw"><div class="chip" style="background:#26262d"></div><div class="nm">line</div><div class="hx">#26262d</div></div>
+        <div class="sw"><div class="chip" style="background:#34343d"></div><div class="nm">line-strong</div><div class="hx">#34343d</div></div>
+      </div>
+
+      <h2>テキスト(3 段)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#ededf0"></div><div class="nm">text-hi</div><div class="hx">#ededf0</div></div>
+        <div class="sw"><div class="chip" style="background:#9a9aa4"></div><div class="nm">text-mid</div><div class="hx">#9a9aa4</div></div>
+        <div class="sw"><div class="chip" style="background:#8b8b96"></div><div class="nm">text-low</div><div class="hx">#8b8b96</div></div>
+      </div>
+
+      <h2>アクセント(indigo + violet)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#6366f1"></div><div class="nm">primary</div><div class="hx">#6366f1</div></div>
+        <div class="sw"><div class="chip" style="background:#7c7ff5"></div><div class="nm">primary-hover</div><div class="hx">#7c7ff5</div></div>
+        <div class="sw"><div class="chip" style="background:#a78bfa"></div><div class="nm">violet</div><div class="hx">#a78bfa</div></div>
+      </div>
+
+      <h2>状態色(run / inbox 種別)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#2dd4bf"></div><div class="nm">running</div><div class="hx">#2dd4bf</div></div>
+        <div class="sw"><div class="chip" style="background:#f59e0b"></div><div class="nm">stalled</div><div class="hx">#f59e0b</div></div>
+        <div class="sw"><div class="chip" style="background:#22c55e"></div><div class="nm">done</div><div class="hx">#22c55e</div></div>
+        <div class="sw"><div class="chip" style="background:#ef4444"></div><div class="nm">failed</div><div class="hx">#ef4444</div></div>
+        <div class="sw"><div class="chip" style="background:#818cf8"></div><div class="nm">q (質問)</div><div class="hx">#818cf8</div></div>
+        <div class="sw"><div class="chip" style="background:#c084fc"></div><div class="nm">review</div><div class="hx">#c084fc</div></div>
+      </div>
+
+      <h2>状態の見え方(pill / badge)</h2>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+        <span class="pill running"><span class="dot"></span>実行中</span>
+        <span class="pill hearing"><span class="dot"></span>ヒアリング中</span>
+        <span class="pill done"><span class="dot"></span>完了</span>
+        <span class="pill stalled"><span class="dot"></span>行き詰まり</span>
+        <span class="badge q">? 質問</span>
+        <span class="badge review">◎ できあがりの確認</span>
+      </div>
+
+      <h2>タイポグラフィ</h2>
+      <div class="type-row"><span class="lab">display 28/700</span><span style="font-size:1.75rem;font-weight:700;letter-spacing:-0.02em">対応待ち(Inbox)</span></div>
+      <div class="type-row"><span class="lab">h1 20/600</span><span style="font-size:1.25rem;font-weight:600;letter-spacing:-0.01em">S1 要件ヒアリング</span></div>
+      <div class="type-row"><span class="lab">h2 16/600</span><span style="font-size:1rem;font-weight:600">会話スレッド</span></div>
+      <div class="type-row"><span class="lab">body 14</span><span style="font-size:0.875rem">対象ユーザーの範囲を確認したい</span></div>
+      <div class="type-row"><span class="lab">caption 12.5</span><span style="font-size:0.78rem;color:#9a9aa4">サイクル v0.0.5 / 2 分前</span></div>
+      <div class="type-row"><span class="lab">mono</span><span style="font-family:var(--font-mono);font-size:0.78rem;color:#a78bfa">【質問 1】 まとめて回答</span></div>
+
+      <h2>余白(4px ベース)</h2>
+      <div class="space-row"><span class="lab">sp-1 4</span><span class="bar" style="width:4px"></span></div>
+      <div class="space-row"><span class="lab">sp-2 8</span><span class="bar" style="width:8px"></span></div>
+      <div class="space-row"><span class="lab">sp-3 12</span><span class="bar" style="width:12px"></span></div>
+      <div class="space-row"><span class="lab">sp-4 16</span><span class="bar" style="width:16px"></span></div>
+      <div class="space-row"><span class="lab">sp-5 20</span><span class="bar" style="width:20px"></span></div>
+      <div class="space-row"><span class="lab">sp-6 24</span><span class="bar" style="width:24px"></span></div>
+      <div class="space-row"><span class="lab">sp-7 32</span><span class="bar" style="width:32px"></span></div>
+
+      <h2>radius / shadow / motion</h2>
+      <div class="shadow-demo">
+        <div class="b" style="border-radius:6px">radius-sm 6</div>
+        <div class="b" style="border-radius:8px">radius-md 8</div>
+        <div class="b" style="border-radius:12px">radius-lg 12</div>
+        <div class="b" style="box-shadow:0 1px 2px rgba(0,0,0,0.4)">shadow-card</div>
+        <div class="b" style="box-shadow:0 12px 32px rgba(0,0,0,0.55)">shadow-popover</div>
+      </div>
+      <div class="sub" style="margin-top:16px">
+        motion: fast 150ms / panel 200ms / ease-out / ease-out-expo
+        cubic-bezier(0.16,1,0.3,1)。アニメーションは transform / opacity のみ。
+      </div>
+
+      <h2>ボタン</h2>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <button class="btn primary">送信して再開 <span class="kbd">⌘⏎</span></button>
+        <button class="btn">差し戻し</button>
+        <button class="btn ghost">会話で直す →</button>
+      </div>
+    </section>
+  </body>
+</html>
