@@ -29,7 +29,7 @@ S7 ドメインコード + S8 統合コードが、**ユーザーストーリー
 |------|------|
 | 入力 | `aidlc-docs/{version}/s8-integration.md` + `aidlc-docs/{version}/s1/` US + `aidlc-docs/{version}/s3/` 画面 screenshot + `src/` 統合コード |
 | 出力 | (1) E2E テストコード: `tests/e2e/` 配下 / (2) 視覚証拠: `aidlc-docs/{version}/s9/screenshots/` + `videos/`(必要時) / (3) 進行ログ: `aidlc-docs/{version}/s9-validation.md` |
-| 完了条件 | (1) 全 US に少なくとも 1 つのシナリオテストがある / (2) 全受け入れ基準がテストでカバーされている / (3) 視覚証拠を **S3 の全状態インベントリ起点で突合**(`s3/screenshots/*.png` の 1 枚 = 1 行を全件列挙してから検証。**撮れた screenshot 起点では未実装画面が diff に現れず取りこぼす**)。各状態に `一致/乖離/未実装` を付け、乖離・未実装は honest に記録して S10 へ渡す / (4) 未解決の CRITICAL バグがゼロ / (5) テスト結果が md に記録されている |
+| 完了条件 | (1) 全 US に少なくとも 1 つのシナリオテストがある / (2) 全受け入れ基準がテストでカバーされている / (3) 視覚証拠を **S3 の全状態インベントリ起点で突合**(`s3/screenshots/*.png` の 1 枚 = 1 行を全件列挙してから検証。**撮れた screenshot 起点では未実装画面が diff に現れず取りこぼす**)。各状態に `一致/乖離/未実装` を付け、乖離・未実装は honest に記録して S10 へ渡す / (4) 未解決の CRITICAL バグがゼロ / (5) テスト結果が md に記録されている / (6) **live 縦経路 e2e を 1 本完走**(v0.0.4 S11 P36/IMP1 / operating-model Rule C): 使い捨てリポ([[test-projects-use-throwaway-repo]])で実 AI を `launch→質問→回答→resume→レビュー→承認` まで実フロー走破し、各 human-gate を実際に通す。**決定論テスト + mock E2E が緑でも、この live 縦経路が未完走なら S9 を `確定` にできない**(決定論/mock は composition-root に mock 注入するため live/headless 経路を構造的に盲点にする = v0.0.4 で 22 バグが人間の最終ゲートに集中した真因)。検出方法を併記して記録する(「opportunistic な手動で 0」と「systematic な live 縦経路網羅で 0」を区別)。**この完了条件の機械的強制(live 証拠が無ければ done 不可の hard-gate)は v0.0.5 IMP1。テキスト規範だけでは deferral される実績があるため、IMP1 完成までは AI 自身が毎 S9 で必ず手動完走する** |
 
 ## 進め方
 

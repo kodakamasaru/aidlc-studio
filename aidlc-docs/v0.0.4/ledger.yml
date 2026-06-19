@@ -136,12 +136,12 @@
     具体 = ①human=ダブルチェックの未認識 ②US/mock を勝手に descope ③S1–S3 の想定未把握
     ④正本未読 ⑤mock 注入で未実装能力を糊塗 ⑥産物起点で網羅漏れ ⑦worker の緑を未検証で外注
     ⑧機能実証を主成果にし mock 突合を後回し ⑨手戻り判定の不一致。
-  state: carried
-  into: v0.0.4/s11-retrospective.md   # 本サイクルの S11 で必ず Problem/Try として根本原因分析する
-  reason: >
-    詳細・Problem 表・Try(再発防止 T1〜T5)は aidlc-docs/v0.0.4/s11-retrospective.md の
-    「先取りプロセス問題メモ」に記録済。S11 はこのファイルを最優先で取り込み分析すること。
-    メモリ機構は信用しない方針のため、決定論的に必ず読まれる場所(S11 出力ファイル + 本台帳)に二重化。
+  state: done
+  closed_in: >
+    2026-06-20 S11 本実行で取り込み完了。P1〜P9(+ 発生時追補 P10〜P35 / Try T1〜T38)を
+    Problem として根本原因分析し、Keep/Try/改善提案に集約。中心所見「バグ多すぎ」の正体 =
+    検出が自動ゲート(S9=3件)を全てすり抜け人間の最終ゲート(S10=22件)に集中、を定量化。
+    s11-retrospective.md ステータス=確定。
 
 - id: F3-project-management-ui
   origin: v0.0.4/s10-acceptance.md   # S10 実機レビュー(2026-06-14)で発見
@@ -199,3 +199,102 @@
     テスト環境(seeded cycle-state fixtures)の構築は v0.0.4 の US-01〜08 範囲外。ユーザー判断で
     「作るのは次サイクル以降でよい / 今サイクルは US-05 完了バナーをモック描画確認で承認」。
     次サイクルでこの env を用意し、US-05 完了バナーの実 backend 到達(+他の高コスト状態)を低コストに実証する。
+
+# ── S11(Retrospective)が新規提起した改善提案(2026-06-20)。S12 がワークフローへ反映 ──
+
+- id: S11-IMP1-live-evidence-hard-gate
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #1(最優先 / P36 で真因是正後)
+  decision: >
+    真因(P36 / ユーザー指摘で是正)= 人間が初日から繰り返し「live で確認せよ」と明示指示し責務契約も
+    焼き込み済みなのに、AI が毎回 live を S10 まで deferral した = 盲点でなく不遵守(compliance)。
+    soft な指示・契約追加では行動が変わらないと本サイクルで実証(契約を焼いた直後に同じ逆転が再発)。
+    対策は「契約/S9 にもう一文足す」でなく deferral を物理的に不能にする 3 点:
+    (a) 機械ハードゲート = 各技術 step の done を「live 証拠アーティファクト(実 backend 縦経路ログ +
+    配信 screenshot)の存在」で機械検証し、無ければ done 不可(自己申告でなく物理前提)。
+    (b) live を安くする = seeded states + backend --watch + verify:shot/visual を毎 step 自動実行し
+    deferral の経済的理由を消す。(c) per-step live = S10 を待たず各 step 完了時に当該 step の live 縦断を
+    1本走らせ、人間が S10 で初めて live を踏む end-loaded 構造を解体する。
+    注: 各 step に live 実行コストを課す運用変更は事業判断の要素を含むため S12 で人間に確認。
+  lineage: >
+    ★これは新規でなく再発: v0.0.3 S11 改善提案 #4 `S11-P04-evaluator-mechanical-gate`
+    (確定前 evaluator を hook/CI で機械強制)が同じ機械ゲート思想。v0.0.3→v0.0.4 carried →
+    v0.0.4 S1 D-01 で「インフラゆえ後回し」と v0.0.5 へ再 point → v0.0.4 はゲート無しで走り 22 バグ。
+    本 IMP1 は1サイクル遅れの再発明(s11 P37/P38)。
+  escalation: >
+    ★3度目の defer 禁止(T41): 構造/インフラ改善は backlog だと毎回後回しされる(P38 実証)。
+    v0.0.5 では本項目を **backlog でなく first-class US として commit** すること。
+    同じ提案が2サイクル連続 carried = 自動 escalate(US 化必須)を改善提案制度に追加(T41/T42)。
+  scope_v005: >
+    ★ユーザー承認(2026-06-20)で IMP1 に以下を含める:
+    (a) **ledger モデル再設計**: 現状は版数ごと `aidlc-docs/{vX}/ledger.yml` を「次サイクルが pull」する
+    単一ホップ・soft 設計で、未解決提案が 1 サイクルごとに AI の視界から落ちる(P37 の機械的原因)。
+    → **ルート単一 append-only 台帳** `aidlc-docs/ledger.yml`(brief.md と同じ全版共通)に変更し、
+    未解決項目を版を跨いで常に保持。context-resolver Section 6 注入を「現サイクル + ルート台帳」にして
+    **全サイクル横断が機械的に効く**ようにする。
+    (b) **reconcile のコード化**: 現状 reconcile ゲートはテキスト規約のみでコード強制ゼロ。
+    前(全)サイクルの未解決 + escalation 付き項目が次サイクルで US 化されていなければ S1 を fail させる
+    script/hook を実装(live 証拠ハードゲートと同じ「テキスト→機械」転換)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    step done 定義 + ハーネス(機械ゲート/安価 live/per-step)への反映は S12(ワークフロー改善)+
+    v0.0.5 本体の仕事。土台は [TEST-ENV-seeded-cycle-states] / [AUTO-ORCH-durable-self-healing] と共用。
+    v0.0.3 `S11-P04` の事実上の後継(lineage 参照)。
+
+- id: S11-IMP2-binding-rule-delivery-checklist
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #2
+  decision: >
+    binding ルールがリンク参照止まりで headless に届かない事故が反復(F-6/7/10/11/14/16 / P11/P12/P14/P16)。
+    新しい kit/rules/*.md 追加時に「どの注入点で headless AI に本文が届くか」を probe test 付きで
+    必須化するチェックリストを operating-model に明記する。
+  state: carried
+  into: v0.0.5
+  reason: operating-model への明文化 + probe test テンプレ整備は S12/次サイクルで実施。
+
+- id: S11-IMP5-retro-metrics-autocollect
+  origin: v0.0.4/s11-retrospective.md   # S11 改善提案 #5
+  decision: >
+    Q&A 件数・Step 別所要・バグ検出ゲート分布を tally する仕組みが無く S11 で手作業再構成した。
+    run/HumanTask store から検出ゲート別バグ・Step 別所要・Q&A 件数を自動集計するレポートを作り
+    S11 入力に供給する。
+  state: carried
+  into: v0.0.5
+  reason: メトリクス自動収集基盤の実装は v0.0.4 範囲外。次サイクル housekeeping/自走基盤と併せて。
+
+# ── S11/S12 の確定 D-NN 台帳化(2026-06-20 / クローズ要件)──
+
+- id: S11-D01
+  origin: v0.0.4/s11-retrospective.md
+  decision: "「バグ多すぎ」を検出ゲート別バグ件数(S9=3/S10=22)で定量化し見出し所見に置いた(矮小化しない)。"
+  state: done
+  closed_in: v0.0.4/s11-retrospective.md
+
+- id: S11-D02
+  origin: v0.0.4/s11-retrospective.md
+  decision: "個票 P1〜P41/T1〜T44 を保持し、Keep/Problem/Try/改善提案は「バグ多すぎ」直結クラスへ集約編成。"
+  state: done
+  closed_in: v0.0.4/s11-retrospective.md
+
+- id: S11-D03
+  origin: v0.0.4/s11-retrospective.md
+  decision: "改善提案 #1(live 縦経路の機械ハードゲート)を最優先と判定。運用コストは事業判断ゆえ S12 Q-01 へ。"
+  state: done
+  closed_in: v0.0.4/s12-improvement.md   # Q-01 で承認(必達ゲート + IMP1 US化)
+
+- id: S12-D01
+  origin: v0.0.4/s12-improvement.md
+  decision: "S12 の最大貢献を『構造改善を次サイクル US 化させる escalation 則自体をテキストで焼く』と定めた(operating-model Rule E + ledger 規約)。P38 の自己再演を防ぐ。"
+  state: done
+  closed_in: kit/rules/aidlc-operating-model.md + kit/rules/ledger.md
+
+- id: S12-D02
+  origin: v0.0.4/s12-improvement.md
+  decision: "live 縦経路 e2e を S9 完了条件(6)= 毎サイクル必達ハードゲート化(テキスト+手動)。機械強制は v0.0.5 IMP1。"
+  state: done
+  closed_in: kit/skills/aidlc-s9-scenario-validation/SKILL.md   # Q-01 で必達を承認
+
+- id: S12-D03
+  origin: v0.0.4/s12-improvement.md
+  decision: "carried 9 件を into: v0.0.5 で残し、自サイクル(into: v0.0.4)carried ゼロをもって CLOSE 可能と判定(established / v0.0.3 S12 D-03 と同一)。"
+  state: done
+  closed_in: v0.0.4/s12-improvement.md
