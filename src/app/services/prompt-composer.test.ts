@@ -96,6 +96,17 @@ describe("PromptComposer — operating-model injection (headless parity)", () =>
     expect(prompt.indexOf(OPMODEL_MARK)).toBeLessThan(prompt.indexOf(SKILL_MARK));
   });
 
+  test("composeReconstruction(feedback): 再提案フィードバックがプロンプトに注入される (US-08 会話で修正)", () => {
+    const composer = new PromptComposer(fsWith());
+    const plain = composer.composeReconstruction(REPO);
+    const revised = composer.composeReconstruction(REPO, "タイトルを mock に変えて");
+    // 初回(feedback なし)は修正指示セクションを出さない。
+    expect(plain).not.toContain("人間からの修正指示");
+    // 再提案(feedback あり)はフィードバック全文を最優先セクションとして注入する。
+    expect(revised).toContain("人間からの修正指示");
+    expect(revised).toContain("タイトルを mock に変えて");
+  });
+
   test("運用モデル不在 → 可視マーカー(silent fallback しない / 原則④)", () => {
     const composer = new PromptComposer(fsWith({ omitOperatingModel: true }));
     const prompt = composer.compose({ role: "generator", step: Step("S1"), repoPath: REPO });

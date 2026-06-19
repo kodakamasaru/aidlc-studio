@@ -151,6 +151,16 @@ export function cycleRoutes(ports: Ports): Hono {
     return ok(c, cycle);
   });
 
+  // US-08 会話で修正: 人間のフィードバックで再構成を再提案させる(再構成 run を再起動)。
+  // body: { feedback: string }。空なら 400 EmptyReproposeFeedback。新しい提案は非同期で
+  // emit され、web は GET /reconstruction-proposal を polling して差分を検知する。
+  app.post("/api/cycles/:cycleId/reconstruct/repropose", async (c) => {
+    const body = (await readJson(c)) as { feedback?: unknown };
+    const feedback = typeof body?.feedback === "string" ? body.feedback : "";
+    await service.reproposeReconstruction(c.req.param("cycleId"), feedback);
+    return ok(c, { reproposed: true });
+  });
+
   // US-08: AI が生成したパイプライン再構成提案を取得する。
   // S1 確定後に scripted/live オーケストレータが ReconstructionProposalEmitted を emit し、
   // EventApplier が reconstruction_proposals テーブルに保存したものを返す。

@@ -295,18 +295,40 @@ export const parseQuestionBlock = (text: string): Result<AidlcQuestion[] | null,
     return err({ code: "bad-json", detail });
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !Array.isArray((parsed as Record<string, unknown>)["questions"])
+  // S10 F-20: accept the three shapes a live model naturally emits for an
+  // ```aidlc-question``` block, not only the {questions:[...]} wrapper:
+  //   (a) {questions:[...]}        — the documented wrapper
+  //   (b) [ {...}, {...} ]         — a bare array of questions
+  //   (c) { id, prompt, options }  — a bare SINGLE question object
+  // (c) is what the contract's "aidlc-question schema: id/prompt/..." wording
+  // invites, and was the real S3 stall: the old parser demanded the wrapper and
+  // rejected the bare object → malformed → retried 3× into the same shape. Being
+  // strict here broke valid-intent output (F-13/T20 class); normalize instead.
+  let rawQuestions: unknown[];
+  if (Array.isArray(parsed)) {
+    rawQuestions = parsed;
+  } else if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    Array.isArray((parsed as Record<string, unknown>)["questions"])
   ) {
+    rawQuestions = (parsed as Record<string, unknown>)["questions"] as unknown[];
+  } else if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "id" in (parsed as Record<string, unknown>) &&
+    "prompt" in (parsed as Record<string, unknown>)
+  ) {
+    // Bare single question object.
+    rawQuestions = [parsed];
+  } else {
     return err({
       code: "schema",
-      detail: "aidlc-question block must parse to { questions: AidlcQuestion[] }",
+      detail:
+        "aidlc-question block must parse to { questions: AidlcQuestion[] }, " +
+        "a bare AidlcQuestion[] array, or a single { id, prompt, ... } question object",
     });
   }
-
-  const rawQuestions = (parsed as Record<string, unknown>)["questions"] as unknown[];
   const questions: AidlcQuestion[] = [];
 
   for (const raw of rawQuestions) {
@@ -502,10 +524,24 @@ const validateReconstructionStep = (
   if (typeof s["label"] !== "string" || s["label"].length === 0) {
     return err({ code: "schema", detail: `steps[${index}].label must be a non-empty string` });
   }
-  if (typeof s["order"] !== "number" || !Number.isInteger(s["order"]) || s["order"] < 0) {
+  // S10 F-13(recon): a `diff:"delete"` step is FILTERED OUT before the pipeline is
+  // applied (web sends only non-delete steps to applyCycleReconstruction) and renders
+  // as ✕ with no position — so its `order` is never consumed. Models naturally encode
+  // a removed step with a sentinel (e.g. order:-1); requiring ≥ 0 there rejects an
+  // otherwise-valid proposal and dumps the raw envelope to the human. So delete steps
+  // need `order` to be an integer (type safety) but NOT non-negative. Non-delete steps
+  // (their order DOES drive the pipeline sort) keep the ≥ 0 requirement.
+  const isDelete = s["diff"] === "delete";
+  if (
+    typeof s["order"] !== "number" ||
+    !Number.isInteger(s["order"]) ||
+    (!isDelete && s["order"] < 0)
+  ) {
     return err({
       code: "schema",
-      detail: `steps[${index}].order must be a non-negative integer`,
+      detail: isDelete
+        ? `steps[${index}].order must be an integer`
+        : `steps[${index}].order must be a non-negative integer`,
     });
   }
   if (typeof s["skillRef"] !== "string" || s["skillRef"].length === 0) {

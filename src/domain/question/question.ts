@@ -80,6 +80,17 @@ export type QuestionPayload =
   // summary は受信箱カードのタイトル描画に使う(1行・人間語)。
   | { readonly kind: "reconstruction"; readonly summary: Text };
 
+/**
+ * US-08 / S10: 再構成カードのタイトル文言は run の進捗で 2 段階。単一の正本としてここに
+ * 置き、ゲートカード(reconstruction-launch)と提案到着(event-applier)で共有する。
+ *  - PENDING: run 実行中。まだ提案が無い → 確認を促してはならない(矛盾文言禁止)。
+ *  - READY  : ReconstructionProposalEmitted 受信後 → 確認・承認を促す。
+ */
+export const RECONSTRUCTION_PENDING_SUMMARY =
+  "工程の再構成 — AI が工程を組み直しています…" as Text;
+export const RECONSTRUCTION_READY_SUMMARY =
+  "工程の再構成提案が届きました — 確認して承認してください" as Text;
+
 export type Question = {
   readonly id: QuestionId;
   readonly runId: RunId;

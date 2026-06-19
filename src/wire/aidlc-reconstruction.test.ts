@@ -139,6 +139,31 @@ describe("validateReconstructionProposal", () => {
     }
   });
 
+  // S10 F-13(recon): a deleted step is filtered out before apply and rendered as ✕
+  // (no position), so its `order` is never consumed. Models naturally encode a removed
+  // step with a sentinel (order:-1) — that must NOT reject the whole proposal (which
+  // would dump the raw envelope to the human). Reproduces the real S10 S2 failure.
+  test("delete step with negative order (sentinel) -> ok (order unused downstream)", () => {
+    const result = validateReconstructionProposal(
+      makeProposal({
+        steps: [
+          makeStep({ id: "S2", label: "画面", order: 0, diff: "keep" }),
+          makeStep({ id: "S4", label: "技術仕様", order: -1, diff: "delete", reason: "この案件には技術的難所がない" }),
+          makeStep({ id: "S5", label: "開発単位", order: 1, diff: "current" }),
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  test("NON-delete step with negative order still -> err schema (order drives the pipeline sort)", () => {
+    const result = validateReconstructionProposal(
+      makeProposal({ steps: [makeStep({ order: -1, diff: "add" })] }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.detail.toLowerCase()).toContain("non-negative");
+  });
+
   test("step with invalid diff -> err schema", () => {
     const result = validateReconstructionProposal(
       makeProposal({ steps: [makeStep({ diff: "modify" as "keep" })] }),

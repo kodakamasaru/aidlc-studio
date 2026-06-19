@@ -256,6 +256,29 @@ describe("resumeRun vs retryRun (cycle Q-02)", () => {
       retryRun(c, { runId: RunId("r1"), newRunId: RunId("x"), startedAt: at(3), maxAttempt: 1 }),
     ).toEqual({ ok: false, error: "MaxAttemptExceeded" });
   });
+
+  // S10 実機 F-21: maxAttempt は AUTO retry の暴走止め。人間が明示的に押す「再試行」は
+  // それで dead-end してはいけない(ユーザー: 「自動なら上限いるが私からも retry できないのは変」)。
+  // manual:true は cap を免除する(人間が governor)。
+  test("retryRun manual:true bypasses maxAttempt (human is the governor / F-21)", () => {
+    let c = unwrap(
+      startPhase(fresh(), { step: Step("S5"), runId: RunId("r1"), startedAt: at(1) }),
+    );
+    c = unwrap(advanceRun(c, { runId: RunId("r1"), to: "stalled", at: at(2) }));
+    // attempt 1 → would be MaxAttemptExceeded at maxAttempt:1, but manual bypasses it.
+    const res = retryRun(c, {
+      runId: RunId("r1"),
+      newRunId: RunId("r1b"),
+      startedAt: at(3),
+      maxAttempt: 1,
+      manual: true,
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      const s5 = res.value.phases[0]!;
+      expect(latestRun(s5)).toMatchObject({ attempt: 2, state: "running" });
+    }
+  });
 });
 
 describe("approvePhase (INV-10: review gate)", () => {

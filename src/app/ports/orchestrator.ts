@@ -50,6 +50,14 @@ export interface RunLaunch {
    * phase snapshot (cycle). Omitted for non-hearing runs (backward compat).
    */
   readonly hearingScope?: string;
+  /**
+   * US-08 会話で修正: when re-launching a reconstruction (hearingScope="reconstruction")
+   * because the human asked to revise the proposal, this carries their free-text
+   * feedback. The composer injects it so the AI re-proposes taking the feedback into
+   * account; the scripted adapter emits a revised proposal. Omitted on the first
+   * (auto) reconstruction launch.
+   */
+  readonly reconstructionFeedback?: string;
 }
 
 /**

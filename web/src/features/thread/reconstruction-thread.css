@@ -16,7 +16,11 @@
 .recon-row {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  /* Allow the reason note to wrap onto its own full-width line (UX): a delete
+     reason is the human's basis for approving the removal, so it must be fully
+     readable — never truncated. */
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--text-body);
   color: var(--color-text-hi);
@@ -94,15 +98,16 @@
   border: 1px solid color-mix(in oklab, var(--color-running) 30%, transparent);
 }
 
-/* Reason / note text */
+/* Reason / note text — full-width on its own line, wraps fully (never truncated).
+   The row uses flex-wrap, so flex-basis:100% pushes the note below name/tag; the
+   left indent aligns it under the step label (past the num column). */
 .recon-note {
   font-size: var(--text-caption);
   color: var(--color-text-mid);
-  flex-shrink: 0;
-  max-width: 40%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1 1 100%;
+  padding-left: calc(1.5rem + var(--sp-3));
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .recon-locked {

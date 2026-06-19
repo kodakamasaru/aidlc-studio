@@ -207,6 +207,13 @@ export class CycleService {
   async startPhase(cycleIdRaw: string, stepRaw: string): Promise<Cycle> {
     const cycleId = CycleId(cycleIdRaw);
     const cycle = this.loadCycle(cycleId);
+    // F-17 gate: while a reconstruction proposal is unresolved (open card), the next
+    // step must not start — the human tailors the pipeline first (要件→ステップ構成→後続).
+    // Reconstruction cards only exist post-S1, so starting S1 itself is unaffected.
+    const openReconstruction = this.ports.repos.questions
+      .listByCycle(cycleId)
+      .some((q) => q.state === "open" && q.kind === "reconstruction");
+    if (openReconstruction) throw fail(409, "ReconstructionPending");
     const project = this.loadProject(cycle.projectId);
     const step = Step(stepRaw);
     const runId = this.ports.ids.runId();
@@ -564,6 +571,35 @@ export class CycleService {
     return this.ports.repos.reconstructionProposals.find(CycleId(cycleIdRaw));
   }
 
+  /**
+   * US-08 会話で修正: re-launch the reconstruction run with the human's free-text
+   * feedback so the AI re-proposes the pipeline taking it into account. Unlike the
+   * auto S1-確定 trigger (launchReconstructionForS1), this is an EXPLICIT human action,
+   * so it intentionally bypasses the "proposal already exists" idempotency guard — a
+   * fresh proposal will upsert over the old one and the web polls until it changes.
+   * Non-blocking: returns once the run is spawned (the new proposal arrives async).
+   */
+  async reproposeReconstruction(cycleIdRaw: string, feedback: string): Promise<void> {
+    const trimmed = feedback.trim();
+    if (trimmed.length === 0) throw fail(400, "EmptyReproposeFeedback");
+    const cycleId = CycleId(cycleIdRaw);
+    const cycle = this.loadCycle(cycleId);
+    const project = this.loadProject(cycle.projectId);
+    const s1Phase = cycle.phases.find((p) => sameStep(p.step, "S1" as Step));
+    const phaseId = s1Phase?.id ?? cycle.phases[0]?.id;
+    if (phaseId === undefined) throw fail(409, "ReproposeNoPhase");
+    await this.ports.orchestrator.launch({
+      runId: this.ports.ids.runId(),
+      projectId: cycle.projectId,
+      cycleId,
+      phaseId,
+      step: "S1" as Step,
+      repoPath: project.repoPath,
+      hearingScope: "reconstruction",
+      reconstructionFeedback: trimmed,
+    });
+  }
+
   async retryRun(cycleIdRaw: string, runIdRaw: string): Promise<Cycle> {
     const cycleId = CycleId(cycleIdRaw);
     const cycle = this.loadCycle(cycleId);
@@ -576,6 +612,10 @@ export class CycleService {
       newRunId,
       startedAt: this.ports.clock.now(),
       maxAttempt: project.env.maxAttempt,
+      // F-21: this entrypoint is the human pressing 再試行 (POST /runs/:id/retry).
+      // The attempt cap bounds AUTOMATIC retries; a deliberate human retry must
+      // never dead-end. Mark it manual so the cap is bypassed.
+      manual: true,
     });
     if (isErr(retried)) throw cycleErrorStatus(retried.error);
     const next = retried.value;

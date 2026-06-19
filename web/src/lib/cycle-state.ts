@@ -20,6 +20,32 @@ export function activePhase(cycle: Cycle): Phase | undefined {
   return pending ?? cycle.phases[cycle.phases.length - 1];
 }
 
+/**
+ * SCR-01 ステップ構成 — どの案内文/導線を出すか (F-14)。
+ *
+ * per-cycle の工程調整は「要件(S1)が固まった直後に AI が組み直しを提案する」US-08 の流れで
+ * 行う。この画面は閲覧専用なので、旧文言『始める前にだけ調整できる』は実態(要件確定後に提案)
+ * と真逆で矛盾していた。実際の調整点へ正しく導くため、状態を 3 分岐で表す:
+ *   - "pre-requirements"        要件(S1)未確定 → 工程は既定のまま動く。確定後に組み直し提案が出る。
+ *   - "reconstruction-available" 組み直し提案が存在 → その提案画面へ導く(本来の調整点)。
+ *   - "locked-running"          要件確定済み・提案なし・進行中 → 構成変更は不可(組み直しは確定直後のみ)。
+ * Pure: cycle + 提案有無 だけに依存。決定論テスト用に export。
+ */
+export type StepsGuidance =
+  | "pre-requirements"
+  | "reconstruction-available"
+  | "locked-running";
+
+export function stepsGuidance(
+  cycle: Cycle,
+  hasReconstructionProposal: boolean,
+): StepsGuidance {
+  if (hasReconstructionProposal) return "reconstruction-available";
+  const requirementsDone =
+    cycle.phases.find((p) => p.step === "S1")?.state === "done";
+  return requirementsDone ? "locked-running" : "pre-requirements";
+}
+
 /** Latest run across the whole cycle (drives detail header + retry target). */
 export function latestRunOfCycle(
   cycle: Cycle,

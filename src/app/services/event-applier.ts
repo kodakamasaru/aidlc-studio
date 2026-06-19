@@ -9,9 +9,9 @@ import type { Ports } from "../ports/composition";
 import type { RunEmission, RunContext } from "../ports/orchestrator";
 import {
   raiseQuestion,
+  RECONSTRUCTION_READY_SUMMARY,
   type Question,
 } from "../../domain/question/question";
-import type { Text } from "../../domain/shared/primitives";
 import { buildReview } from "../../domain/review/review";
 import { advanceRun } from "../../domain/cycle/cycle";
 import {
@@ -198,27 +198,37 @@ export class EventApplier {
         // latest write wins (re-emission on retry overwrites cleanly).
         repos.reconstructionProposals.save(ctx.cycleId, event.proposal);
 
-        // US-08 F-1: raise a reconstruction inbox card so the human is notified.
-        // Guard: if an open reconstruction card already exists for this cycle
-        // (e.g. re-emission on retry), do not create a duplicate.
-        const existingOpenReconstruction = repos.questions
+        // US-08 F-1 / S10: surface the reconstruction inbox card with the "ready"
+        // wording. The F-17 gate card was raised UP FRONT (before this run finished)
+        // with a PENDING title that does NOT invite confirmation — there was nothing
+        // to confirm yet. Now the proposal exists, so FLIP that same card's title to
+        // RECONSTRUCTION_READY_SUMMARY (re-save by id; the repo upserts ON CONFLICT)
+        // and notify. We must NOT early-return on the existing card (the old guard
+        // did) — that left it stuck on the misleading "確認してください" wording forever.
+        const existingOpen = repos.questions
           .listByCycle(ctx.cycleId)
-          .some(
+          .find(
             (existing) =>
               existing.state === "open" && existing.kind === "reconstruction",
           );
-        if (existingOpenReconstruction) return;
-
-        const q = raiseQuestion({
-          id: ids.questionId(),
-          runId: ctx.runId,
-          cycleId: ctx.cycleId,
-          payload: {
-            kind: "reconstruction",
-            summary: "工程の再構成提案が届きました — 確認して承認してください" as Text,
-          },
-          createdAt: clock.now(),
-        });
+        const q: Question = existingOpen
+          ? {
+              ...existingOpen,
+              payload: {
+                kind: "reconstruction",
+                summary: RECONSTRUCTION_READY_SUMMARY,
+              },
+            }
+          : raiseQuestion({
+              id: ids.questionId(),
+              runId: ctx.runId,
+              cycleId: ctx.cycleId,
+              payload: {
+                kind: "reconstruction",
+                summary: RECONSTRUCTION_READY_SUMMARY,
+              },
+              createdAt: clock.now(),
+            });
         repos.questions.save(q);
         raised.push(q);
         return;

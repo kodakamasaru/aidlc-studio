@@ -646,10 +646,13 @@ describe("orchestrator failure compensation", () => {
 
 // ── retryRun MaxAttemptExceeded (Fix 10) ─────────────────────────
 describe("retryRun max attempts", () => {
-  test("exhausting maxAttempt=1 → 409 MaxAttemptExceeded", async () => {
+  // F-21: maxAttempt bounds AUTOMATIC retries. The POST /runs/:id/retry endpoint is
+  // the HUMAN pressing 再試行 — a deliberate act that must NOT dead-end at the cap
+  // (ユーザー: 「自動なら上限いるが私からも retry できないのは変」). So even past the cap
+  // the human retry succeeds (200) and spawns the next attempt.
+  test("human retry is NOT capped by maxAttempt — succeeds past the cap (F-21)", async () => {
     const h = buildTestApp();
-    // maxAttempt is a project default (3); override via a project with env=1 by
-    // creating it directly through the repo so we can pin maxAttempt.
+    // Pin maxAttempt=1 so a single retry would exceed the auto cap.
     const repoPath = makeRepoDir();
     const projectId = await createProject(h, repoPath);
     const project = h.ports.repos.projects.findById(
@@ -659,13 +662,20 @@ describe("retryRun max attempts", () => {
     h.ports.repos.projects.save(capped);
 
     const { cycle, runId } = await cycleWithFailedRun(h, projectId);
-    // attempt would become 2 > maxAttempt(1) → MaxAttemptExceeded.
+    // attempt would become 2 > maxAttempt(1) — but this is a HUMAN retry → allowed.
     const { status, json } = await post(
       h.app,
       `/api/cycles/${cycle.id}/runs/${runId}/retry`,
     );
-    expect(status).toBe(409);
-    expect(json.error).toBe("MaxAttemptExceeded");
+    expect(status).toBe(200);
+    // The phase is running again on a fresh attempt (the human is never stranded).
+    const phase = json.data.phases.find((p: any) =>
+      p.runs.some((r: any) => r.id === runId),
+    );
+    expect(phase.state).toBe("running");
+    expect(phase.runs.some((r: any) => r.attempt === 2 && r.state === "running")).toBe(
+      true,
+    );
   });
 });
 

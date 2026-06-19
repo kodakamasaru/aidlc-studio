@@ -365,11 +365,18 @@ export type RetryRunCmd = {
   readonly startedAt: Instant;
   /** EnvConfig.maxAttempt(既定 3)。アプリ層が Project から渡す。 */
   readonly maxAttempt: number;
+  /**
+   * F-21: maxAttempt は AUTOMATIC retry の暴走止め。`manual:true`(人間が「再試行」を
+   * 明示的に押した)はこの cap を免除する — 人間の意図的な操作を上限で dead-end させない
+   * (ユーザー方針: 自動 retry には上限が要るが、人間からの retry は常に効くべき)。欠落=従来
+   * 動作(cap 適用)。
+   */
+  readonly manual?: boolean;
 };
 
 /**
  * retryRun: failed|stalled な Run から attempt+1 の新 Run を生成(元 Run は終端のまま履歴に残す)。
- * INV-6: 自動 retry なし(手動)。attempt は maxAttempt を超えない。
+ * INV-6: 自動 retry なし(手動)。attempt は maxAttempt を超えない(ただし manual は cap 免除 / F-21)。
  */
 export const retryRun = (
   cycle: Cycle,
@@ -381,7 +388,8 @@ export const retryRun = (
     return err("RunNotFailedOrStalled");
   }
   const nextAttempt = loc.run.attempt + 1;
-  if (nextAttempt > cmd.maxAttempt) return err("MaxAttemptExceeded");
+  // F-21: a human-initiated retry is never blocked by the auto-retry cap.
+  if (!cmd.manual && nextAttempt > cmd.maxAttempt) return err("MaxAttemptExceeded");
 
   const newRun: Run = {
     id: cmd.newRunId,

@@ -287,6 +287,22 @@ export function CycleReconstructionThread({
     };
   }, [waitingForReproposal, reload]);
 
+  // F-17: the reconstruction GATE card is raised at launch, so the proposal may not
+  // exist yet (the live run is still producing it) → GET returns 404. Poll while 404
+  // so the page fills in automatically when the proposal arrives, instead of stranding
+  // the human on "まだ生成されていません".
+  useEffect(() => {
+    const is404 =
+      proposalQ.status === "error" &&
+      proposalQ.error instanceof ApiError &&
+      proposalQ.error.status === 404;
+    if (!is404) return;
+    const id = window.setInterval(() => {
+      if (!document.hidden) reload({ background: true });
+    }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [proposalQ.status, proposalQ.error, reload]);
+
   // When a new proposal arrives, append it to history.
   const currentProposal = proposalQ.data;
   const prevStepsRef = useRef<string>("");
@@ -350,13 +366,41 @@ export function CycleReconstructionThread({
     return (
       <div className="thread-page">
         <div className="thread-container">
-          <div className="thread-empty" role="alert">
+          <div className="thread-empty" role={isNotFound ? "status" : "alert"} aria-busy={isNotFound}>
             <p className="thread-empty__title">
               {isNotFound
-                ? "再構成提案がまだ生成されていません"
+                ? "AI が工程を組み直しています…(まだ提案が届いていません)"
                 : "読み込みに失敗しました"}
             </p>
-            {!isNotFound ? (
+            {isNotFound ? (
+              // F-17: a failed/empty reconstruction run would otherwise strand the human
+              // here forever (the gate blocks the next step). Offer an explicit re-run so
+              // they can recover without resetting the cycle (原則④: never a dead-end).
+              <button
+                type="button"
+                className="btn btn--surface"
+                disabled={submitting}
+                onClick={() => {
+                  void (async () => {
+                    setSubmitting(true);
+                    setSubmitError(null);
+                    try {
+                      await api.reproposeReconstruction(
+                        cycleId,
+                        "前回の組み直しが届かなかったので、もう一度工程を組み直してください。",
+                      );
+                      setWaitingForReproposal(true);
+                    } catch (err) {
+                      setSubmitError(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  })();
+                }}
+              >
+                {submitting ? <Spinner size={14} /> : null} もう一度組み直す
+              </button>
+            ) : (
               <button
                 type="button"
                 className="btn btn--surface"
@@ -364,6 +408,9 @@ export function CycleReconstructionThread({
               >
                 再試行
               </button>
+            )}
+            {submitError ? (
+              <p className="form-error" role="alert">{submitError}</p>
             ) : null}
           </div>
         </div>
@@ -429,11 +476,10 @@ export function CycleReconstructionThread({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const inbox = await api.getCycleInbox(cycleId);
-      const openQ = inbox.find((q) => q.state === "open");
-      if (openQ) {
-        await api.answerQuestion(openQ.id, { verdict: "answer", body: text });
-      }
+      // US-08 会話で修正: 再提案は専用エンドポイント。reconstruction カードは approve/reject
+      // しか受け付けない(answerQuestion で verdict:"answer" を送ると InvalidVerdict 400)。
+      // フィードバックで再構成 run を再起動し、新しい提案を polling で待つ。
+      await api.reproposeReconstruction(cycleId, text);
       // Seed history with initial proposal + human turn.
       setHistory((h) => {
         const base: HistoryEntry[] =

@@ -132,6 +132,23 @@ export const SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE: ReconstructionProposal = {
   ],
 };
 
+/**
+ * US-08 会話で修正: the deterministic REVISED proposal emitted when a human re-proposes
+ * with feedback (reconstructionFeedback present). It differs from the initial cycle
+ * proposal (CUSTOM-QA renamed + S4 kept instead of deleted) so the web's re-proposal
+ * polling detects a change and the e2e can assert the modify→re-propose loop works.
+ */
+export const SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE_REVISED: ReconstructionProposal = {
+  scope: "cycle",
+  steps: [
+    { id: "S1", label: "要件ヒアリング", order: 0, skillRef: "kit/skills/aidlc-s1-requirements", instruction: "S1: 要件を構造化 US に展開する。", diff: "keep" },
+    { id: "S2", label: "画面要素", order: 1, skillRef: "kit/skills/aidlc-s2-wireframe", instruction: "S2: ワイヤーフレームを生成する。", diff: "keep" },
+    { id: "S3", label: "UIデザイン", order: 2, skillRef: "kit/skills/aidlc-s3-ui-design", instruction: "S3: 本格 UI デザインを生成する。", diff: "keep" },
+    { id: "S4", label: "技術仕様", order: 3, skillRef: "kit/skills/aidlc-s4-tech-spec", instruction: "S4: 技術仕様を作成する(再提案で復活)。", diff: "keep" },
+    { id: "CUSTOM-QA", label: "独自QA工程(再提案で見直し)", order: 4, skillRef: "kit/skills/aidlc-s1-requirements", instruction: "CUSTOM-QA: 人間の指摘を反映した品質検証。", diff: "add" },
+  ],
+};
+
 export const SCRIPTED_RECONSTRUCTION_PROPOSAL_GLOBAL: ReconstructionProposal = {
   scope: "global",
   steps: [
@@ -212,10 +229,15 @@ export class ScriptedOrchestrator implements OrchestratorPort {
     // Emits RunStateChanged("done") — NOT ResultEmitted — to avoid triggering
     // another onRolelessResult in EngineService (infinite loop guard).
     if (cmd.hearingScope === "reconstruction") {
+      // US-08 会話で修正: a re-propose carries the human's feedback → emit the REVISED
+      // proposal (differs from the initial one) so the web's re-proposal polling sees a
+      // change. The first (auto) launch has no feedback → the initial proposal.
       const proposal =
         this.scenario === "reconstruction-global"
           ? SCRIPTED_RECONSTRUCTION_PROPOSAL_GLOBAL
-          : SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE;
+          : cmd.reconstructionFeedback && cmd.reconstructionFeedback.trim().length > 0
+            ? SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE_REVISED
+            : SCRIPTED_RECONSTRUCTION_PROPOSAL_CYCLE;
       await this.emit(ctx, {
         type: "ReconstructionProposalEmitted",
         runId: cmd.runId,

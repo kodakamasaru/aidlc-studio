@@ -406,6 +406,11 @@ export const api = {
   applyCycleReconstruction: (cycleId: string, steps: readonly ReconstructionStep[]): Promise<Cycle> =>
     request(`/cycles/${encodeURIComponent(cycleId)}/reconstruct`, jsonBody({ steps })),
 
+  // US-08 会話で修正: 人間のフィードバックで再構成を再提案させる。新しい提案は非同期で
+  // emit されるので、呼び出し側は getReconstructionProposal を polling して差分を待つ。
+  reproposeReconstruction: (cycleId: string, feedback: string): Promise<{ reproposed: boolean }> =>
+    request(`/cycles/${encodeURIComponent(cycleId)}/reconstruct/repropose`, jsonBody({ feedback })),
+
   // US-08 AC-7: グローバル既定パイプラインを全置換。
   replaceProjectPipeline: (projectId: string, steps: readonly ReconstructionStep[]): Promise<Project> =>
     request(`/projects/${encodeURIComponent(projectId)}/pipeline`, jsonBody({ steps })),

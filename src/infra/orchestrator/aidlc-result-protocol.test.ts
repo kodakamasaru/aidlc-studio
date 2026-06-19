@@ -27,6 +27,7 @@ import {
   aidlcResultToEvents,
   aidlcQuestionToEvent,
   LiveClaudeOrchestrator,
+  MAX_REPAIR_ATTEMPTS,
 } from "./live";
 import { ScriptedOrchestrator } from "./scripted";
 import { serializeAidlcResult, type AidlcResult } from "../../wire/aidlc-result";
@@ -102,9 +103,12 @@ function fakePlainResultStdout(sessionId = "sess-plain-001"): string {
   return [initLine, resultLine].join("\n");
 }
 
-/** Build JSONL with a malformed aidlc-result block (unclosed fence → err). */
-function fakeMalformedResultStdout(): string {
-  const initLine = JSON.stringify({ type: "system", subtype: "init", session_id: "sess-malformed" });
+/**
+ * Build JSONL with a malformed aidlc-result block (unclosed fence → err).
+ * withSession=false omits the init line so extractSessionId returns null — used to
+ * exercise the F-22 "no resumable session → straight to stall" path.
+ */
+function fakeMalformedResultStdout(withSession = true): string {
   // Unclosed fence — parseAidlcResultBlock returns err
   const malformed = "```aidlc-result\n{\"status\":\"done\"}";
   const resultLine = JSON.stringify({
@@ -112,7 +116,13 @@ function fakeMalformedResultStdout(): string {
     subtype: "success",
     result: malformed,
   });
-  return [initLine, resultLine].join("\n");
+  const lines = withSession
+    ? [
+        JSON.stringify({ type: "system", subtype: "init", session_id: "sess-malformed" }),
+        resultLine,
+      ]
+    : [resultLine];
+  return lines.join("\n");
 }
 
 /** Build JSONL with a legacy aidlc-question block (no aidlc-result). */
@@ -133,14 +143,33 @@ function fakeLegacyQuestionStdout(): string {
   return [initLine, resultLine].join("\n");
 }
 
-/** Run awaitAndEmit with a fake child that outputs stdoutContent. */
+/**
+ * Run awaitAndEmit with a fake child that outputs stdoutContent. Returns the
+ * orchestrator so tests can read private F-22 state (repairCounts).
+ * opts.claudeBin: binary used for any self-repair re-spawn (default a fast no-op
+ *   so the background repair turn can't spawn a real `claude`).
+ * opts.presetRepair: pre-seed the run's repair-attempt count (to exercise the
+ *   "budget exhausted → stall" path deterministically without spawning).
+ */
 async function drainFake(
   stdoutContent: string,
   emissionsOut: RunEmission[],
-): Promise<void> {
+  opts: { claudeBin?: string; presetRepair?: number } = {},
+): Promise<LiveClaudeOrchestrator> {
   const sink = async (e: RunEmission) => { emissionsOut.push(e); };
-  const orc = new LiveClaudeOrchestrator({ sink });
+  const orc = new LiveClaudeOrchestrator({
+    sink,
+    // `true` exits 0 immediately with no output — a self-repair re-spawn becomes a
+    // harmless no-op instead of invoking a real `claude` during the unit test.
+    claudeBin: opts.claudeBin ?? "true",
+  });
   injectCtx(orc, ctx);
+  if (opts.presetRepair !== undefined) {
+    (orc as unknown as { repairCounts: Map<string, number> }).repairCounts.set(
+      runId,
+      opts.presetRepair,
+    );
+  }
 
   const fakeChild = Bun.spawn(
     ["bun", "-e", `process.stdout.write(${JSON.stringify(stdoutContent)})`],
@@ -151,6 +180,14 @@ async function drainFake(
   await (orc as unknown as {
     awaitAndEmit(ctx: RunContext, child: typeof fakeChild, completeness: boolean): Promise<void>;
   }).awaitAndEmit(ctx, fakeChild, false);
+  return orc;
+}
+
+/** Read the private F-22 repair-attempt counter for the test run. */
+function repairCountOf(orc: LiveClaudeOrchestrator): number {
+  return (
+    (orc as unknown as { repairCounts: Map<string, number> }).repairCounts.get(runId) ?? 0
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +283,11 @@ describe("aidlcResultToEvents — pure mapper", () => {
     expect(ev.decisions![0]!.id).toBe("D-01");
   });
 
-  test("status=done → RunStateChanged done (no human gate needed)", () => {
+  // F-15: the AI's status does NOT decide the human gate — the STEP CONFIG (humanGate)
+  // does. So status=done must NOT self-complete/skip the gate; it emits a reviewable
+  // ResultEmitted just like needs_human. Advancing to done happens only when the human
+  // approves the review (InboxService.finalizeApprovedReview → RunStateChanged done).
+  test("status=done → ResultEmitted (does NOT skip the human gate; step config decides)", () => {
     // Arrange
     const result = makeMinimalResult({ status: "done" });
 
@@ -255,10 +296,21 @@ describe("aidlcResultToEvents — pure mapper", () => {
 
     // Assert
     expect(events.length).toBe(1);
-    const ev = events[0] as RunStateChanged;
-    expect(ev.type).toBe("RunStateChanged");
+    const ev = events[0] as ResultEmitted;
+    expect(ev.type).toBe("ResultEmitted");
     expect(ev.runId).toBe(runId);
-    expect(ev.to).toBe("done");
+    // It does NOT emit a RunStateChanged done (no AI-driven auto-complete).
+    expect(events[0]!.type).not.toBe("RunStateChanged");
+  });
+
+  test("status=done and status=needs_human map to the SAME event shape (gate is config's job)", () => {
+    const done = aidlcResultToEvents(runId, makeMinimalResult({ status: "done" }));
+    const needsHuman = aidlcResultToEvents(
+      runId,
+      makeMinimalResult({ status: "needs_human" }),
+    );
+    expect(done.map((e) => e.type)).toEqual(needsHuman.map((e) => e.type));
+    expect(done[0]!.type).toBe("ResultEmitted");
   });
 
   test("status=stalled → RunStateChanged stalled (retriable)", () => {
@@ -315,7 +367,7 @@ describe("aidlcResultToEvents — pure mapper", () => {
 // ---------------------------------------------------------------------------
 
 describe("awaitAndEmit — aidlc-result envelope path", () => {
-  test("aidlc-result with status=done → RunStateChanged done (new envelope path)", async () => {
+  test("aidlc-result with status=done → ResultEmitted (gate is step config's job, F-15)", async () => {
     // Arrange
     const result = makeMinimalResult({ status: "done" });
     const emissions: RunEmission[] = [];
@@ -323,12 +375,15 @@ describe("awaitAndEmit — aidlc-result envelope path", () => {
     // Act
     await drainFake(fakeAidlcResultStdout(result), emissions);
 
-    // Assert — envelope path → RunStateChanged done
-    const stateChanges = emissions.filter(
+    // Assert — F-15: done no longer self-completes; it emits a reviewable ResultEmitted.
+    // The human gate is governed by step config, not the AI's status.
+    const reviews = emissions.filter((e) => e.event.type === "ResultEmitted");
+    expect(reviews.length).toBeGreaterThan(0);
+    const autoDone = emissions.filter(
       (e) => e.event.type === "RunStateChanged" &&
         (e.event as RunStateChanged).to === "done",
     );
-    expect(stateChanges.length).toBeGreaterThan(0);
+    expect(autoDone.length).toBe(0);
   });
 
   test("aidlc-result with status=stalled → RunStateChanged stalled", async () => {
@@ -386,17 +441,58 @@ describe("awaitAndEmit — aidlc-result envelope path", () => {
     expect(ev.completeness).toBeDefined();
   });
 
-  test("malformed aidlc-result envelope → falls through (some terminal event emitted, no QuestionRaised)", async () => {
-    // Arrange — malformed = unclosed fence → err → log + fall through
+  // F-22: a malformed envelope is no longer an immediate stall. With a resumable
+  // session and repair budget left, the adapter feeds the schema error back into the
+  // SAME session (self-repair) so the model can re-emit — only stalling once the
+  // budget is exhausted or the run has no session. The three branches:
+
+  test("malformed aidlc-result + NO resumable session → stalled (terminal), no QuestionRaised", async () => {
     const emissions: RunEmission[] = [];
 
-    // Act
-    await drainFake(fakeMalformedResultStdout(), emissions);
+    // No session_id → self-repair is impossible → straight to the human-retriable stall.
+    await drainFake(fakeMalformedResultStdout(false), emissions);
 
-    // Assert — no QuestionRaised from broken envelope; some event must be emitted
     const questionEvents = emissions.filter((e) => e.event.type === "QuestionRaised");
     expect(questionEvents.length).toBe(0);
-    expect(emissions.length).toBeGreaterThan(0);
+    const stalls = emissions.filter(
+      (e) => e.event.type === "RunStateChanged" &&
+        (e.event as RunStateChanged).to === "stalled",
+    );
+    expect(stalls.length).toBeGreaterThan(0);
+  });
+
+  test("malformed aidlc-result + session + budget AVAILABLE → self-repair attempted, NOT stalled", async () => {
+    const emissions: RunEmission[] = [];
+
+    const orc = await drainFake(fakeMalformedResultStdout(true), emissions);
+
+    // A repair turn was spawned into the session (counter incremented), and NO
+    // terminal stall was emitted on this turn — the human is not bothered yet.
+    expect(repairCountOf(orc)).toBe(1);
+    const stalls = emissions.filter(
+      (e) => e.event.type === "RunStateChanged" &&
+        (e.event as RunStateChanged).to === "stalled",
+    );
+    expect(stalls.length).toBe(0);
+    const questionEvents = emissions.filter((e) => e.event.type === "QuestionRaised");
+    expect(questionEvents.length).toBe(0);
+  });
+
+  test("malformed aidlc-result + session + budget EXHAUSTED → stalled for human retry", async () => {
+    const emissions: RunEmission[] = [];
+
+    // Pre-seed the repair counter at the cap → the next malformed turn must stall.
+    const orc = await drainFake(fakeMalformedResultStdout(true), emissions, {
+      presetRepair: MAX_REPAIR_ATTEMPTS,
+    });
+
+    const stalls = emissions.filter(
+      (e) => e.event.type === "RunStateChanged" &&
+        (e.event as RunStateChanged).to === "stalled",
+    );
+    expect(stalls.length).toBeGreaterThan(0);
+    // Counter advanced past the cap (no further auto-repair).
+    expect(repairCountOf(orc)).toBe(MAX_REPAIR_ATTEMPTS + 1);
   });
 
   test("NO aidlc-result block → legacy path: plain text → ResultEmitted (regression guard)", async () => {
@@ -488,18 +584,18 @@ describe("ScriptedOrchestrator — aidlc-result scenarios (C6 parity)", () => {
     });
   }
 
-  test("aidlc-result-done scenario: launch → RunStateChanged done", async () => {
+  test("aidlc-result-done scenario: launch → ResultEmitted (gate is step config's job, F-15)", async () => {
     // Arrange
     const { orc, emissions } = makeScripted("aidlc-result-done");
 
     // Act
     await doLaunch(orc);
 
-    // Assert
+    // Assert — F-15: status=done no longer skips the human gate; it emits a reviewable
+    // ResultEmitted. Advancing to done happens only on human approval.
     expect(emissions).toHaveLength(1);
-    const ev = emissions[0]!.event as RunStateChanged;
-    expect(ev.type).toBe("RunStateChanged");
-    expect(ev.to).toBe("done");
+    const ev = emissions[0]!.event;
+    expect(ev.type).toBe("ResultEmitted");
   });
 
   test("aidlc-result-needs-human scenario: launch → ResultEmitted with completeness", async () => {

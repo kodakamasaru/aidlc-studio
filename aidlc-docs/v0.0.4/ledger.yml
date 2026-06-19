@@ -156,3 +156,46 @@
     プロジェクト管理 UI(作成/リセット/切替)は v0.0.4 の US-01〜08(S1 会話ループ)の範囲外 = baseline 機能。
     ここで実装するのは scope creep のため次サイクルへ。併せて legacy データのマイグレーション方針も検討
     (非 canonical legacy ID の正規化 / 安全なマッピング)。一時 cleanup script + backup は housekeeping で整理。
+
+- id: AUTO-ORCH-durable-self-healing
+  origin: v0.0.4/s10-acceptance.md   # S10 中の設計対話(2026-06-19)で確定
+  decision: >
+    プロダクト最終構想「放置可能な自走基盤」の設計を確定。タスクを積めば最大並列 N を超えない範囲で
+    human-gate 手前まで自走し、claude セッション上限/アプリ再起動/クラッシュでも不整合なく自己復帰、
+    技術的失敗は人間に出さず仕組み内で retry。中核方針: ①プロセス使い捨て/DB が唯一の真実/起動毎 reconcile/
+    遷移は冪等 ②人間の介在点は固定4つ(要件/画面/レビュー/改善)以外に増やさない ③各技術 step は
+    generate→独立検証→自動 retry(claude に自己採点させない)④上限/レートは backoff-retriable に分類して自動再開
+    ⑤retry 上限到達は inbox に積む + スケジューラは後続タスクへ(非ブロッキング)⑥claude の不確実性は1試行に
+    隔離し done は観測事実で裏取り。設計仕様の正本 = aidlc-docs/v0.0.5/autonomous-self-healing-orchestration.md。
+  state: carried
+  into: v0.0.5
+  reason: >
+    v0.0.4 の US-01〜08(Human Inbox 縦ループ)の範囲外。自走スケジューラ(N並列+DAG+parking)/上限 backoff/
+    逐次 stream 監視 + live-run 永続台帳/late-emit 冪等化/独立検証→自動 retry 配線 が未実装(ギャップ表は設計仕様 §11)。
+    既存の土台(reconcile・session_id 永続・evaluator/deterministic-gate/visual-eval)を活かして v0.0.5 で構築。
+    [O3-live-resume-continuation-unproven] はこの自走基盤の resume 経路に内包して実証する。
+
+- id: F12-thread-badge-consistency
+  origin: v0.0.4/s10-acceptance.md   # F-12 修正時の軽微な残り(2026-06-19)
+  decision: >
+    会話スレッドのヘッダ・ステップ状態バッジが、レビュー emit 後も run=running のため「起動中/実行中」のまま
+    (本文は F-12 で「できあがりを確認する」CTA に解消済だが、バッジがレビュー準備完了と不一致)。
+  state: carried
+  into: v0.0.5
+  reason: >
+    本筋の固着(F-12)は v0.0.4 で解消済。バッジ整合は表示の粗で実害小のため次サイクル housekeeping。
+
+- id: TEST-ENV-seeded-cycle-states
+  origin: v0.0.4/s10-acceptance.md   # S10 受け入れ中のユーザー着想(2026-06-20)
+  decision: >
+    実動作テストで「サイクル完了の完了バナー(US-05)」のような高コスト状態を低コストに検証するため、
+    任意のステップ状態に予め置いたサイクル(seed fixture)からテストを開始できる環境を作る。
+    例: ほぼ done のサイクルを seed → 1 操作で完了到達 → 完了バナーが実 backend で出るのを目視。
+    現状は完了到達がサイクル全工程の完走を要し高コストなため、US-05 完了バナーはフロント描画(モック注入)
+    のみで実 backend 未到達。この seed 環境ができれば US-05 完了バナーの実 backend 検証をそこに内包できる。
+  state: carried
+  into: v0.0.5
+  reason: >
+    テスト環境(seeded cycle-state fixtures)の構築は v0.0.4 の US-01〜08 範囲外。ユーザー判断で
+    「作るのは次サイクル以降でよい / 今サイクルは US-05 完了バナーをモック描画確認で承認」。
+    次サイクルでこの env を用意し、US-05 完了バナーの実 backend 到達(+他の高コスト状態)を低コストに実証する。

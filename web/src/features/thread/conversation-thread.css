@@ -412,6 +412,22 @@
   color: var(--color-running);
   align-self: flex-start;
 }
+.thread-review-ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--color-success-soft, var(--color-running-soft));
+  border: 1px solid var(--color-success-border, var(--color-running-border));
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  color: var(--color-text);
+  align-self: stretch;
+}
+.thread-review-ready .btn {
+  margin-left: auto;
+}
 .thread-dots {
   display: flex;
   gap: 4px;

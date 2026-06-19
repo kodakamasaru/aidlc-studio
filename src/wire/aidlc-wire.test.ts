@@ -111,6 +111,40 @@ describe("parseQuestionBlock", () => {
     }
   });
 
+  // S10 実機 F-20: live S3 で AI が ```aidlc-question``` に **裸の単一質問オブジェクト**
+  // {"id":...,"prompt":...,"options":[...]} を入れた(契約 line121 の per-question schema
+  // 「id/prompt/...」をそのまま書いた)。旧パーサは {questions:[...]} ラッパー必須で schema
+  // エラー→ malformed→ 3回 retry しても同じ形で全て stall。valid-intent を over-strict が
+  // 壊していた(F-13/T20 と同クラス)。robust に bare object/array も受理する。
+  test("bare single question object (no {questions} wrapper) -> ok length 1 (F-20)", () => {
+    const q = makeQuestion({ id: "Q-01", prompt: "この方向で確定?" });
+    const text = fenceQuestion(q); // {id,prompt,options,...} 直書き(ラッパー無し)
+
+    const result = parseQuestionBlock(text);
+
+    expect(result.ok).toBe(true);
+    if (result.ok && result.value !== null) {
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0]?.id).toBe("Q-01");
+      expect(result.value[0]?.prompt).toBe("この方向で確定?");
+    }
+  });
+
+  test("bare array of questions (no {questions} wrapper) -> ok length N (F-20)", () => {
+    const q1 = makeQuestion({ id: "q1", prompt: "First?" });
+    const q2 = makeQuestion({ id: "q2", prompt: "Second?" });
+    const text = fenceQuestion([q1, q2]); // [ {...}, {...} ] 直書き
+
+    const result = parseQuestionBlock(text);
+
+    expect(result.ok).toBe(true);
+    if (result.ok && result.value !== null) {
+      expect(result.value).toHaveLength(2);
+      expect(result.value[0]?.id).toBe("q1");
+      expect(result.value[1]?.id).toBe("q2");
+    }
+  });
+
   test("malformed JSON inside block -> err bad-json", () => {
     // Arrange
     const text = "```aidlc-question\n{ this is not valid json }\n```";

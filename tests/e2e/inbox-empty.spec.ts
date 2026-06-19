@@ -17,7 +17,9 @@ test("inbox shows the designed empty state when no questions are open", async ({
   await page.goto("/");
   await ensureProject(page);
 
-  await page.goto("/inbox");
+  // 受信箱へはサイドバーの導線で遷移する(実操作 / page.goto しない)。
+  await page.locator("a.nav-item", { hasText: "受信箱" }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
 
   // v0.0.4: InboxPage empty state uses a <p class="inbox-empty__title"> with
   // "対応待ちはありません". It is NOT a heading — it is a paragraph.

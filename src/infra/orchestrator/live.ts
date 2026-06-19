@@ -33,7 +33,7 @@ import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { join, resolve } from "node:path";
 import { logError, logInfo } from "../log";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, copyFileSync, realpathSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parseQuestionBlock, parseReconstructionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
 import { parseAidlcResultBlock, type AidlcResult } from "../../wire/aidlc-result";
@@ -72,7 +72,15 @@ export function aidlcResultToEvents(
     return result.questions.map((q) => aidlcQuestionToEvent(runId, q));
   }
 
-  if (result.status === "needs_human") {
+  // F-15: 人間レビューの要否は「ステップ設定(humanGate)」が決めるのであって、ステップ内の
+  // AI が status で決めることではない。AI が status:"done"(人間ゲート不要)と主張しても、
+  // レビューが設定された工程(S1 等)で人間ゲートをスキップさせてはならない(責務契約②
+  // human-gate のみ停止 / Human Inbox の前提)。よって done でも needs_human でも、成果を
+  // **レビュー可能な ResultEmitted** として出し、ゲートの可否は下流(ステップ設定)に委ねる。
+  // 前進(done への確定・reconstruction 等)は人間が承認して初めて起きる
+  // (InboxService.finalizeApprovedReview → RunStateChanged done)。
+  // stalled だけは続行不能の報告なので別扱い。
+  if (result.status === "needs_human" || result.status === "done") {
     // Build a ResultEmitted that carries the artifact content (md 本文) as blocks
     // PLUS completeness + artifacts + decisions from the envelope (§C7.4). Rendering
     // the body fulfils US-02 (review without opening files).
@@ -87,14 +95,6 @@ export function aidlcResultToEvents(
     return [event];
   }
 
-  if (result.status === "done") {
-    return [{
-      type: "RunStateChanged",
-      runId,
-      to: "done",
-    }];
-  }
-
   // status === "stalled"
   return [{
     type: "RunStateChanged",
@@ -102,6 +102,68 @@ export function aidlcResultToEvents(
     to: "stalled",
     reason: "AI がスタックを報告しました(aidlc-result status=stalled)。Inbox から retry してください。",
   }];
+}
+
+/**
+ * S10 F-13: a ```aidlc-result``` fence that is PRESENT but MALFORMED (bad JSON /
+ * unclosed fence / schema violation) is a RETRIABLE failure — NOT a reason to dump
+ * the raw model text into a summary card. The fence's presence proves the model
+ * intended a structured envelope; surfacing the raw text instead would
+ *   (a) leak internal JSON / file paths / IDs to the human (契約① 違反),
+ *   (b) silently drop any questions the envelope carried, and
+ *   (c) skip retry entirely (a broken run shown as a normal review).
+ * So we emit `stalled` (the retriable stall surface) with a human-safe reason —
+ * the system / human retries and a fresh run typically produces valid JSON. The
+ * reason names only the failure CLASS, never the raw JSON (契約① / 原則④).
+ * Pure: exported for direct unit testing.
+ */
+export function malformedResultEvent(runId: RunId): DomainEvent {
+  return {
+    type: "RunStateChanged",
+    runId,
+    to: "stalled",
+    reason: "AI の出力結果の形式が不正でした(結果データが壊れています)。Inbox から retry してください。",
+  };
+}
+
+/**
+ * F-22 self-repair: how many AUTOMATIC repair turns we feed back into the SAME
+ * session before giving up and stalling for the human. A `retry` re-runs the same
+ * prompt and reproduces the same malformed shape (that was the real S3 3×-stall),
+ * so the durable fix is to tell the model — IN CONTEXT — exactly what was wrong and
+ * let it re-emit. Bounded so a model that can't self-correct still ends in a
+ * human-retriable stall (the human is the final governor / F-21). 2 = original + 2
+ * repairs = 3 envelope attempts within one run, none of which burdens the human.
+ */
+export const MAX_REPAIR_ATTEMPTS = 2;
+
+/** Which structured fence failed to parse — drives the repair instruction's schema reminder. */
+export type RepairFenceKind = "aidlc-result" | "aidlc-question" | "aidlc-reconstruction";
+
+const REPAIR_SCHEMA_HINT: Record<RepairFenceKind, string> = {
+  "aidlc-result":
+    '{"artifacts":[],"questions":[],"decisions":[],"completeness":{"requirements":[],"addressed":[]},"status":"needs_human"}',
+  "aidlc-question":
+    '{"questions":[{"id":"Q-01","prompt":"…","options":[{"id":"A","label":"…","recommended":true}],"answerKind":"single"}]}',
+  "aidlc-reconstruction":
+    '{"scope":"cycle","steps":[{"id":"S2","label":"…","order":0,"skillRef":"aidlc-s2-wireframe","instruction":"…","diff":"keep"}]}',
+};
+
+/**
+ * F-22 self-repair: build the AI-FACING correction message resumed into the session
+ * when a structured fence was present but malformed. NOT shown to the human (it is a
+ * resume body that drains through awaitAndEmit; success yields a proper card). It
+ * names the failure, echoes the validator's detail, and shows the exact expected
+ * shape so the model can re-emit a single valid block. Pure: exported for testing.
+ */
+export function buildRepairInstruction(kind: RepairFenceKind, detail: string): string {
+  return [
+    `直前の出力の \`\`\`${kind}\`\`\` ブロックが形式不正で解釈できませんでした。`,
+    `理由: ${detail}`,
+    "説明文や成果物の作り直しは不要です。**正しい " +
+      `\`\`\`${kind}\`\`\` ブロックを 1 つだけ**、有効な minified JSON で出し直してください。`,
+    `期待する形(例): ${REPAIR_SCHEMA_HINT[kind]}`,
+  ].join("\n");
 }
 
 /** Default bounded prompt: one sentence, no tools needed, fully deterministic shape. */
@@ -166,6 +228,53 @@ export function artifactBlockTitle(body: string, rel: string): string {
 export function screenLabel(rel: string): string {
   const base = (rel.split("/").pop() ?? rel).replace(/\.html?$/i, "");
   return base.replace(/[-_]/g, " ").trim();
+}
+
+/** A Markdown image reference `![alt](path)` found in the model's prose. */
+export interface MarkdownImageRef {
+  readonly raw: string; // the full `![alt](path)` match (for replacement)
+  readonly alt: string;
+  readonly path: string; // the link target (may be a file path or file:// URL)
+}
+
+const MD_IMAGE_RE = /!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/g;
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif)$/i;
+
+/**
+ * F-23: parse Markdown image references out of the model's prose. The S10 failure:
+ * after being told "don't ask visual approval via a text question", the model tried
+ * to SHOW the screens by embedding `![alt](/abs/path/scr-01.png)` in its prose AND
+ * skipping the aidlc-result envelope — so the review fell to the legacy summary path
+ * and rendered raw, unloadable file paths instead of a gallery. The adapter converts
+ * these refs to real served screenshot blocks (and de-pathifies the prose). Pure:
+ * exported for testing. Only `path` matching an image extension is a candidate.
+ */
+export function parseMarkdownImageRefs(text: string): MarkdownImageRef[] {
+  const refs: MarkdownImageRef[] = [];
+  for (const m of text.matchAll(MD_IMAGE_RE)) {
+    const alt = m[1] ?? "";
+    const path = m[2] ?? "";
+    if (!IMAGE_EXT_RE.test(path)) continue; // non-image link → leave it alone
+    refs.push({ raw: m[0], alt, path });
+  }
+  return refs;
+}
+
+/**
+ * F-23: replace each converted image ref's raw `![alt](path)` with just its caption
+ * so the summary prose carries the human-readable label and NEVER the file path
+ * (契約① no path leak). Pure: exported for testing.
+ */
+export function stripImageRefs(
+  text: string,
+  refs: readonly MarkdownImageRef[],
+): string {
+  let out = text;
+  for (const ref of refs) {
+    const caption = ref.alt.trim().length > 0 ? ref.alt.trim() : screenLabel(ref.path);
+    out = out.split(ref.raw).join(`【画面: ${caption}】`);
+  }
+  return out;
 }
 
 /**
@@ -349,6 +458,10 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   // Unit-04: count resume turns per runId (turns in one hearing). When this
   // exceeds MAX_HEARING_TURNS the run is stalled so the human decides next steps.
   private readonly resumeCounts = new Map<string, number>();
+  // F-22: count AUTOMATIC self-repair turns per runId (malformed-envelope fixes
+  // fed back into the same session). Separate budget from resumeCounts: a repair is
+  // not a hearing turn. Exceeding MAX_REPAIR_ATTEMPTS stalls for the human.
+  private readonly repairCounts = new Map<string, number>();
 
   constructor(opts: LiveClaudeOptions) {
     this.sink = opts.sink;
@@ -400,7 +513,9 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     // prompt). content-driven detection at emit time handles the block; this is the
     // belt-and-suspenders that makes the AI actually produce it.
     if (cmd.hearingScope === "reconstruction") {
-      return this.composer.composeReconstruction(cmd.repoPath);
+      // US-08 会話で修正: forward the human's revise feedback (if any) so the AI
+      // re-proposes taking it into account.
+      return this.composer.composeReconstruction(cmd.repoPath, cmd.reconstructionFeedback);
     }
     // BU-1: prefer structured path when structuredContext is present (§C7.1-C7.4 sections).
     // Legacy path (contextPaths) is kept as fallback for scripted / backward-compat cases.
@@ -595,6 +710,41 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     this.children.set(ctx.runId, child);
 
     void this.awaitAndEmit(ctx, child, false);
+  }
+
+  /**
+   * F-22 self-repair: a structured fence was PRESENT but malformed. Instead of
+   * immediately stalling (which a fresh `retry` would just reproduce — same prompt,
+   * same broken shape), feed the validator's error back into the SAME session and
+   * let the model re-emit a valid block in context. Bounded by MAX_REPAIR_ATTEMPTS;
+   * once exhausted — or if the session can't be resumed (no session_id) — emit the
+   * retriable `stalled` so the HUMAN takes over (the human retry is never capped /
+   * F-21). The repair body is AI-facing and never shown to the human.
+   */
+  private async repairOrStall(
+    ctx: RunContext,
+    sessionId: string | null,
+    kind: RepairFenceKind,
+    detail: string,
+  ): Promise<void> {
+    const attempts = (this.repairCounts.get(ctx.runId as string) ?? 0) + 1;
+    this.repairCounts.set(ctx.runId as string, attempts);
+
+    if (sessionId !== null && attempts <= MAX_REPAIR_ATTEMPTS) {
+      logInfo(
+        "LiveClaudeOrchestrator: malformed fence — self-repair turn (feeding schema error back into the session, NOT stalling yet)",
+        { runId: ctx.runId as string, fence: kind, attempt: attempts, max: MAX_REPAIR_ATTEMPTS, detail },
+      );
+      this.startResumeTurn(ctx, sessionId, buildRepairInstruction(kind, detail));
+      return;
+    }
+
+    // Budget exhausted, or the run has no session to resume → hand to the human.
+    logError(
+      "LiveClaudeOrchestrator: self-repair exhausted (or no session) — stalling for human retry",
+      { runId: ctx.runId as string, fence: kind, attempts, resumable: sessionId !== null },
+    );
+    await this.emit(ctx, malformedResultEvent(ctx.runId));
   }
 
   async cancel(cmd: { readonly runId: RunId }): Promise<void> {
@@ -802,13 +952,20 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       // Present → ReconstructionProposalEmitted + RunStateChanged(done), mirroring
       // the scripted adapter (done, NOT ResultEmitted — no visual_review card and no
       // re-trigger of onS1Confirmed). Absent (ok null) → fall through to the normal
-      // aidlc-result/question paths. Parse error → log (原則④) + fall through.
+      // aidlc-result/question paths.
       const reconParseResult = parseReconstructionBlock(text);
       if (!reconParseResult.ok) {
-        logError(
-          "LiveClaudeOrchestrator: aidlc-reconstruction block parse error — falling back",
-          { runId: ctx.runId as string, code: reconParseResult.error.code, detail: reconParseResult.error.detail },
+        // S10 F-13(recon): the ```aidlc-reconstruction``` fence WAS present but its
+        // JSON/schema is invalid. Do NOT fall through to the legacy raw-text dump
+        // (that leaks the raw envelope to the human / 契約①). F-22: try an in-context
+        // self-repair turn first; only stall once the repair budget is exhausted.
+        await this.repairOrStall(
+          ctx,
+          sessionId,
+          "aidlc-reconstruction",
+          reconParseResult.error.detail,
         );
+        return;
       } else if (reconParseResult.value !== null) {
         await this.emit(ctx, {
           type: "ReconstructionProposalEmitted",
@@ -826,27 +983,37 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       // Absent (ok null) → proceed to the existing paths below, unchanged.
       const resultParseResult = parseAidlcResultBlock(text);
       if (!resultParseResult.ok) {
-        logError(
-          "LiveClaudeOrchestrator: aidlc-result block parse error — falling back to legacy path",
-          { runId: ctx.runId as string, code: resultParseResult.error.code, detail: resultParseResult.error.detail },
+        // S10 F-13: the fence WAS present but its JSON/schema is malformed. This is
+        // NOT "no envelope" (that is ok(null), handled below) — it is a broken run.
+        // Do NOT fall through to the legacy raw-text dump: that would leak internal
+        // JSON/paths to the human (契約① 違反) and silently drop the envelope's
+        // questions. F-22: try an in-context self-repair turn first; stall only once
+        // the repair budget is exhausted. 原則④: visible, not silent.
+        await this.repairOrStall(
+          ctx,
+          sessionId,
+          "aidlc-result",
+          resultParseResult.error.detail,
         );
-        // Fall through to legacy path (aidlc-question then ResultEmitted).
+        return;
       } else if (resultParseResult.value !== null) {
         // Envelope found and validated → emit events derived from it. For a
         // needs_human review, read the artifact md bodies so the review shows the
         // actual brief/US content, not just file links (US-02).
         const result = resultParseResult.value;
-        const contentBlocks =
-          result.status === "needs_human"
-            ? this.readArtifactBlocks(ctx.runId as string, result.artifacts)
-            : [];
+        // F-15: done も needs_human も等しくレビュー可能な成果として扱う(ゲートはステップ設定が
+        // 決める)。どちらも成果本文/視覚証拠を読み込み、レビューに本文を描画する(US-02)。
+        const producesReview =
+          result.status === "needs_human" || result.status === "done";
+        const contentBlocks = producesReview
+          ? this.readArtifactBlocks(ctx.runId as string, result.artifacts)
+          : [];
         // 視覚デザイン証拠 (S3 等): render the AI's .html screens to images so the
         // design surfaces in the review gallery — the human judges the UI THROUGH the
         // platform's browser as images, never by opening files (原則#1 視覚確認 / 契約①).
-        const designBlocks =
-          result.status === "needs_human"
-            ? await this.captureDesignBlocks(ctx.runId as string, result.artifacts)
-            : [];
+        const designBlocks = producesReview
+          ? await this.captureDesignBlocks(ctx.runId as string, result.artifacts)
+          : [];
         const events = aidlcResultToEvents(ctx.runId, result, [
           ...contentBlocks,
           ...designBlocks,
@@ -859,14 +1026,21 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
 
       // Unit-03: check for an aidlc-question block. Present → emit QuestionRaised
       // cards (one per question). Absent → fall through to the existing
-      // ResultEmitted→visual_review path. Parse error → log (原則④) + fall through
-      // (safe side: never silently misclassify a parse failure as a clean result).
+      // ResultEmitted→visual_review path.
       const questionParseResult = parseQuestionBlock(text);
       if (!questionParseResult.ok) {
-        logError(
-          "LiveClaudeOrchestrator: aidlc-question block parse error — falling back to ResultEmitted",
-          { runId: ctx.runId as string, code: questionParseResult.error.code, detail: questionParseResult.error.detail },
+        // S10 F-13(question): the ```aidlc-question``` fence WAS present but malformed —
+        // same class as the aidlc-result / reconstruction cases above (T20: fix the whole
+        // class, not one instance). Falling through would dump the raw block to the human
+        // (契約①) and silently drop the questions. F-22: try an in-context self-repair
+        // turn first; stall only once the repair budget is exhausted.
+        await this.repairOrStall(
+          ctx,
+          sessionId,
+          "aidlc-question",
+          questionParseResult.error.detail,
         );
+        return;
       } else if (questionParseResult.value !== null) {
         // Block found and parsed → emit one QuestionRaised per question (US-03 AC).
         for (const q of questionParseResult.value) {
@@ -892,9 +1066,18 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         // US-05: capture the verify-ui screenshot as visual evidence for the review.
         shotBlock = await this.captureVerifyUi(ctx.runId as string);
       }
+      // F-23: the model may have embedded `![](path)` image links in this prose
+      // (instead of aidlc-result artifacts[]). Convert them to real served
+      // screenshot blocks and strip the paths from the summary so the gallery
+      // renders and no file path leaks (契約①).
+      const { blocks: mdImageBlocks, cleanedText } = this.legacyImageBlocks(
+        ctx.runId as string,
+        text,
+      );
       const blocks: ReviewBlock[] = [
-        { type: "summary", title: `${ctx.step as string} (live Claude)` as Text, body: text as Text },
+        { type: "summary", title: `${ctx.step as string} (live Claude)` as Text, body: cleanedText as Text },
         ...(shotBlock ? [shotBlock] : []),
+        ...mdImageBlocks,
       ];
       // SUCCESS: emit ONLY the review. Do NOT emit `done` — the run stays
       // `running` until the human approves the review (resume → done). This keeps
@@ -1017,6 +1200,69 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       });
     }
     return blocks;
+  }
+
+  /**
+   * F-23 safety net: the model presented screens by embedding `![alt](/abs/scr.png)`
+   * Markdown image links in its prose (instead of the aidlc-result artifacts[] path),
+   * so the review fell to the legacy summary and showed raw, unloadable file paths.
+   * Convert each ref pointing to an existing image UNDER the run's repo into a real
+   * served screenshot block (copy into shotsDir → served URL), and return the prose
+   * with those refs de-pathified. Refs that don't resolve under the repo are left in
+   * place untouched (no copy, no leak-by-serving an arbitrary path). Best-effort: any
+   * failure on a single ref skips just that one.
+   */
+  private legacyImageBlocks(
+    runId: string,
+    text: string,
+  ): { blocks: ReviewBlock[]; cleanedText: string } {
+    const repoPath = this.repoPaths.get(runId);
+    if (repoPath === undefined) return { blocks: [], cleanedText: text };
+    // realpath both sides so the macOS /tmp → /private/tmp symlink (and any other)
+    // can't make an in-repo file look out-of-repo. repoPath always exists here.
+    let repoRoot: string;
+    try {
+      repoRoot = realpathSync(repoPath);
+    } catch {
+      return { blocks: [], cleanedText: text };
+    }
+    const refs = parseMarkdownImageRefs(text);
+    const blocks: ReviewBlock[] = [];
+    const converted: MarkdownImageRef[] = [];
+    let i = 0;
+    for (const ref of refs) {
+      const raw = ref.path.replace(/^file:\/\//, "");
+      const candidate = isAbsolute(raw) ? raw : join(repoPath, raw);
+      if (!existsSync(candidate)) continue;
+      // Resolve symlinks before the containment check (security: only serve files
+      // that truly live UNDER the run's repo, never an arbitrary path the model names).
+      let abs: string;
+      try {
+        abs = realpathSync(candidate);
+      } catch {
+        continue;
+      }
+      if (abs !== repoRoot && !abs.startsWith(repoRoot + "/")) continue;
+      const ext = (abs.match(IMAGE_EXT_RE)?.[0] ?? ".png").toLowerCase();
+      const file = `${runId}-md-${i++}${ext}`;
+      try {
+        copyFileSync(abs, join(this.shotsDir, file));
+      } catch (err) {
+        logError("LiveClaudeOrchestrator.legacyImageBlocks: copy failed", {
+          artifact: ref.path,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+      const caption = ref.alt.trim().length > 0 ? ref.alt.trim() : screenLabel(abs);
+      blocks.push({
+        type: "screenshot",
+        src: `${this.shotUrlBase}/${file}` as Text,
+        caption: caption as Text,
+      });
+      converted.push(ref);
+    }
+    return { blocks, cleanedText: stripImageRefs(text, converted) };
   }
 
   private async emit(ctx: RunContext, event: DomainEvent): Promise<void> {

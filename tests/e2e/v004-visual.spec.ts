@@ -30,6 +30,17 @@
 //
 // All other states are captured below.
 //
+// ── ナビゲーション方針(実操作シナリオ / 直接遷移は最小限)──────────────────
+// 到達可能な状態は人間の実操作(作成→開始→受信箱カード→スレッド→回答→レビュー→承認)で
+// 歩いて撮る。`page.goto()` で内部 URL へ直行してよいのは、フローでは到達できない次の状態のみ
+// (それぞれ直前に理由をコメントする):
+//   - 入口を開く(`${SERVER}/`)
+//   - 合成状態: API を `page.route` で stall/固定して作るスケルトン・空・実行中・完了
+//   - エラー状態: 存在しない questionId(fake-question-id)による 404 系
+//   - デモ用オーバーライド: `?usDecided=false`(pre-US ロックの撮影)
+//   - 導線の無いルート: `/cycles/:id/settings`(CycleStepConfigPage は UI 導線が無い ★要追跡)
+//   - 可変構成: scripted シナリオに無いため実 API(POST /reconstruct)で組んでから表示
+//
 // Constraint: `src/` and `web/src/` are read-only. No changes to source code.
 import { test, expect } from "@playwright/test";
 import { ensureProject, shotS9v004 } from "./helpers";
@@ -57,7 +68,9 @@ test("SCR-01 inbox.empty: no questions, shows empty state", async ({ page }) => 
   // サイクル未作成・inbox 空 が保証される。stalled.spec.ts などが 8892 を汚染しても影響なし。
   await page.goto(`${EMPTY_INBOX}/`);
   await ensureProject(page);
-  await page.goto(`${EMPTY_INBOX}/inbox`);
+  // 受信箱へはサイドバー導線で(実操作 / page.goto しない)。
+  await page.locator("a.nav-item", { hasText: "受信箱" }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
 
   await expect(page.locator(".inbox-empty__title")).toBeVisible({ timeout: 8000 });
   await expect(page.locator(".inbox-empty__title")).toHaveText("対応待ちはありません");
@@ -99,8 +112,10 @@ test("SCR-01 inbox.loading: skeleton loading state", async ({ page }) => {
     // (route is intentionally not called to stall the request)
   });
 
-  // Navigate to inbox — skeleton appears immediately because the API is stalled.
-  await page.goto(`${HAPPY}/inbox`);
+  // Navigate to inbox via the sidebar (実操作) — skeleton appears because the
+  // stalled API keeps the SPA inbox view in its loading state.
+  await page.locator("a.nav-item", { hasText: "受信箱" }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
   // Give React a moment to render the skeleton before screenshotting.
   await page.waitForTimeout(500);
 
@@ -216,11 +231,18 @@ test("SCR-02 conversation-thread.appended: multi-turn — 2nd Q appended after 1
     });
   });
 
+  // Activate the intercept BEFORE submit so EVERY post-submit inbox poll returns the
+  // follow-up Q. (F-12: the thread now stops polling once a visual_review is in the
+  // inbox. The happy backend emits exactly that one turn after the answer, so if the
+  // real review raced into a poll first, polling would stop before the synthetic
+  // follow-up Q was ever fetched. Intercepting the inbox replaces the review with the
+  // follow-up Q on every poll, keeping the multi-turn append deterministic.)
+  // Polling is OFF during turn 1 (Q1 is an open question), so flipping this here does
+  // not disturb the turn-1 view — the first poll fires only after submit clears Q1.
+  interceptActive = true;
   await page.getByRole("button", { name: /まとめて送信して再開/ }).click();
   // Human bubble confirms the answer was recorded locally in React state.
   await expect(page.locator(".thread-bubble--human")).toBeVisible();
-  // Activate the intercept now so subsequent inbox polls return the follow-up Q.
-  interceptActive = true;
 
   // Wait for the polling to pick up the follow-up Q → 2nd .thread-bubble--ai.
   // (ConversationThread polls every ~2.5s while isRunning && no open questions.)
@@ -771,9 +793,11 @@ test("SCR-04 step-config-readback.default: cycle settings readback table visible
   await expect(page).toHaveURL(/\/cycles\/[^/]+$/, { timeout: 8000 });
   const cycleId = page.url().replace(/^.*\/cycles\//, "").replace(/\/.*$/, "");
 
-  // Navigate directly to the cycle settings page (no UI nav link exists to this
-  // route — the sidebar goes to /settings/steps, not /cycles/:id/settings).
-  await page.goto(`${COMPLETE}/cycles/${cycleId}/settings`);
+  // P25 解消: この画面は「ステップ構成」→「各ステップの設定を見る →」で到達可能になった
+  // (reachability は scr-04.pre-us が実フローで担保)。default は「確定後の通常表示(ロック
+  // 解除)」の visual を決定論的に撮るため ?usDecided=true のデモ override を使う(F-14 配線
+  // 後は実状態だと S1 未確定でロック表示になるため)。
+  await page.goto(`${COMPLETE}/cycles/${cycleId}/settings?usDecided=true`);
   // Cycle scope tag confirms we're on the cycle-scoped view.
   await expect(page.locator(".cfg-rb__scope-tag--cycle")).toBeVisible({ timeout: 10000 });
   await expect(page.locator(".cfg-rb__scope-tag--cycle")).toContainText("このサイクル");
@@ -783,8 +807,10 @@ test("SCR-04 step-config-readback.default: cycle settings readback table visible
   await shotS9v004(page, "scr-04-step-config-readback.default.png");
 });
 
-// SCR-04 step-config-readback.pre-us: ?usDecided=false query param activates
-// the pre-US lock banner (🔒) + "以降のステップ" row + disabled "会話で直す" button.
+// SCR-04 step-config-readback.pre-us: 要件(S1)未確定の pre-US ロック(🔒)+ 無効化された
+// 「会話で直す」ボタン。F-14 でロックは実状態(S1 が done か)に配線済みなので、新規サイクル
+// (S1 未起動)では override 無しで自然にロック状態になる。実フローで到達する(P25 の reachability
+// もこれで担保: ステップ構成 →「各ステップの設定を見る」リンク)。
 
 test("SCR-04 step-config-readback.pre-us: pre-US lock banner with disabled button", async ({
   page,
@@ -796,11 +822,14 @@ test("SCR-04 step-config-readback.pre-us: pre-US lock banner with disabled butto
   await page.getByLabel("サイクル名(ゴール)").fill("readback-pre-us");
   await page.getByRole("button", { name: "作成して開く" }).click();
   await expect(page).toHaveURL(/\/cycles\/[^/]+$/, { timeout: 8000 });
-  const cycleId = page.url().replace(/^.*\/cycles\//, "").replace(/\/.*$/, "");
 
-  // ?usDecided=false activates the pre-us lock state in CycleStepConfigPage.
-  await page.goto(`${COMPLETE}/cycles/${cycleId}/settings?usDecided=false`);
-  // Pre-US lock banner: 🔒 icon + "要件が決まると…" text.
+  // 実フロー: サイクル詳細 → ステップ構成 → 各ステップの設定 へ実クリックで到達。
+  await page.getByRole("link", { name: /ステップ構成を見る/ }).click();
+  await expect(page).toHaveURL(/\/steps$/);
+  await page.getByRole("link", { name: /各ステップの設定.*を見る/ }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+
+  // S1 未確定なので pre-US ロックが自然に出る(?usDecided override 不要)。
   await expect(page.locator(".cfg-rb__lock")).toBeVisible({ timeout: 10000 });
   // Disabled "会話で直す(要件決定後)" button (aria-disabled=true).
   await expect(page.getByRole("button", { name: /会話で直す/ })).toBeVisible();

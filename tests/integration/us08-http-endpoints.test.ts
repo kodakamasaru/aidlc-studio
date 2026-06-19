@@ -8,6 +8,10 @@
 // ここは HTTP バリデーション・ルーティング・正常系応答形式のみ検証。
 import { describe, test, expect } from "bun:test";
 import { buildTestApp, buildLoopTestApp, makeRepoDir } from "../support/harness";
+import {
+  RECONSTRUCTION_PENDING_SUMMARY,
+  RECONSTRUCTION_READY_SUMMARY,
+} from "../../src/domain/question/question";
 
 // ── request helpers ──────────────────────────────────────────────────────────
 async function post(
@@ -476,6 +480,57 @@ describe("US-08 F-1 — reconstruction inbox card", () => {
     expect(reconCard).toBeDefined();
     expect(reconCard.kind).toBe("reconstruction");
     expect(reconCard.cycleId).toBe(cycleId);
+    // S10 回帰: 提案が届いた後のカード文言は「確認して承認してください」(READY)。
+    // scripted は S1 開始時に提案を同期 emit するので、起動直後に READY へ反転済み。
+    expect(reconCard.payload.summary).toBe(RECONSTRUCTION_READY_SUMMARY);
+  });
+
+  test("reconstruction card: gate card flips PENDING → READY when the proposal arrives", async () => {
+    const { h, projectId, cycleId } = await setup();
+
+    // F-17 ゲートカードを「提案到着前」の状態で先出しする(launch がやることを再現)。
+    // この時点では確認すべきものが無いので PENDING 文言でなければならない(矛盾文言禁止)。
+    const cycle = h.ports.repos.cycles.findById(cycleId as any)!;
+    const phase = cycle.phases.find((p: any) => p.step === "S1")!;
+    const runId = h.ports.ids.runId();
+    const { raiseQuestion } = await import("../../src/domain/question/question");
+    const gateCard = raiseQuestion({
+      id: h.ports.ids.questionId(),
+      runId,
+      cycleId: cycleId as any,
+      payload: { kind: "reconstruction", summary: RECONSTRUCTION_PENDING_SUMMARY },
+      createdAt: h.ports.clock.now(),
+    });
+    h.ports.uow.run(() => h.ports.repos.questions.save(gateCard));
+
+    const before = ((await (await h.app.request(`/api/projects/${projectId}/inbox`)).json()) as any).data
+      .find((q: any) => q.kind === "reconstruction" && q.state === "open");
+    expect(before.payload.summary).toBe(RECONSTRUCTION_PENDING_SUMMARY);
+    // PENDING 文言は確認を促してはならない(S10 実機で出ていた矛盾文言の回帰ガード)。
+    expect(before.payload.summary).not.toContain("確認してください");
+
+    // 提案到着 → 同じ id のカードが READY へ反転、重複は増えない。
+    const { EventApplier } = await import("../../src/app/services/event-applier");
+    await new EventApplier(h.ports).apply({
+      ctx: {
+        runId,
+        cycleId: cycleId as any,
+        phaseId: phase.id,
+        step: "S1" as any,
+        projectId: cycle.projectId,
+      },
+      event: {
+        type: "ReconstructionProposalEmitted",
+        runId,
+        proposal: { scope: "cycle" as const, steps: [] },
+      },
+    });
+
+    const after = ((await (await h.app.request(`/api/projects/${projectId}/inbox`)).json()) as any).data
+      .filter((q: any) => q.kind === "reconstruction" && q.state === "open");
+    expect(after.length).toBe(1);
+    expect(after[0].id).toBe(gateCard.id);
+    expect(after[0].payload.summary).toBe(RECONSTRUCTION_READY_SUMMARY);
   });
 
   test("reconstruction card: duplicate guard — re-emission does not stack a second card", async () => {

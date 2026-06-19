@@ -15,7 +15,13 @@ import {
   aidlcQuestionToEvent,
   artifactBlockTitle,
   screenLabel,
+  malformedResultEvent,
+  buildRepairInstruction,
+  MAX_REPAIR_ATTEMPTS,
+  parseMarkdownImageRefs,
+  stripImageRefs,
 } from "./live";
+import { parseAidlcResultBlock } from "../../wire/aidlc-result";
 import type { RunId } from "../../domain/shared/ids";
 import type { AidlcQuestion, AidlcOption } from "../../wire/aidlc-wire";
 
@@ -344,5 +350,111 @@ describe("screenLabel (S3 視覚証拠)", () => {
     expect(label).not.toContain("/");
     expect(label).not.toContain(".html");
     expect(label).not.toContain("aidlc-docs");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S10 F-13 — a PRESENT-but-MALFORMED aidlc-result fence must become a retriable
+// `stalled`, never a raw-text summary dump (which leaks internal JSON + drops the
+// envelope's questions). Regression: reproduces the real S10 実機 failure where the
+// model nested `status` inside `completeness` and omitted the root `}`.
+// ---------------------------------------------------------------------------
+
+describe("malformed aidlc-result handling (S10 F-13)", () => {
+  // The exact structural defect seen in the S10 run: `status` placed INSIDE the
+  // completeness object and the root object's closing `}` omitted → invalid JSON.
+  const MALFORMED_ENVELOPE = [
+    "要件一覧の初版を作成しました。",
+    "",
+    "```aidlc-result",
+    '{"artifacts":["aidlc-docs/v0.0.1/s1/index.md"],"questions":[],"decisions":[],' +
+      '"completeness":{"requirements":[{"key":"r1","text":"目的が1文で言える"}],' +
+      '"addressed":["r1"],"status":"needs_human"}', // ← missing the root-object '}'
+    "```",
+  ].join("\n");
+
+  test("the parser rejects the malformed envelope (root not closed)", () => {
+    const r = parseAidlcResultBlock(MALFORMED_ENVELOPE);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("bad-json");
+  });
+
+  test("malformedResultEvent emits a retriable stalled run state", () => {
+    const ev = malformedResultEvent(runId);
+    expect(ev.type).toBe("RunStateChanged");
+    if (ev.type === "RunStateChanged") {
+      expect(ev.to).toBe("stalled");
+      expect(ev.reason && ev.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("the stall reason never leaks internal JSON / paths (契約①)", () => {
+    const ev = malformedResultEvent(runId);
+    const reason = ev.type === "RunStateChanged" ? (ev.reason ?? "") : "";
+    expect(reason).not.toContain("aidlc-docs");
+    expect(reason).not.toContain("{");
+    expect(reason).not.toContain('"');
+    expect(reason).not.toContain(".md");
+  });
+});
+
+describe("self-repair instruction (F-22)", () => {
+  test("MAX_REPAIR_ATTEMPTS is a small positive bound (auto loop cannot run away)", () => {
+    expect(MAX_REPAIR_ATTEMPTS).toBeGreaterThanOrEqual(1);
+    expect(MAX_REPAIR_ATTEMPTS).toBeLessThanOrEqual(5);
+  });
+
+  test("names the failed fence, echoes the validator detail, and shows the expected shape", () => {
+    const msg = buildRepairInstruction(
+      "aidlc-question",
+      "aidlc-question block must parse to { questions: AidlcQuestion[] }",
+    );
+    // The AI-facing repair message must tell the model WHICH fence + WHAT to emit.
+    expect(msg).toContain("aidlc-question");
+    expect(msg).toContain("must parse to"); // the validator's detail is echoed
+    expect(msg).toContain('"questions"'); // expected shape reminder
+    // It asks for exactly one corrected block, not a redo of the whole step.
+    expect(msg).toContain("1 つだけ");
+  });
+
+  test("each fence kind gets its own schema reminder", () => {
+    expect(buildRepairInstruction("aidlc-result", "x")).toContain('"status"');
+    expect(buildRepairInstruction("aidlc-reconstruction", "x")).toContain('"scope"');
+  });
+});
+
+describe("Markdown image refs in prose (F-23)", () => {
+  // The real S10 prose: the model embedded screenshots as Markdown image links to
+  // absolute file paths instead of emitting aidlc-result artifacts[].
+  const PROSE = [
+    "画面を実際にお見せします。",
+    "",
+    "![翌日メニュー一覧](/private/tmp/aidlc-sandbox/aidlc-docs/v0.0.1/s3/screenshots/scr-01.default.png)",
+    "",
+    "**予約完了**",
+    "![予約完了](/private/tmp/aidlc-sandbox/aidlc-docs/v0.0.1/s3/screenshots/scr-03.default.png)",
+  ].join("\n");
+
+  test("parses each image ref with alt + path", () => {
+    const refs = parseMarkdownImageRefs(PROSE);
+    expect(refs).toHaveLength(2);
+    expect(refs[0]?.alt).toBe("翌日メニュー一覧");
+    expect(refs[0]?.path).toContain("scr-01.default.png");
+    expect(refs[1]?.alt).toBe("予約完了");
+  });
+
+  test("ignores non-image links (only image extensions are candidates)", () => {
+    const refs = parseMarkdownImageRefs("[要件一覧](aidlc-docs/s1/index.md) と ![x](a.png)");
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.path).toBe("a.png");
+  });
+
+  test("stripImageRefs replaces the raw link with a caption — no path leaks (契約①)", () => {
+    const refs = parseMarkdownImageRefs(PROSE);
+    const cleaned = stripImageRefs(PROSE, refs);
+    expect(cleaned).not.toContain("/private/tmp");
+    expect(cleaned).not.toContain(".png");
+    expect(cleaned).not.toContain("![");
+    expect(cleaned).toContain("翌日メニュー一覧"); // caption survives as readable text
   });
 });

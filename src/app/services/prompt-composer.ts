@@ -130,8 +130,10 @@ export const OUTPUT_CONTRACT_INSTRUCTION = [
   "  - 質問がない場合は questions[] 自体を空配列 []",
   "- decisions[]: AI が独自に決めた事項({id,decision,reason} — 理由必須)",
   "- completeness: {requirements:[{key,text}], addressed:[key]} — 未充足は addressed に含めない",
-  "- status: \"done\" | \"needs_human\" | \"stalled\"",
-  "  - done: 人間ゲート不要で前進可(完了条件を完全に充足)",
+  "- status: \"done\" | \"needs_human\" | \"stalled\"(あなたの自己評価。**人間レビューの要否は",
+  "  ステップ設定が決めるのであって status では決まらない** — done と書いても、レビューが設定",
+  "  された工程では必ず人間の承認カードが出る。done で人間ゲートをスキップさせることはできない)",
+  "  - done: あなたの判断で完了条件を充足したと考える(それでもゲート設定があれば人間レビューに回る)",
   "  - needs_human: 人間のレビュー / 承認が必要、または questions[] に質問がある",
   "  - stalled: 続行不能(理由は decisions に書く)",
   "  - questions[] が空でない場合は status=\"needs_human\" にすること",
@@ -175,11 +177,22 @@ export class PromptComposer {
    * then proposes the PENDING pipeline (S1 is already fixed — AC-5). Output is a
    * single ```aidlc-reconstruction``` block (scope:"cycle"), all human text 日本語.
    */
-  composeReconstruction(repoPath: string): string {
+  composeReconstruction(repoPath: string, feedback?: string): string {
     const docsDir = join(repoPath, "aidlc-docs");
+    const trimmedFeedback = feedback?.trim();
     return [
       "あなたは AI-DLC の工程再構成器です。S1(要件)が確定した直後に、このサイクルの工程を US に合わせて1回だけ組み直します(US-08)。",
       "",
+      // US-08 会話で修正: 人間が前回の提案に修正指示を出して再提案を求めている場合は、
+      // それを最優先で踏まえて組み直す(指示に沿った変更を必ず反映する)。
+      ...(trimmedFeedback
+        ? [
+            "── 人間からの修正指示(再提案 / これを最優先で踏まえよ) ──",
+            trimmedFeedback,
+            "前回の提案を、この指示に沿って見直して**再提案**せよ。指示が反映された提案にすること。",
+            "",
+          ]
+        : []),
       this.contractLayer(repoPath),
       this.operatingModelLayer(repoPath),
       "",
@@ -197,6 +210,7 @@ export class PromptComposer {
       '{"scope":"cycle","steps":[{"id":"S2","label":"画面","order":0,"skillRef":"aidlc-s2-wireframe","instruction":"この工程のルール本文(日本語・何をどう作るか)","diff":"keep","reason":"根拠(任意)"}]}',
       "```",
       "フィールド: scope=\"cycle\"。steps[] は非空・各要素に id / label / order(0始まり連番) / skillRef / instruction(ルール本文・日本語) / diff(\"keep\"|\"add\"|\"delete\"|\"current\")。diff=\"delete\" のときは reason 必須。",
+      "order は **残す工程(keep/add/current)だけ**で 0 始まりの連番にせよ。delete の工程は最終パイプラインから外れ order は使われないので、残す工程の連番に欠番を作らず詰めること(delete には order:-1 を与えてよい)。",
       "label・instruction・reason など人間が読む文字列はすべて日本語。",
     ].join("\n");
   }

@@ -155,10 +155,19 @@ export function ConversationThread({
     cycle?.state === "done" ||
     (activePhase?.state === "done" && allOpenQuestions.length === 0);
 
-  // ── Polling: while AI is running and no questions yet ────────
+  // A visual_review for this cycle means the AI finished answering and emitted a
+  // review — the QA thread must STOP showing "考えています" and point the human to the
+  // review (原則#1/Human Inbox), NOT poll forever. The live run stays `running` under
+  // the review-gate, so isRunning alone never clears. BUG (S10 device_check 2026-06):
+  // the thread only watched kind==="question" and ignored the emitted visual_review,
+  // leaving the screen stuck on "AI が続きを考えています".
+  const openReview = (inboxQ.data ?? []).find((q) => q.kind === "visual_review");
+
+  // ── Polling: while AI is running and neither questions nor a review yet ────────
   const reloadInbox = inboxQ.reload;
   const reloadCycle = cycleQ.reload;
-  const shouldPoll = isRunning && allOpenQuestions.length === 0;
+  const shouldPoll =
+    isRunning && allOpenQuestions.length === 0 && openReview === undefined;
 
   useEffect(() => {
     if (!shouldPoll) return;
@@ -467,7 +476,7 @@ export function ConversationThread({
         {/* ── Running: answers submitted, AI is continuing ─── */}
         {/* Only shown when the human has submitted at least one batch (hasHistory).
             Before any submission, the empty/launched state above is shown instead. */}
-        {isRunning && allOpenQuestions.length === 0 && hasHistory && (
+        {isRunning && allOpenQuestions.length === 0 && hasHistory && !openReview && (
           <div className="thread-running" aria-live="polite">
             <span className="thread-dots" aria-hidden="true">
               <i />
@@ -486,6 +495,17 @@ export function ConversationThread({
               })()}
             </span>
             <span className="sr-only">AI が続きを考えています</span>
+          </div>
+        )}
+
+        {/* ── Review ready: the AI emitted a 「できあがりの確認」 after the QA. Stop the
+            spinner and send the human to the review (S10 device_check fix). ─── */}
+        {openReview && allOpenQuestions.length === 0 && (
+          <div className="thread-review-ready" aria-live="polite">
+            <span>AI が「できあがりの確認」を出しました。内容を確認して承認 / 差し戻しできます。</span>
+            <Link to={`/questions/${openReview.id}`} className="btn btn--primary">
+              できあがりを確認する
+            </Link>
           </div>
         )}
 

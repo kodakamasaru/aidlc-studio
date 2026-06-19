@@ -2,13 +2,14 @@
 // 説明 + 状態バッジ のカードで縦に並べ、進行中は変更不可の注意を出す。末尾に現ステップの
 // 「指示(要約)」(契約)+ 全文リンク。S3 視覚契約 scr-01.cycle-steps。
 import { Link, useParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 import { useAsync } from "../../lib/useAsync";
 import { useProjectContext } from "../../lib/project-context";
 import { useSetTopbar } from "../../components/shell/topbar-context";
 import { LoadingMessage, ErrorMessage } from "../../components/ui/StateMessage";
 import { CheckIcon } from "../../components/ui/Icon";
 import { stepLabel, stepDesc } from "../../lib/step-label";
+import { stepsGuidance } from "../../lib/cycle-state";
 import "./cycle-detail.css";
 
 const STATE_TEXT: Record<string, string> = {
@@ -31,6 +32,16 @@ function stepNumber(step: string): string {
 export function CycleStepsPage() {
   const { cycleId = "" } = useParams();
   const cycleQ = useAsync(() => api.getCycle(cycleId), [cycleId]);
+  // F-14: per-cycle の工程調整は「要件(S1)確定直後の組み直し提案」で行う。提案が存在するなら
+  // 本来の調整点なので導線を出す。未生成は 404 → null(エラー扱いにしない / 黙って落とさない)。
+  const proposalQ = useAsync(async () => {
+    try {
+      return await api.getReconstructionProposal(cycleId);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  }, [cycleId]);
   const { project } = useProjectContext();
   const cycle = cycleQ.data;
 
@@ -61,8 +72,10 @@ export function CycleStepsPage() {
   }
 
   const active = cycle.phases.find((p) => p.state !== "done");
-  const started =
-    cycle.state !== "planned" || cycle.phases.some((p) => p.runs.length > 0);
+  // F-14: この画面は「閲覧専用」。per-cycle の工程調整は要件(S1)確定直後の組み直し提案で行う
+  // ので、案内文は状態に応じて実態を述べ(旧『始める前にだけ調整できる』は実態と真逆で削除)、
+  // 提案があれば本来の調整点へ導く。
+  const guidance = stepsGuidance(cycle, proposalQ.data != null);
   // 現ステップの契約(指示の要約に使う)。project が未取得なら要約は出さない。
   const activeDef = project?.pipelineDef.find((s) => s.id === active?.step);
   const c = activeDef?.contracts ?? {};
@@ -75,13 +88,31 @@ export function CycleStepsPage() {
       </Link>
       <header className="page-head">
         <h1 className="page-title">{cycle.version} のステップ構成</h1>
+        {/* P25: 詳細設定(各ステップの成果物・人の確認・行き詰まり時)への導線。
+            これが無いと CycleStepConfigPage(/cycles/:id/settings)が orphan route
+            になる(どこからもリンクされず人間が到達できない)。 */}
+        <Link to={`/cycles/${cycleId}/settings`} className="page-head__link">
+          各ステップの設定(成果物・人の確認・行き詰まり時)を見る →
+        </Link>
       </header>
 
-      {started ? (
-        <p className="cycle-steps-note" role="note">
-          このサイクルは進行中です。構成の変更はできません(始める前のサイクルでのみ調整できます)。
+      {guidance === "reconstruction-available" ? (
+        <p className="cycle-steps-note cycle-steps-note--action" role="note">
+          要件が固まったので、AI がこのサイクル向けの工程の組み直しを提案しています。{" "}
+          <Link to={`/cycles/${cycleId}/reconstruction`} className="page-head__link">
+            → 工程の組み直しを確認する
+          </Link>
         </p>
-      ) : null}
+      ) : guidance === "pre-requirements" ? (
+        <p className="cycle-steps-note" role="note">
+          工程はまず既定のまま動きます。要件(「{stepLabel("S1")}」)が固まると、AI
+          がこのサイクル向けに工程の組み直しを提案します。ここは現在の工程を確認する画面です。
+        </p>
+      ) : (
+        <p className="cycle-steps-note" role="note">
+          進行中のため工程構成は変更できません。工程の組み直しは、要件が固まった直後にのみ行います。
+        </p>
+      )}
 
       <ol className="cycle-steps-cards">
         {cycle.phases.map((phase) => {

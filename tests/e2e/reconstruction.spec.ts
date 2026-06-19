@@ -107,8 +107,12 @@ test("cycle reconstruction: runs S1 to generate proposal then renders diff list"
     )
     .toBe(200);
 
-  // ── 6. Navigate to reconstruction page and assert diff list ───
-  await page.goto(`${VARIABLE}/cycles/${cycleId}/reconstruction`);
+  // ── 6. 受信箱の「工程の再構成」カードから提案画面へ(実フロー / 直接遷移しない)──
+  await page.locator("a.nav-item", { hasText: "受信箱" }).click();
+  const reconCard = page.getByRole("listitem").filter({ hasText: "工程の再構成" });
+  await expect(reconCard).toBeVisible();
+  await reconCard.getByRole("link", { name: /確認する/ }).click();
+  await expect(page).toHaveURL(/\/cycles\/[^/]+\/reconstruction$/);
 
   // .recon-list must be visible with real diff entries (not the empty state).
   const reconList = page.locator(".recon-list");
@@ -124,6 +128,17 @@ test("cycle reconstruction: runs S1 to generate proposal then renders diff list"
 
   // Screenshot the real proposal diff list (overwrite any prior empty-state capture).
   await shotS9v004(page, "scr-02-conversation-thread.reconstruction.png");
+
+  // ── 6b. 会話で修正(再提案)— modify ブランチ。旧実装は reconstruction カードへ
+  // answerQuestion(verdict:"answer") を送って 400 InvalidVerdict になっていた(検出ギャップ:
+  // E2E が approve しか踏まず modify を一度も歩いていなかった)。今は専用 repropose で再提案。
+  await page.getByText("直したい所を会話で").click();
+  await page.getByLabel("修正の指示").fill("S4 を残して。レビュー工程も見直して");
+  await page.getByRole("button", { name: /送信して再提案/ }).click();
+  // 回帰防止: 400 / InvalidVerdict が出ないこと。
+  await expect(page.getByText(/InvalidVerdict/)).toHaveCount(0);
+  // 再提案(REVISED)が届く: CUSTOM-QA が見直し版ラベルに変わる(polling で差分検知)。
+  await expect(page.getByText(/再提案で見直し/)).toBeVisible({ timeout: 10000 });
 
   // ── 7. Approve → back to cycle detail ─────────────────────────
   const approveBtn = page.getByRole("button", { name: /承認して進む/ });

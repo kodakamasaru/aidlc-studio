@@ -75,7 +75,7 @@ interface StepConfigReadbackProps {
 export function StepConfigReadback({
   scope,
   cycleId,
-  usDecided = true,
+  usDecided,
 }: StepConfigReadbackProps) {
   const ctx = useProjectContext();
   // Cycle scope renders the cycle's OWN config = the snapshot pinned onto each
@@ -164,7 +164,13 @@ export function StepConfigReadback({
           }))
           .sort((a, b) => a.order - b.order);
   const isCycle = scope === "cycle";
-  const isPreUs = isCycle && !usDecided;
+  // F-14: pre-US ロックは実サイクル状態に配線する。要件(S1)が done なら「要件決定済み」。
+  // usDecided prop はハーネス/デモの明示オーバーライド(?usDecided=)としてのみ優先する
+  // (旧実装は prop 既定 true でロックが実状態に繋がっておらず、要件確定後に組み直すという
+  // 設計と矛盾していた)。
+  const requirementsDone =
+    cycleQ.data?.phases.find((p) => p.step === "S1")?.state === "done";
+  const isPreUs = isCycle && !(usDecided ?? requirementsDone ?? false);
   // Empty-value wording: a cycle's step is FROZEN at creation (no live inheritance),
   // so an unconfigured step reads "調整なし". Global scope edits live defaults.
   const inheritLabel = isCycle ? "調整なし(作成時の既定のまま)" : "未設定";
@@ -434,13 +440,23 @@ export function GlobalStepConfigPage() {
 }
 
 /** Route: /cycles/:cycleId/settings — cycle-scoped readback.
- * pre-us 状態: ?usDecided=false で SCR-04 pre-us view を描画(ハーネス・デモ用)。
- * 本番では cycle API が usDecided を返せるようになったら query param を廃止予定。
+ * pre-US ロックは実サイクル状態(S1 が done か = 要件決定済み)から導出する(F-14)。
+ * ?usDecided=true/false は SCR-04 の各状態を撮るためのハーネス/デモ用オーバーライド。
  */
 export function CycleStepConfigPage() {
   const { cycleId = "" } = useParams();
   const [searchParams] = useSearchParams();
-  // ?usDecided=false → pre-us 状態を描画(default: true = US 決定済み)
-  const usDecided = searchParams.get("usDecided") !== "false";
-  return <StepConfigReadback scope="cycle" cycleId={cycleId} usDecided={usDecided} />;
+  // F-14: 通常は実サイクル状態(S1 が done か)からロックを導出させるため undefined を渡す。
+  // ?usDecided=true/false が明示されたときだけ、ハーネス/デモ用のオーバーライドとして渡す。
+  const raw = searchParams.get("usDecided");
+  const override = raw === null ? undefined : raw !== "false";
+  // exactOptionalPropertyTypes: omit the prop entirely (not usDecided={undefined})
+  // so the component derives the lock from real cycle state.
+  return (
+    <StepConfigReadback
+      scope="cycle"
+      cycleId={cycleId}
+      {...(override !== undefined ? { usDecided: override } : {})}
+    />
+  );
 }

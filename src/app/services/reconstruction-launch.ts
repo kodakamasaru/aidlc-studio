@@ -16,6 +16,10 @@ import type { Ports } from "../ports/composition";
 import type { Cycle } from "../../domain/cycle/cycle";
 import { sameStep, type Step } from "../../domain/shared/vocab";
 import type { PhaseId } from "../../domain/shared/ids";
+import {
+  raiseQuestion,
+  RECONSTRUCTION_PENDING_SUMMARY,
+} from "../../domain/question/question";
 import { logError } from "../../infra/log";
 
 export async function launchReconstructionForS1(
@@ -28,6 +32,11 @@ export async function launchReconstructionForS1(
   if (!sameStep(step, "S1" as Step)) return;
   // Idempotency + recursion guard: a proposal already exists → it already ran.
   if (ports.repos.reconstructionProposals.find(cycle.id) !== undefined) return;
+  // Already launched (gate card open) → don't double-launch / double-card.
+  const openReconstruction = ports.repos.questions
+    .listByCycle(cycle.id)
+    .some((q) => q.state === "open" && q.kind === "reconstruction");
+  if (openReconstruction) return;
 
   const project = ports.repos.projects.findById(cycle.projectId);
   if (!project) return;
@@ -35,6 +44,27 @@ export async function launchReconstructionForS1(
   const runId = ports.ids.runId();
   const phaseId =
     cycle.phases.find((p) => sameStep(p.step, "S1" as Step))?.id ?? fallbackPhaseId;
+
+  // F-17 gate: raise the reconstruction GATE card UP FRONT (before launching the
+  // run). This makes 要件→ステップ構成→後続 a real gate (startPhase refuses the next
+  // step while this card is open) AND ensures a failed/empty reconstruction run
+  // leaves a *pending* card the human can retry/reject — never a silent skip to S2
+  // (原則④). While the run is still working there is NOTHING to confirm yet, so the
+  // gate-card title must NOT invite confirmation (S10 実機: 組み上がる前から「確認して
+  // ください」と出るのは矛盾). The applier flips this title to RECONSTRUCTION_READY_SUMMARY
+  // when the run emits ReconstructionProposalEmitted.
+  const card = raiseQuestion({
+    id: ports.ids.questionId(),
+    runId,
+    cycleId: cycle.id,
+    payload: {
+      kind: "reconstruction",
+      summary: RECONSTRUCTION_PENDING_SUMMARY,
+    },
+    createdAt: ports.clock.now(),
+  });
+  ports.uow.run(() => ports.repos.questions.save(card));
+
   try {
     await ports.orchestrator.launch({
       runId,
