@@ -29,7 +29,7 @@ S7 ドメインコード + S8 統合コードが、**ユーザーストーリー
 |------|------|
 | 入力 | `aidlc-docs/{version}/s8-integration.md` + `aidlc-docs/{version}/s1/` US + `aidlc-docs/{version}/s3/` 画面 screenshot + `src/` 統合コード |
 | 出力 | (1) E2E テストコード: `tests/e2e/` 配下 / (2) 視覚証拠: `aidlc-docs/{version}/s9/screenshots/` + `videos/`(必要時) / (3) 進行ログ: `aidlc-docs/{version}/s9-validation.md` |
-| 完了条件 | (1) 全 US に少なくとも 1 つのシナリオテストがある / (2) 全受け入れ基準がテストでカバーされている / (3) 視覚証拠を **S3 の全状態インベントリ起点で突合**(`s3/screenshots/*.png` の 1 枚 = 1 行を全件列挙してから検証。**撮れた screenshot 起点では未実装画面が diff に現れず取りこぼす**)。各状態に `一致/乖離/未実装` を付け、乖離・未実装は honest に記録して S10 へ渡す / (4) 未解決の CRITICAL バグがゼロ / (5) テスト結果が md に記録されている / (6) **live 縦経路 e2e を 1 本完走**(v0.0.4 S11 P36/IMP1 / operating-model Rule C): 使い捨てリポ([[test-projects-use-throwaway-repo]])で実 AI を `launch→質問→回答→resume→レビュー→承認` まで実フロー走破し、各 human-gate を実際に通す。**決定論テスト + mock E2E が緑でも、この live 縦経路が未完走なら S9 を `確定` にできない**(決定論/mock は composition-root に mock 注入するため live/headless 経路を構造的に盲点にする = v0.0.4 で 22 バグが人間の最終ゲートに集中した真因)。検出方法を併記して記録する(「opportunistic な手動で 0」と「systematic な live 縦経路網羅で 0」を区別)。**この完了条件の機械的強制(live 証拠が無ければ done 不可の hard-gate)は v0.0.5 IMP1。テキスト規範だけでは deferral される実績があるため、IMP1 完成までは AI 自身が毎 S9 で必ず手動完走する** |
+| 完了条件 | (1) 全 US に少なくとも 1 つのシナリオテストがある / (2) 全受け入れ基準がテストでカバーされている / (3) 視覚証拠を **S3 の全状態インベントリ起点で突合**(`s3/screenshots/*.png` の 1 枚 = 1 行を全件列挙してから検証。**撮れた screenshot 起点では未実装画面が diff に現れず取りこぼす**)。各状態に `一致/乖離/未実装` を付け、乖離・未実装は honest に記録して S10 へ渡す / (4) 未解決の CRITICAL バグがゼロ / (5) テスト結果が md に記録されている / (6) **live 縦経路 e2e を 1 本完走**(v0.0.4 S11 P36/IMP1 / operating-model Rule C): 使い捨てリポ([[test-projects-use-throwaway-repo]])で実 AI を `launch→質問→回答→resume→レビュー→承認` まで実フロー走破し、各 human-gate を実際に通す。**決定論テスト + mock E2E が緑でも、この live 縦経路が未完走なら S9 を `確定` にできない**(決定論/mock は composition-root に mock 注入するため live/headless 経路を構造的に盲点にする = v0.0.4 で 22 バグが人間の最終ゲートに集中した真因)。検出方法を併記して記録する(「opportunistic な手動で 0」と「systematic な live 縦経路網羅で 0」を区別)。**この完了条件の機械的強制(live 証拠が無ければ done 不可の hard-gate)は v0.0.5 IMP1。テキスト規範だけでは deferral される実績があるため、IMP1 完成までは AI 自身が毎 S9 で必ず手動完走する** / (7) **全 US の per-US エビデンス(毎サイクル必達)**: `aidlc-docs/{version}/s9/evidence-by-us.md` に **s1/ の全 US を 1 件ずつ**「変更 → 確認手段 → 証拠アーティファクト」で対応付け、各 US に**実物の証拠**(UI=実機 screenshot / live 挙動=実 claude 操作 dossier `s9/live-gate/`・`s9/live/`(動画+連番 screenshot+runId)/ backend・script・gate=実行ログ or テスト)を出す。`bun run evidence:check {version}`(全 US に entry+証拠参照)と `bun run live:check {version}`(実 claude 操作 dossier / Rule C-2)が **両方 PASS** でなければ S9 を `確定` にできない。「ファイルへの参照」でなく**証拠そのもの**を残す(v0.0.5 でユーザーが3度要求した恒久ルール)|
 
 ## 進め方
 
@@ -63,7 +63,7 @@ S7 ドメインコード + S8 統合コードが、**ユーザーストーリー
 
 5. AI が独自に決めたこと(テスト戦略、ツール選択、データ準備方法)は **「AI が独自に決めたこと と 理由」に `### D-NN` で必ず追記**。技術判断は AI 自走で確定し(事後 double-check)、事業判断が要るものだけ Q カードで人間に問う。レビューで人間が覆した場合のみ AI が `上書き` に記録する。
 
-6. 完了条件 5 つが全て満たされたら s9-validation.md を `ステータス: 確定`。**次サイクル(あれば S1 から再開)に渡す引き継ぎ**を必ず書いて締める。
+6. 完了条件 7 つ(特に (6) live 縦経路 + (7) per-US エビデンス: `evidence:check` & `live:check` 両 PASS)が全て満たされたら s9-validation.md を `ステータス: 確定`。**次サイクル(あれば S1 から再開)に渡す引き継ぎ**を必ず書いて締める。
 
 ## 成果物 md テンプレート(進行ログ)
 

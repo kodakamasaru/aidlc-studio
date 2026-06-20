@@ -1,0 +1,83 @@
+# ルート台帳(aidlc-docs/ledger.yml)— 全サイクル横断・append-only(US-02 / Unit-02)。
+# schema = kit/rules/ledger.md。state: carried|done|dropped。carried は into 必須。
+# これは「未解決の現在ビュー」: into が未着手サイクル(> v0.0.5)を指す carried のみを保持する。
+# 版別 ledger(aidlc-docs/<vX>/ledger.yml)は履歴として不変。本ファイルは
+#   bun run scripts/migrate-root-ledger.ts
+# で再生成できる(冪等)。新しい carried は確定と同じターンで本ファイルへも追記する。
+
+- id: S7-C1
+  origin: v0.0.1/s7-integration.md
+  decision: "live adapter の対話型 Q→回答→resume ループ(headless claude のセッション resume / 実 AI が Q を出して停止し人間回答で再開)。v0 は run→emit→done の実 AI 検証まで。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C4
+  origin: v0.0.1/s7-integration.md
+  decision: "backtrack 後の戻り先 Phase への run 自動生成 = S6 に relaunchPhase 相当が必要 / S7 では pipeline rewind+Fact まで。差し戻し後の戻り先 Phase は domain 上 running(run なし)で、既存 startPhase は pending 前提のため再起動できない。UI は SCR-02 で「要再実行 / running(run なし)」を disabled-with-explanation で表示。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C2
+  origin: v0.0.1/s7-integration.md
+  decision: "orchestration→web の push 経路(SSE/WebSocket)。v0 はポーリング/リクエスト駆動。"
+  state: carried
+  into: v0.0.x
+
+- id: S7-C3
+  origin: v0.0.1/s7-integration.md
+  decision: "frontend MEDIUM 整理: 画面ガード共通化(PageGuard 抽出)/ 一覧 comparator 共通化(LOW)。機能影響なしのため繰越。"
+  state: carried
+  into: v0.0.x
+
+- id: S8-Q02
+  origin: v0.0.2/s8-integration.md
+  decision: "auto-rework(理由なし gap)の完全 silent 自動再生成。v0.0.2 は loud(eval run stalled+理由)で代替。Unit-05 の silent UX 最適化が残(新ドメイン再生成コマンド要)。"
+  state: carried
+  into: v0.0.6
+
+- id: O3-live-resume-continuation-unproven
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: "US-04 resume 継続が live 未実証(揮発しない実 session を用いた --resume 継続の実機実証)。 AUTO-ORCH の reconcile/resume 経路(v0.0.6 = AUTO-ORCH-core)に内包して実証する。"
+  state: carried
+  into: v0.0.6
+  reason: "内包先の reconcile-resume(AUTO-ORCH-core)が v0.0.6 のため、本項も v0.0.6。独立 US にせず resume 経路の 実機シナリオで兼ねる(v0.0.4 AUTO-ORCH エントリの内包方針を継承)。"
+
+- id: F3-project-management-ui
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: "web にプロジェクト作成/リセット/切替の UI が無い(project-context が projects[0] 固定)。legacy プロジェクト (step-model-v2 前 / S2.5 入り)の安全な正規化マイグレーションを含む。一時 cleanup script(scripts/ cleanup-legacy-project.ts)+ backup の整理も本項に同送(v0.0.5 US-09 は純 dead-code 削除のみ)。"
+  state: carried
+  into: v0.0.7
+  reason: "baseline UI 機能で IMP1 の信頼層には不要。v0.0.7 で US 化する(当初ドラフト US-13 相当)。"
+
+- id: S11-IMP5-retro-metrics-autocollect
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: "run/HumanTask store から検出ゲート別バグ・Step 別所要・Q&A 件数を自動集計するレポートを作り S11 入力に供給。"
+  state: carried
+  into: v0.0.7
+  reason: "S11 入力の自動化で、本サイクルの信頼層には不要。v0.0.7 で US 化する(当初ドラフト US-14 相当)。"
+
+- id: AUTO-ORCH-core
+  origin: v0.0.4/ledger.yml (AUTO-ORCH-durable-self-healing / into v0.0.5) → v0.0.5 S1 分割
+  decision: "放置可能な自走基盤の core: 自走スケジューラ(N並列+依存DAG+human-gate parking)/ 独立検証→自動 retry / 上限 backoff 自動再開 / retry 上限→inbox+後続継続 / 起動毎 reconcile を resume 優先+孤児自動 retry / stall 検知+late-emit 冪等化。設計正本 = aidlc-docs/v0.0.5/autonomous-self-healing-orchestration.md(§1-§12)。"
+  state: carried
+  into: v0.0.6
+  reason: "v0.0.5 を検証/台帳の土台に絞ったため(信頼層を自走エンジン本体より先に固める / 未検証成果の自動前進を防ぐ)。 v0.0.6 S1 で US 化する(当初ドラフト US-01〜05,07 相当)。"
+
+- id: AUTO-ORCH-monitoring-parallel
+  origin: v0.0.4/ledger.yml (AUTO-ORCH-durable-self-healing / into v0.0.5) → v0.0.5 S1 分割
+  decision: "監視 / 並行の重インフラ: CLI spawn → Agent SDK query() 全面移行 + live-run 永続台帳(runId↔pid↔ session_id↔last-activity)/ stream 逐次監視 / worktree 複数による真の並行サイクル(N>1)+ 書込競合分離・ マージ戦略。設計正本 = autonomous-self-healing-orchestration.md §10/§13。"
+  state: carried
+  into: v0.0.7
+  reason: "監視 SDK 全面移行と worktree 真の並行は移行コスト大の重インフラ。core(v0.0.6)が乗ってから着手する。 v0.0.7 S1 で US 化する(当初ドラフト US-06,08 相当)。"
+
+- id: P-ARCH-01-methodology-platform-link
+  origin: v0.0.5/s11 + s10 review (ユーザー指摘 2026-06-21)
+  decision: "方法論(kit 散文)とプラットフォーム(機械ゲート/UI)が 3 重符号化で単一正本なし。(3a)新規不変条件は step-contracts 単一正本へ宣言する規律 +(2)ルール↔ゲート↔テスト連結の drift 検出 +(1)S12 規範。 precision-first(存在=ゲート / 質=evaluator / 狙い=平易 intent)。詳細 BACKLOG §K。"
+  state: carried
+  into: v0.0.6
+
+- id: P-ARCH-02-cross-cycle-project-param
+  origin: v0.0.5/s11 + s10 review (ユーザー指摘 2026-06-21)
+  decision: "reconcile/ledger CLI が studio リポ固定で project 非パラメータ = 任意 PJ で動くプラットフォーム機能に なっていない。repoPath パラメータ化 + seed 跨サイクル fixture。US-03 のゲート BLOCK 画面化の前提。詳細 BACKLOG §K。"
+  state: carried
+  into: v0.0.6

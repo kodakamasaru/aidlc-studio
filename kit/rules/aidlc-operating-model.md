@@ -204,11 +204,51 @@ v0.0.4 で「決定論テスト緑のまま live でのみ露呈するバグ 22 
 - 検証は AI が継続的に自分で回し、人間には最終 OK だけを求める([[dogfood-harness-principles-on-this-repo]] / [[verify-ui-in-real-browser]])。
 - **テキスト指示だけでは不十分(実証済)**。Rule C の機械的強制 ─ live 証拠が無ければ step を done にできない hard-gate + live を安くする seeded states + per-step live ─ は v0.0.5 の first-class US(ledger `S11-IMP1-live-evidence-hard-gate`)。backlog でなく必達で commit する(下 Rule E)。
 
+#### Rule C-2 — 「実操作確認 / live で確認」の語義を固定する(v0.0.5 S9 で再発 → 恒久)
+
+> **人間が「live で確認」「実操作で確認」と言ったら、それは "実 `claude` を実際に走らせ、実サイトを操作し、操作→結果を動画 + 操作列 screenshot で残す" を意味する。次のどれも「実操作確認の代替」として認めない:**
+> 1. **コードパス検証 / scripted orchestrator / 単体・統合テスト**(= 実 AI を走らせていない。決定論層は別途必要だが live 確認の代替にならない)。
+> 2. **「有料だから / 実機依存だから」を理由にした go-ahead 待ちでの deferral**(人間が既に明示指示しているなら go-ahead は得られている。これは P37 の live-deferral 不遵守の再発そのもの)。
+> 3. **静的 screenshot 1 枚**(「どう操作して→こうなったか」が示せない。操作の前後・各 human-gate 通過を**操作列**で残す)。
+
+- **必須成果物 = live operation dossier**: `aidlc-docs/{version}/s9/live/` に ① 操作の動画(`*.webm`)② 操作ステップ毎の連番 screenshot(`NN-*.png`: 開く→作成→開始→質問→回答→レビュー→承認)③ 実 run の runId(live backend ログ)を残す。
+- **機械ゲート(毎サイクル必達 / S9・CLOSE はこれら全 PASS でなければ `確定` にしない)**:
+  - `bun run live:check <version>`(`scripts/check-live-dossier.ts`)— 実 claude 操作 dossier(動画 + 連番 screenshot + README + runId)の存在を検査。無ければ exit 1。
+  - `bun run evidence:check <version>`(`scripts/evidence-check.ts`)— **s1/ の全 US を自動列挙**し、`s9/evidence-by-us.md` に各 US の「変更→確認手段→証拠アーティファクト」entry + 実証拠参照が揃っているか検査。1 つでも欠ければ exit 1。**毎サイクル、全 US に実物のエビデンスを出すことを構造強制**(v0.0.5 でユーザーが3度要求)。「ファイル参照」でなく証拠そのものを残す。
+- なぜここまでやるか: v0.0.5 S9 で AI(私)が「実操作確認」を **コードパス・スクリプト**で代替し実 claude を回さなかった。まさに本サイクルが潰す対象(live-deferral)の再発。語義を固定し dossier を機械ゲート化して構造で断つ。
+
+#### Rule C-3 — エビデンスの説得責任 + descope 禁止(v0.0.5 S9 で再発 → 恒久)
+
+> **エビデンスの宛先は「内部コードを知らず、US と UI(ユーザー目線の動作)だけ知る人」。その人が『このままリリースして絶対に問題ない』と確信できる説得力が無ければ、それはエビデンスではない。**
+
+- **内部語は証拠でない**: 関数名 / JSON / `ok=true` / `reached=true` / `eligibility:eligible` / 「○○.test.ts が緑」/ manifest の中身 等は、宛先の人には何も証明しない。**証拠は「ユーザーがこう操作する → 画面がこうなる(=US の受け入れ条件をユーザー目線で満たす)」を実物(実機 screenshot / 実 claude 操作の動画・連番 screenshot)で示すこと**。決定論テストは内部の裏付けであって、人間レビュー用エビデンスの本体ではない。
+- **AI による descope の全面禁止**: AI が「到達不可」「不要」「間接的に確認済」「別サイクルで」「対象外」「(差分起点で)再撮影不要」等と判断して、ある US/状態のエビデンスを**省くことを禁止**。省いてよいのは **人間が明示承認し ledger に 1 エントリ(state/理由)を記録したときだけ**。AI 単独の「不要/到達不可」宣言は、本サイクルで実害(US-01 ゲートが実は inert だった見落とし)を生んだ反パターン。
+- **網羅は US インベントリ起点**(産物起点でない / [[completeness-checks-anchor-on-spec]]): s1/ の全 US を 1 件ずつ、ユーザー目線の動作で「リリース可」を示し切る。1 件でも未提示・内部語のみ・AI 判断で省略 があれば S9/S10 を `確定` にしない。
+- **提示の標準粒度 = US/カード単位の self-contained 4-フィールドパケット**(S8/S9/S10 の人間レビュー全てに binding): ① **何を作ったか**(プロダクト語)② **どう確認できるか**(コマンド/画面操作 → 何が起きる。「ファイルを開く」で済ませない)③ **証拠**(具体物 + それで何が分かるか / screenshot は実物添付・テストは件数と担保・CLI は出力要点)④ **判断ポイント**(accept/却下のために見るべき 1 点。残リスク・未実証・乖離を正直に)。**ファイルパス/ID/リンクを「開いてください」と渡すのは禁止** — 中身を本文に書き screenshot は実物を同梱(= レビュアがそれだけで判断できる)。これは「人間が IDE を触らず Inbox を捌くだけ」(Human Inbox)の前提条件。
+- **機械強制**: `evidence:check`(全 US に entry)+ `live:check`(実操作 dossier)。中身が user-facing で説得力あるかの最終判定は **S10 の人間レビュー**(AI は user-facing 証拠を出し切る責任を負い、合否は人間が持つ)。
+
+#### Rule C-4 — 証拠の「作る人」と「チェックする人」を分ける(self-attestation 禁止 / v0.0.5 で指摘 → 恒久)
+
+> **証拠を作った主体が、その証拠の十分性を自分で判定してはならない。** 作成者の自己認定は「AI が自分の done を自分で承認する」構造そのもので、本ハーネスが潰す対象。証拠は最低 **3 つの独立した役で**通す:
+> 1. **作成者(producer)**: 実装した AI が user-facing 証拠(Rule C-3)を作る。
+> 2. **独立検証者(independent checker)**: producer と**別エージェント / 別コンテキスト**(IDE なら別セッション、headless なら gen→gate→eval の evaluator run、手動運用でも producer と分けて起動する evaluator AI)が、各 US の証拠を **adversarial に**「内部コードを知らない人がこれでリリース可と確信できるか」を反証しにいく。producer 自身は judge を兼ねない。
+> 3. **人間(final acceptor / S10)**: 最終受け入れ。
+
+- **運用(producer が自分でやってはいけないこと)**: 「この証拠で十分」「これは到達不可/不要」を producer が宣言しない。十分性判定は independent checker と人間が持つ。producer の責務は「出し切る」ことだけ。
+- **coordinator も兼任しない(精度確認の独立性)**: 全体を回す coordinator(=descope/受け入れ依頼の権限を持つ主体)は、precision-critical な証拠の **producer も checker も兼ねない**。両方を**それぞれ別の専任エージェント(クリーン文脈)に委譲**し、coordinator は調整と受け渡しのみ。理由: 同一主体が作る・確認する・descope 権限を持つと、雑な証拠や省略へのバイアスが構造的に残る(v0.0.5 で実証 — coordinator 自身が producer 兼 judge をやり雑な内部語証拠 + descope を生んだ)。最低でも producer agent ≠ checker agent ≠ coordinator の 3 分離 + 人間。
+- **headless での担保**: 技術 step は gen→gate→eval(generator≠evaluator の別 run)で producer/checker が構造分離される。role-less step や S9 証拠パッケージは、producer と別に **evaluator AI を起動して証拠監査の結論を得る**([[dogfood-harness-principles-on-this-repo]] の「非人間レビュー箇所は別 evaluator AI を起動」)。
+- なぜ: v0.0.5 S9 で AI(私)が証拠を作り自分で「十分」と認定 → 内部語の雑な証拠 + 勝手な descope を生んだ。作成者≠検証者を構造化して self-attestation を断つ。
+
 ### Rule D — binding ルールは「リンク参照」でなく「プロンプト本文注入」で配送する
 
 > **全工程 binding の規範(契約/operating-model/対人契約等)は、composer が正本を読んで全 live プロンプトに本文注入して初めて headless AI に効く。新しい `kit/rules/*.md` や binding ルールを足したら、「どの注入点で headless AI に本文が届くか」を probe で確認する。リンクは人間用の単一正本維持であって headless への配送手段ではない。**
 
 - なぜ: v0.0.4 で契約/運用モデルがリンク参照止まりで headless に届かず F-6/7/10/11/14/16 が連鎖した([[completeness-checks-anchor-on-spec]] の配送版)。
+- **probe(US-05 / Unit-05 で機械化済 / 新規 binding rule 追加時の必須チェックリスト)**:
+  1. 新しい `kit/rules/*.md` を **全工程 binding** にするなら、composer の注入経路(`PromptComposer.contractLayer` / `operatingModelLayer` 等)に本文を乗せる(リンク参照だけにしない)。
+  2. `scripts/probe-binding-rules.ts` の `MUST_REACH` にそのファイルを追加する。
+  3. `bun run scripts/probe-binding-rules.ts`(= `probe:rules`)が **reached:true** を返すことを確認する。本文が届かない(リンク参照のみ)なら **exit 1** でブロックされる。
+  4. probe の機械的定義 = composer の組み立て結果(prompt 本文)に当該ルール本文が現れること(`src/app/services/binding-probe.ts` / US-05 D-01)。
 
 ### Rule E — 改善提案の deferral 防止(構造改善ほど先送りされる逆選択を断つ)
 

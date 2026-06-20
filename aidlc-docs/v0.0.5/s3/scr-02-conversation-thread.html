@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-02: 会話スレッド 状態バッジ整合(US-08) — v0.0.5 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+    <style>
+      /* 既存 review トークンを pill にも適用(新規色なし) */
+      .pill.review { color: var(--color-review); background: var(--color-review-soft); border-color: var(--color-review-border); }
+      .pill.review .dot { background: var(--color-review); }
+      .cta { display: inline-block; margin-top: 14px; padding: 9px 16px; border-radius: var(--radius-full); font-size: 0.85rem; font-weight: 600; color: var(--color-review); background: var(--color-review-soft); border: 1px solid var(--color-review-border); text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <!-- 意図する状態(整合): できあがり → バッジ「できあがりの確認」が本文・CTA と一致 -->
+    <section data-state="default" data-screen="scr-02-conversation-thread" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ 対応待ち</a>
+        <span class="title">アプリへの組み込み</span>
+        <span class="crumb">サイクル v0.0.5</span>
+        <span class="spacer"></span>
+        <span class="pill review"><span class="dot"></span>できあがりの確認</span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+          <div class="bubble ai" style="max-width:100%">
+            <div class="who">AI</div>
+            <div class="box">
+              <div class="q-line"><span class="q-text">できあがりました。内容を確認してください。承認すると次に進みます。</span></div>
+              <a class="cta" href="#">できあがりを確認する →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

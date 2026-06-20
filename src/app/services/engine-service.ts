@@ -32,7 +32,8 @@ import {
 } from "../../domain/cycle/cycle";
 import { sameStep, type Step } from "../../domain/shared/vocab";
 import { resolveContracts, type StepContracts } from "../../domain/project/step-contracts";
-import { resolveContextPaths } from "./context-resolver";
+import { resolveGatePaths } from "./context-resolver";
+import { evidenceGateBlockReason } from "./evidence-gate-check";
 import { readPipeline, type Project } from "../../domain/project/project";
 import { lookupProfile, emptyProfile } from "../../domain/review/profile";
 import { evaluateCompleteness, type Requirement } from "../../domain/review/brief";
@@ -79,6 +80,11 @@ export class EngineService {
     // from InboxService.finalizeApprovedReview. The launcher is idempotent (DB
     // proposal guard), so firing from both paths is safe and never self-recurses.
     if (event.type === "RunStateChanged" && event.to === "done") {
+      // US-01: the applier may have REJECTED this done (evidence gate → stalled).
+      // Only fire reconstruction when the run actually reached done in the
+      // persisted cycle — never off a gate-stalled run.
+      const run = this.locateRun(cycle, ctx.runId);
+      if (run?.state !== "done") return;
       await launchReconstructionForS1(this.ports, cycle, ctx.step, ctx.phaseId);
     }
   }
@@ -100,11 +106,14 @@ export class EngineService {
       ? lookupProfile(contracts.output.profileKind)
       : emptyProfile("default");
 
-    // Unit-02 前段文脈注入: resolve prior-step artifact paths for the deterministic gate.
-    // These are the same paths that were passed as contextPaths at launch; the gate
-    // checks that the prior-step artifacts actually exist on disk before advancing.
+    // 前段の存在ゲート: 各 done 前段ステップの index.md が存在することだけを要求する
+    // (project-AGNOSTIC)。以前は resolveContextPaths の「詳細成果物パス(studio 固有の
+    // 画面/Unit/集約ファイル名)」まで HARD 要求していたため、別プロジェクト(例: chat)の
+    // S9 live run が `s3/scr-01-inbox.md` 不在で stall した。詳細ファイルは prompt 文脈
+    // (soft / 欠落マーカー)であってゲートの硬要件ではない(precision-first: 存在=ゲート、
+    // 中身の質=evaluator)。resolveGatePaths は index.md のみを返す。
     const artifactPaths = project
-      ? resolveContextPaths({
+      ? resolveGatePaths({
           cycle,
           step: ctx.step,
           repoPath: project.repoPath,
@@ -156,6 +165,8 @@ export class EngineService {
         phaseId: phase.id,
         step: ctx.step,
         repoPath: project?.repoPath ?? "",
+        // US-04: thread the cycle version for the live adapter's auto evidence manifest.
+        version: cycle.version,
         generatorRunId: ctx.runId,
         ...(contracts?.verification
           ? { verification: contracts.verification.observations }
@@ -187,12 +198,12 @@ export class EngineService {
     event: ResultEmitted,
   ): Promise<void> {
     if (!event.completeness) {
-      await this.raiseVisualReview(ctx, event);
+      await this.allowDone(cycle, ctx, event);
       return;
     }
     const report = evaluateCompleteness(event.completeness);
     if (report.isComplete) {
-      await this.raiseVisualReview(ctx, event);
+      await this.allowDone(cycle, ctx, event);
       return;
     }
     const requests = this.descopeRequestsFor(ctx.runId, report.gaps);
@@ -206,9 +217,13 @@ export class EngineService {
 
   // ── helpers ──────────────────────────────────────────────────────
   private runRole(cycle: Cycle, runId: RunId): RunRole | undefined {
+    return this.locateRun(cycle, runId)?.role;
+  }
+
+  private locateRun(cycle: Cycle, runId: RunId): Run | undefined {
     for (const phase of cycle.phases) {
-      const run: Run | undefined = phase.runs.find((r) => r.id === runId);
-      if (run) return run.role;
+      const run = phase.runs.find((r) => r.id === runId);
+      if (run) return run;
     }
     return undefined;
   }
@@ -240,6 +255,31 @@ export class EngineService {
       return;
     }
     this.ports.uow.run(() => this.ports.repos.cycles.save(r.value));
+  }
+
+  /**
+   * US-01 live-evidence hard gate. The evaluator's allow-done is the technical
+   * step's self-reported completion; before presenting it to the human as a
+   * visual_review we machine-verify that the step's live evidence exists
+   * (縦経路ログ + 視覚/動作証拠). Missing evidence → STALL with a loud reason
+   * (retriable) instead of raising the review — so the human never reviews a step
+   * whose live evidence isn't already on disk. No gate installed (deterministic
+   * tests) → the review is raised unchanged.
+   */
+  private async allowDone(
+    cycle: Cycle,
+    ctx: RunContext,
+    event: ResultEmitted,
+  ): Promise<void> {
+    // US-01 live-evidence gate (gen→eval path): a technical step's evaluator
+    // allow-done is gated on live evidence (shared check, scoped by
+    // contracts.requiresLiveEvidence). Blocked → stall instead of raising review.
+    const blockReason = evidenceGateBlockReason(this.ports, cycle, ctx);
+    if (blockReason !== undefined) {
+      this.advanceAndSave(cycle, ctx.runId, "stalled", blockReason);
+      return;
+    }
+    await this.raiseVisualReview(ctx, event);
   }
 
   private async raiseVisualReview(ctx: RunContext, event: ResultEmitted): Promise<void> {

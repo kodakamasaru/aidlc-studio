@@ -1,0 +1,18 @@
+{
+  "version": "v0.0.1",
+  "slug": "chat",
+  "title": "社内チャット",
+  "brief": "10〜30人規模の小規模チームが使う社内チャットアプリ。チャンネルを自由に作成・参加してトピック別にメッセージをやり取りできる。チャンネルごとの未読件数をリアルタイムで表示し、@メンションで特定メンバーに通知を届ける。メッセージ検索でアーカイブを素早く引ける。Slack のような外部 SaaS に頼らず、オンプレ or 自社クラウドで動かせることを重視する。",
+  "stopAt": "S9",
+  "steps": [
+    { "step": "S1", "state": "done" },
+    { "step": "S2", "state": "done" },
+    { "step": "S3", "state": "done" },
+    { "step": "S4", "state": "done" },
+    { "step": "S5", "state": "done" },
+    { "step": "S6", "state": "done" },
+    { "step": "S7", "state": "done", "evidence": "complete" },
+    { "step": "S8", "state": "done", "evidence": "complete" },
+    { "step": "S9", "state": "review", "evidence": "complete" }
+  ]
+}

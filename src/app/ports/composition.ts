@@ -6,6 +6,7 @@ import type { Clock, IdGen, Fs } from "./sys";
 import type { UnitOfWork } from "./unit-of-work";
 import type { OrchestratorPort } from "./orchestrator";
 import type { NotifyPort } from "./notify";
+import type { EvidenceGatePort } from "./evidence-gate";
 import type {
   ProjectRepo,
   CycleRepo,
@@ -45,4 +46,11 @@ export interface Ports {
   readonly repos: Repos;
   readonly orchestrator: OrchestratorPort;
   readonly notify: NotifyPort;
+  /**
+   * US-01 live-evidence hard gate. OPTIONAL: when absent (deterministic test
+   * harness) no gating happens; the composition root (server.ts) always installs
+   * the real Fs-backed gate so a technical step cannot self-report done without
+   * live evidence. Consumed by EngineService at the evaluator's allow-done.
+   */
+  readonly evidence?: EvidenceGatePort;
 }

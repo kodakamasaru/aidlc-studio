@@ -115,6 +115,59 @@ describe("gen→gate→eval E2E", () => {
     expect(cards.length).toBe(0);
   });
 
+  test("requiresLiveEvidence WITHOUT explicit verification → still launches a SEPARATE evaluator run (recorder≠reviewer is structural)", async () => {
+    // A step that declares requiresLiveEvidence but NO verification contract must
+    // still run gen→eval: the producer run and the reviewer run are DISTINCT runs
+    // with distinct ids/roles, so the same single run can never self-attest.
+    const harness = buildLoopTestApp("gen-eval-complete");
+    const project = unwrap(
+      openProject({
+        id: ProjectId(PID),
+        repoPath: "/repo/target",
+        vision: "vision/brief.md" as unknown as VisionRef,
+        pipelineDef: [
+          {
+            id: Step("S1"),
+            label: "S1",
+            order: 0,
+            skillRef: "kit/skills/aidlc-s1" as unknown as SkillRef,
+            // NO verification contract — only requiresLiveEvidence. The role
+            // decision must still pick "generator" so a separate evaluator runs.
+            contracts: {
+              humanGate: { mode: "device_check" },
+              requiresLiveEvidence: true,
+            },
+          },
+        ],
+        env: {
+          modelName: "claude",
+          worktreeRoot: "/wt",
+          stallTimeoutMin: 30,
+          maxAttempt: 3,
+        },
+        createdAt: unwrap(instant("2026-06-11T00:00:00.000Z")),
+      }),
+    );
+    harness.ports.uow.run(() => harness.ports.repos.projects.save(project));
+
+    const cycles = new CycleService(harness.ports);
+    const cycle = cycles.createCycle(PID, { title: "live-evidence", version: "v0.0.3" });
+    await cycles.startPhase(cycle.id, "S1");
+
+    const phase = cycles.getCycle(cycle.id).phases.find((p) => (p.step as string) === "S1")!;
+    const gen = phase.runs.find((r) => r.role === "generator");
+    const ev = phase.runs.find((r) => r.role === "evaluator");
+    // Two DISTINCT runs: a producer (generator) and a separate reviewer (evaluator).
+    expect(phase.runs.length).toBe(2);
+    expect(gen).toBeDefined();
+    expect(ev).toBeDefined();
+    expect(gen!.id).not.toBe(ev!.id); // recorder ≠ reviewer (distinct runIds)
+    expect(gen!.role).toBe("generator");
+    expect(ev!.role).toBe("evaluator");
+    expect(gen!.state).toBe("done"); // producer finished + gate passed
+    expect(ev!.state).toBe("running"); // reviewer is the live audit run
+  });
+
   test("descope → backlog: answering the descope Question creates a backlog Task", async () => {
     const { harness, cycle } = await runToEval("gen-eval-descope");
     const ev = cycle.phases[0]!.runs.find((r) => r.role === "evaluator")!;

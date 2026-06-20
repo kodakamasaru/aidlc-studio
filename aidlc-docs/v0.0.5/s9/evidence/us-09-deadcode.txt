@@ -1,0 +1,7 @@
+=== US-09 dead code: StepConfigPage 削除確認 ===
+ D web/src/features/settings/StepConfigPage.tsx
+GlobalHearingPage.tsx
+StepConfigReadback.tsx
+StepSpecPage.tsx
+step-config-readback.css
+step-config.css

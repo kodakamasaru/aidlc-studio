@@ -12,6 +12,7 @@ import { buildStore } from "../../src/infra/db/store";
 import { FixedClock, SeqIdGen, FakeFs } from "../../src/infra/sys/fakes";
 import { createApp } from "../../src/infra/http/app";
 import type { Ports } from "../../src/app/ports/composition";
+import type { EvidenceGatePort } from "../../src/app/ports/evidence-gate";
 import type {
   DomainEventSink,
   OrchestratorPort,
@@ -111,6 +112,7 @@ const LOOP_INSTANTS: readonly string[] = [
 
 export function buildLoopTestApp(
   scenario: ScriptedScenario = "happy",
+  evidence?: EvidenceGatePort,
 ): LoopTestApp {
   const db = openDb(":memory:");
   const store = buildStore(db);
@@ -133,6 +135,7 @@ export function buildLoopTestApp(
     repos: store.repos,
     orchestrator,
     notify: noopNotify,
+    ...(evidence !== undefined ? { evidence } : {}),
   };
   engine = new EngineService(ports);
   const app = createApp(ports);

@@ -139,6 +139,22 @@ export const OUTPUT_CONTRACT_INSTRUCTION = [
   "  - questions[] が空でない場合は status=\"needs_human\" にすること",
 ].join("\n");
 
+/**
+ * 独立証拠監査 stance(Rule C-3)。evaluator run の頭に注入する宣言。
+ * この run は成果物を「作っていない」独立レビュアであり、生成者の自己申告ではなく
+ * 証拠そのものを見て「非コードのレビュアが安全にリリースできると確信できるか」を判定する。
+ * completeness の addressed は「ユーザー目線の証拠がある」ことを意味し、内部語(test 緑/
+ * ok=true 等)で済ませてはならない。
+ */
+export const EVALUATOR_AUDITOR_STANCE = [
+  "── あなたの立場(独立した証拠監査者 / Rule C-3) ──",
+  "あなたはこの成果物を**作っていない**独立のレビュアです。生成者(別 run)の自己申告を信じず、",
+  "証拠そのものを監査せよ。判定基準は「コードを読まない非コードのレビュアが、この証拠だけを見て",
+  "『安全にリリースしてよい』と確信できるか」。確信できないなら addressed に含めるな(= それが gap)。",
+  "ユーザー目線の動作証拠(実機 screenshot/動画/実行ログ)が無く、内部語(関数名/JSON/ok=true/",
+  "test 緑)で済まされている要件は未対応として扱え。",
+].join("\n");
+
 export class PromptComposer {
   constructor(private readonly fs: Fs) {}
 
@@ -257,6 +273,8 @@ export class PromptComposer {
         core("evaluator", input.step, skillRef),
         this.contractLayer(input.repoPath),
         this.operatingModelLayer(input.repoPath),
+        EVALUATOR_AUDITOR_STANCE,
+        "",
         payloadHeader("検証の基準(スキル本文)"),
         body.trim(),
         "",
@@ -373,6 +391,8 @@ export class PromptComposer {
       core("evaluator", input.step, skillRef),
       this.contractLayer(input.repoPath),
       this.operatingModelLayer(input.repoPath),
+      EVALUATOR_AUDITOR_STANCE,
+      "",
       payloadHeader("検証の基準(スキル本文)"),
       body.trim(),
       "",

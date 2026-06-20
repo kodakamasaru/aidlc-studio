@@ -348,6 +348,9 @@ export function ConversationThread({
     <StateBadge variant="done">完了</StateBadge>
   ) : isStalled ? (
     <StateBadge variant="stalled">行き詰まり</StateBadge>
+  ) : openReview ? (
+    // Review emitted — badge aligns with body CTA "できあがりを確認する" (US-08 / SCR-02)
+    <StateBadge variant="review" ariaLabel="できあがりの確認">◎ できあがりの確認</StateBadge>
   ) : allOpenQuestions.length > 0 ? (
     // Questions are waiting for human answers — "回答待ち"
     <StateBadge variant="stalled">回答待ち</StateBadge>
@@ -386,7 +389,7 @@ export function ConversationThread({
       right: runBadge,
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [titleLabel, isDone, isStalled, isRunning, hasHistory, allOpenQuestions.length, backTo, backLabel, cycleName],
+    [titleLabel, isDone, isStalled, isRunning, hasHistory, allOpenQuestions.length, openReview, backTo, backLabel, cycleName],
   );
 
   // ── Render ────────────────────────────────────────────────────

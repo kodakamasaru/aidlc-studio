@@ -14,6 +14,7 @@ import {
 } from "../../domain/question/question";
 import { buildReview } from "../../domain/review/review";
 import { advanceRun } from "../../domain/cycle/cycle";
+import { evidenceGateBlockReason } from "./evidence-gate-check";
 import {
   docPath,
   indexArtifact,
@@ -22,7 +23,10 @@ import type { DomainEvent } from "../../domain/events/events";
 import { isOk, isErr } from "../../domain/shared/result";
 import { logError } from "../../infra/log";
 
-type ApplierPorts = Pick<Ports, "clock" | "ids" | "uow" | "repos" | "notify">;
+type ApplierPorts = Pick<
+  Ports,
+  "clock" | "ids" | "uow" | "repos" | "notify" | "evidence"
+>;
 
 export class EventApplier {
   constructor(private readonly ports: ApplierPorts) {}
@@ -82,6 +86,24 @@ export class EventApplier {
           });
           return;
         }
+        // US-01 live-evidence hard gate (role-less path): a technical step
+        // (contracts.requiresLiveEvidence) that self-reports done is REJECTED
+        // unless its live evidence exists. Block → stall (loud, retriable) so the
+        // human never sees a "done" technical step without live evidence on disk.
+        if (event.to === "done") {
+          const blockReason = evidenceGateBlockReason(this.ports, cycle, ctx);
+          if (blockReason !== undefined) {
+            const stalled = advanceRun(cycle, {
+              runId: ctx.runId,
+              to: "stalled",
+              at: clock.now(),
+              reason: blockReason,
+            });
+            if (isOk(stalled)) repos.cycles.save(stalled.value);
+            else logError("RunStateChanged: evidence-gate stall failed", stalled.error);
+            return;
+          }
+        }
         const advanced = advanceRun(cycle, {
           runId: ctx.runId,
           to: event.to,
@@ -133,6 +155,27 @@ export class EventApplier {
         // auto visual_review ONLY for role-less runs (v0.0.1 single-run flow) —
         // keeping that path byte-for-byte unchanged (backward compatible).
         if (this.isRoleBearingRun(ctx)) return;
+        // US-01 live-evidence hard gate (role-less review path): a technical step
+        // (requiresLiveEvidence) must not be PRESENTED to the human as ready-for-
+        // review without live evidence. Block → stall the run (loud, retriable)
+        // and raise NO review card, so "human がレビューする時点で証拠が揃っている".
+        {
+          const cycle = repos.cycles.findById(ctx.cycleId);
+          if (cycle) {
+            const blockReason = evidenceGateBlockReason(this.ports, cycle, ctx);
+            if (blockReason !== undefined) {
+              const stalled = advanceRun(cycle, {
+                runId: ctx.runId,
+                to: "stalled",
+                at: clock.now(),
+                reason: blockReason,
+              });
+              if (isOk(stalled)) repos.cycles.save(stalled.value);
+              else logError("ResultEmitted: evidence-gate stall failed", stalled.error);
+              return;
+            }
+          }
+        }
         // US-13: a step's output is presented to the human as a visual-review
         // card. Guard against duplicates: a redelivered/retried ResultEmitted for
         // the same (runId, taskId) must not stack a second open review card. The
