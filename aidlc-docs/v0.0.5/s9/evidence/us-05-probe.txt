@@ -1,0 +1,5 @@
+=== US-05 probe (pass) + negative ===
+$ bun run scripts/probe-binding-rules.ts
+[probe-binding-rules] OK   kit/rules/responsibility-contract.md  (注入点: 最上位契約 — AI 開発部 ⇄ 事業部(全工程 binding / 他ルールと衝突したらこれが勝つ))
+[probe-binding-rules] OK   kit/rules/aidlc-operating-model.md  (注入点: 運用モデル — AI-DLC v2 実行規範(全工程 binding / 責務契約に次ぐ上位 / 運用ゲートの正本))
+[probe-binding-rules] すべての binding rule が headless prompt 本文に到達。

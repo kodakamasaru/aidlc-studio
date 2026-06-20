@@ -24,6 +24,18 @@ export type VerificationContract = {
   readonly observations: readonly Text[];
 };
 
+/**
+ * 技術 step(S7/S8/S9)共通の検証観点(STANCE: ユーザー目線の証拠)。
+ * evaluator(= 成果物を作っていない独立レビュア run)はこの観点で証拠を監査し、
+ * 「非コードのレビュアが見て安全にリリースできると確信できるか」を判定する(Rule C-3)。
+ * generic + 再利用可能に保ち、各 step は同一観点を共有する。
+ */
+export const LIVE_EVIDENCE_OBSERVATIONS: readonly Text[] = [
+  "各 US の受け入れ条件がユーザー目線の動作(実機 screenshot/動画/実行ログ)で示されている" as Text,
+  "内部語(関数名/JSON/ok=true/test 緑)でなく非コードのレビュアーが見て分かる証拠である" as Text,
+  "到達不可/不要扱いで省略された US が無い" as Text,
+];
+
 /** いつ人間に渡すか。視覚レビュー / 実機確認 / なし。 */
 export type HumanGateContract = {
   readonly mode: "visual_review" | "device_check" | "none";
@@ -37,12 +49,18 @@ export type EscalationContract = {
   readonly maxRetry?: number;
 };
 
-/** Step の振る舞い宣言(4 契約を内包する VO)。全フィールド optional。 */
+/** Step の振る舞い宣言(契約を内包する VO)。全フィールド optional。 */
 export type StepContracts = {
   readonly output?: OutputContract;
   readonly verification?: VerificationContract;
   readonly humanGate?: HumanGateContract;
   readonly escalation?: EscalationContract;
+  /**
+   * US-01: この step の done を live 証拠(縦経路ログ + 視覚/動作証拠)の存在で機械検証するか。
+   * true の技術 step は、role-less(直接 done)/ gen→eval(evaluator allow-done)いずれの経路でも
+   * 証拠ゲートを通る。欠落 = 不要(従来の hearing/設計 step は false)。
+   */
+  readonly requiresLiveEvidence?: boolean;
 };
 
 /** 実行モード(VO / enum)。 */
@@ -95,22 +113,29 @@ export const DEFAULT_STEP_CONTRACTS: Readonly<Record<string, StepContracts>> = {
     escalation: { onStall: "retry", maxRetry: 3 },
   },
   S7: {
-    // 純粋ドメインコード — 人間はコードを見ない方針(責務契約)
+    // 純粋ドメインコード — 人間はコードを見ない方針(責務契約)。技術 step ゆえ live 証拠必須(test-report 等)。
+    // verification: 生成者と別の独立レビュア run が証拠を STANCE(ユーザー目線)で監査してから人間へ。
     output: { artifactGlob: "src/domain/**" as Text },
+    verification: { observations: LIVE_EVIDENCE_OBSERVATIONS },
     humanGate: { mode: "none" },
     escalation: { onStall: "retry", maxRetry: 3 },
+    requiresLiveEvidence: true,
   },
   S8: {
-    // 実装統合 — 実機+視覚レビュー必須(CLAUDE.md human-gate 強調)
+    // 実装統合 — 実機+視覚レビュー必須(CLAUDE.md human-gate 強調)。live 証拠ハードゲート対象(US-01)。
     output: { artifactGlob: "src/**" as Text },
+    verification: { observations: LIVE_EVIDENCE_OBSERVATIONS },
     humanGate: { mode: "device_check" },
     escalation: { onStall: "retry", maxRetry: 3 },
+    requiresLiveEvidence: true,
   },
   S9: {
-    // シナリオ検証 — シナリオ+視覚証拠(CLAUDE.md)
+    // シナリオ検証 — シナリオ+視覚証拠(CLAUDE.md)。live 証拠ハードゲート対象(US-01)。
     output: { artifactGlob: "tests/e2e/**" as Text },
+    verification: { observations: LIVE_EVIDENCE_OBSERVATIONS },
     humanGate: { mode: "visual_review" },
     escalation: { onStall: "retry", maxRetry: 3 },
+    requiresLiveEvidence: true,
   },
   S10: {
     // 受け入れ — 人間による最終受け入れ(onStall=human でゲートを人間が持つ)

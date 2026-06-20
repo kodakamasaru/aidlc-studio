@@ -242,11 +242,21 @@ export class CycleService {
     );
   }
 
-  /** "generator" when the step declares a VerificationContract; else undefined. */
+  /**
+   * "generator" when the step must be independently reviewed before a human sees
+   * it; else undefined (role-less single-run flow). A step qualifies when it
+   * declares a VerificationContract OR requires live evidence — the latter ties
+   * "requires live evidence" to "must be audited by a SEPARATE reviewer run":
+   * a technical step's evidence is produced by the generator and judged by a
+   * distinct evaluator run (recorder≠reviewer) BEFORE the human review. Steps
+   * with neither contract stay role-less (existing pipelines unaffected).
+   */
   private generatorRoleFor(project: Project, step: Step): RunRole | undefined {
     const stepDef = readPipeline(project).find((sd) => sameStep(sd.id, step));
     const contracts = stepDef ? resolveContracts(stepDef) : undefined;
-    return contracts?.verification ? "generator" : undefined;
+    return contracts?.verification || contracts?.requiresLiveEvidence
+      ? "generator"
+      : undefined;
   }
 
   /**
@@ -333,6 +343,9 @@ export class CycleService {
         phaseId: phase.id,
         step,
         repoPath: project.repoPath,
+        // US-04: thread the cycle version so the live adapter can write the step's
+        // auto evidence manifest under aidlc-docs/<version>/_evidence/<step>/.
+        version: next.version,
         ...(role !== undefined ? { role } : {}),
         ...(contextPaths.length > 0 ? { contextPaths } : {}),
         structuredContext,
@@ -477,6 +490,8 @@ export class CycleService {
         phaseId: phase.id,
         step,
         repoPath: project.repoPath,
+        // US-04: thread the cycle version for the live adapter's auto evidence manifest.
+        version: next.version,
         // Signal the orchestrator that this is a global hearing so config
         // questions carry target.scope="global" instead of "cycle:{id}".
         hearingScope: "global",
@@ -595,6 +610,7 @@ export class CycleService {
       phaseId,
       step: "S1" as Step,
       repoPath: project.repoPath,
+      version: cycle.version,
       hearingScope: "reconstruction",
       reconstructionFeedback: trimmed,
     });
@@ -634,6 +650,8 @@ export class CycleService {
         phaseId: phase.id,
         step: phase.step,
         repoPath: project.repoPath,
+        // US-04: thread the cycle version so the retried run also writes auto evidence.
+        version: cycle.version,
       });
     } catch (err) {
       compensateRun(

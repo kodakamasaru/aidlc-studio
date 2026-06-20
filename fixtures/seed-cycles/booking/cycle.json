@@ -1,0 +1,15 @@
+{
+  "version": "v0.0.1",
+  "slug": "booking",
+  "title": "会議室予約",
+  "brief": "社員が会議室をいつでも素早く予約・管理できる社内向け会議室予約システム。会議室一覧と日別の空き時間カレンダーで空き状況を確認し、予約の作成・変更・取消を行い、ダブルブッキングを自動防止する。カレンダー連携・外部認証・リソース申請ワークフローはスコープ外とする。",
+  "stopAt": "S6",
+  "steps": [
+    { "step": "S1", "state": "done" },
+    { "step": "S2", "state": "done" },
+    { "step": "S3", "state": "done" },
+    { "step": "S4", "state": "done" },
+    { "step": "S5", "state": "done" },
+    { "step": "S6", "state": "review" }
+  ]
+}

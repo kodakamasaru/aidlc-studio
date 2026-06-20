@@ -502,15 +502,15 @@ export class ScriptedOrchestrator implements OrchestratorPort {
         blocks: [
           {
             type: "summary",
-            title: "Step output",
-            body: "Deterministic scripted result.",
+            title: "ステップ出力",
+            body: "スクリプテッドの確定済み結果です。",
           },
           { type: "ac-map", items: [{ ac: "AC-1", status: "done" }] },
           { type: "mermaid", src: "graph TD; A-->B" },
           {
             type: "screenshot",
             src: "screenshots/x.png",
-            caption: "verify-ui screenshot",
+            caption: "verify-ui スクリーンショット",
           },
         ],
       });

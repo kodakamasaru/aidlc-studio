@@ -28,6 +28,7 @@ import {
 import { LiveClaudeOrchestrator } from "./infra/orchestrator/live";
 import { PromptComposer } from "./app/services/prompt-composer";
 import { PlaywrightCapturer } from "./infra/screenshot/playwright-capturer";
+import { FsEvidenceGate } from "./infra/evidence/fs-evidence-gate";
 import type { Ports } from "./app/ports/composition";
 import type { OrchestratorPort, DomainEventSink } from "./app/ports/orchestrator";
 import type { NotifyPort } from "./app/ports/notify";
@@ -90,6 +91,14 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
   // hearing stalls right after the human answers (S10 実機: 回答したら止まる).
   const orchestrator = buildOrchestrator(orchestratorKind, sink, store.repos.sessions);
 
+  // US-01 live-evidence hard gate (S8 D-04): installed for the LIVE adapter only.
+  // The scripted orchestrator is the deterministic double (E2E / demos) with no
+  // real backend to produce live evidence; gating it would stall every gen→eval
+  // run. The live path is the real product surface where the AI self-reports done,
+  // so that is exactly where evidence must exist before the human reviews.
+  const evidence =
+    orchestratorKind === "live" ? new FsEvidenceGate(nodeFs) : undefined;
+
   const ports: Ports = {
     clock,
     ids,
@@ -98,6 +107,7 @@ export function buildServer(opts?: BuildServerOptions): BuiltServer {
     repos: store.repos,
     orchestrator,
     notify: noopNotify,
+    ...(evidence !== undefined ? { evidence } : {}),
   };
   engine = new EngineService(ports);
 
@@ -229,6 +239,7 @@ function buildOrchestrator(
     "gen-eval-descope",
     "config-hearing", // BU-3: exercises the config-hearing write mechanism
     "missing-context", // S9: visual evidence for the missing-context banner in ReviewDetail
+    "multi-turn", // US-07: multi-turn hearing parity (C6) — no happy fallback
   ];
   const requested = process.env.AIDLC_SCENARIO as ScriptedScenario | undefined;
   const scenario =

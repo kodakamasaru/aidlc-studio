@@ -31,6 +31,7 @@ import type { Fs } from "../ports/sys";
 import type { QuestionRepo, CycleRepo, FactRepo } from "../ports/repos";
 import { effectiveRevision } from "../../domain/facts/facts";
 import type { CycleId, RunId } from "../../domain/shared/ids";
+import { resolveSection6 } from "./root-ledger";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -397,6 +398,35 @@ export function resolveContextPaths(input: ResolveContextInput): readonly string
   return paths;
 }
 
+/**
+ * Deterministic-gate required paths: each done prior step's `index.md` ONLY.
+ *
+ * Project-AGNOSTIC by design. The gate's job is to verify the prior steps actually
+ * produced output before this step advances — and EVERY step writes `index.md`
+ * regardless of the project's domain. The detail artifact filenames in
+ * STEP_DIRECT_DEPS (e.g. `scr-01-inbox.md`, `unit-01-*.md`, aggregate names) are
+ * the STUDIO's own deliverable names; requiring them as a HARD gate stalls any
+ * other project whose screens/units/aggregates are named differently (real bug:
+ * a live S9 run on the seeded chat project stalled on `s3/scr-01-inbox.md` etc.).
+ * Detail files remain best-effort PROMPT context via resolveContextPaths /
+ * composeStructuredContext (missing ones surface as visible markers, never a hard
+ * fail). Quality of the detail content is the evaluator's job, not this gate's
+ * (precision-first: existence → gate; richness/correctness → evaluator).
+ */
+export function resolveGatePaths(input: ResolveContextInput): readonly string[] {
+  const { cycle, step, repoPath } = input;
+  const version = cycle.version as string;
+  const currentStepId = step as string;
+  const currentPhase = cycle.phases.find((p) => (p.step as string) === currentStepId);
+  const currentOrder = currentPhase?.order ?? Infinity;
+  return cycle.phases
+    .filter(
+      (p) => (p.state === "done" || p.state === "review") && p.order < currentOrder,
+    )
+    .sort((a, b) => a.order - b.order)
+    .map((p) => indexPath(repoPath, version, p.step as string));
+}
+
 // ── composeStructuredContext (BU-1 §C7.1-C7.3) ──────────────────────────────
 
 /** Where the cycle's brief lives, relative to a project repo root. */
@@ -652,14 +682,17 @@ export function composeStructuredContext(
   }
 
   // ── Section 6: 決定・引き継ぎ(ledger + confirmed D-NN) ────────────────────
-  const lPath = ledgerPath(repoPath, version);
-  const ledgerRaw = fs.read(lPath);
+  // US-02: inject the cross-cycle ROOT ledger (aidlc-docs/ledger.yml) alongside the
+  // current cycle's ledger, so a carried item from any past cycle stays in the
+  // headless AI's view (no more 1-hop loss). Falls back to current-only when the
+  // root ledger doesn't exist yet (pre-migration repos).
+  const section6Content = resolveSection6(fs, repoPath, version);
   let decisionsLedger: ContextSection | undefined;
-  if (ledgerRaw !== undefined && ledgerRaw.trim().length > 0) {
+  if (section6Content !== undefined) {
     decisionsLedger = {
       id: "section-6-decisions-ledger",
       label: "決定・引き継ぎ(ledger)",
-      content: `【ledger.yml】\n${ledgerRaw.trim()}`,
+      content: section6Content,
     };
   }
 

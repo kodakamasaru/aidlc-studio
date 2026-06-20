@@ -21,6 +21,14 @@ export interface RunLaunch {
   readonly step: Step;
   /** Absolute repo path of the target project (worktree base). */
   readonly repoPath: string;
+  /**
+   * US-04: the cycle's version (e.g. "v0.0.5"). The live adapter uses it to write
+   * the step's auto-generated evidence manifest under
+   * <repoPath>/aidlc-docs/<version>/_evidence/<step>/ so the Unit-01 gate can read
+   * platform-produced evidence. Optional = backward compatible (scripted / runs that
+   * don't carry a version simply skip evidence writing).
+   */
+  readonly version?: string;
   /** Optional git worktree ref for parallel-cycle isolation. */
   readonly worktreeRef?: string;
   /**
@@ -72,6 +80,8 @@ export interface EvalLaunch {
   readonly phaseId: PhaseId;
   readonly step: Step;
   readonly repoPath: string;
+  /** US-04: cycle version, for the live adapter's auto evidence manifest (see RunLaunch.version). */
+  readonly version?: string;
   /** The generator run whose BriefOut this evaluator verifies. */
   readonly generatorRunId: RunId;
   /** The step's VerificationContract observations (what to check). */
@@ -101,6 +111,8 @@ export interface RetryLaunch {
   readonly phaseId: PhaseId;
   readonly step: Step;
   readonly repoPath: string;
+  /** US-04: cycle version, for the live adapter's auto evidence manifest (see RunLaunch.version). */
+  readonly version?: string;
   readonly worktreeRef?: string;
 }
 

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tokens — v0.0.5 S3(v0.0.4 踏襲 / バッジ差分)</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+    <style>
+      /* 既存 review トークン(s3-base.css :root の --color-review*)を pill にも適用。新規色は足さない */
+      .pill.review { color: var(--color-review); background: var(--color-review-soft); border-color: var(--color-review-border); }
+      .pill.review .dot { background: var(--color-review); }
+      body { padding: 32px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 12px 0 24px; }
+      .lead { font-size: 0.875rem; color: var(--color-text-low); max-width: 640px; }
+    </style>
+  </head>
+  <body>
+    <section data-state="badges" data-screen="tokens">
+      <h1 style="font-size:1.25rem;font-weight:600;margin-bottom:4px">v0.0.5 視覚カタログ(差分のみ)</h1>
+      <p class="lead">本サイクルは v0.0.4 デザインシステムを全面踏襲。新規トークン・新規視覚方向は無い。差分は「会話スレッドの状態バッジ」が出すトークンのみ(US-08)。</p>
+
+      <h2>状態バッジ(差分対象)</h2>
+      <div class="row">
+        <span class="pill running"><span class="dot"></span>実行中</span>
+        <span style="color:var(--color-text-low)">→ レビュー emit →</span>
+        <span class="pill review"><span class="dot"></span>できあがりの確認</span>
+      </div>
+
+      <h2>既存トークン値(参照)</h2>
+      <div class="row">
+        <span class="pill running"><span class="dot"></span>running #2dd4bf</span>
+        <span class="pill review"><span class="dot"></span>review #c084fc</span>
+        <span class="badge review">◎ できあがりの確認(既存 badge)</span>
+      </div>
+      <p class="lead">US-08 の差分 = レビュー emit でバッジを <b>running(実行中 / teal)</b> から既存 <b>review(できあがりの確認 / purple)</b> トークンへ切り替える。本文 CTA「できあがりを確認する」と一致させる。新規トークンは追加しない。</p>
+    </section>
+  </body>
+</html>

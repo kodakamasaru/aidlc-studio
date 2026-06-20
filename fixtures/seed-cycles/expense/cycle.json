@@ -1,0 +1,17 @@
+{
+  "version": "v0.0.1",
+  "slug": "expense",
+  "title": "家計簿",
+  "brief": "個人が日常的な支出を手軽に記録・把握するためのシンプルな家計簿アプリ。金額・日付・カテゴリ・メモを入力して支出を登録でき、カテゴリ別・月次の集計グラフで出費傾向を可視化する。月ごとに予算を設定でき、残額と超過警告をホームに表示する。直近の支出一覧でいつでも記録を振り返れる。マルチユーザーや共有機能は持たず、1人で使う個人ツール。",
+  "stopAt": "S8",
+  "steps": [
+    { "step": "S1", "state": "done" },
+    { "step": "S2", "state": "done" },
+    { "step": "S3", "state": "done" },
+    { "step": "S4", "state": "done" },
+    { "step": "S5", "state": "done" },
+    { "step": "S6", "state": "done" },
+    { "step": "S7", "state": "done", "evidence": "complete" },
+    { "step": "S8", "state": "review", "evidence": "complete" }
+  ]
+}

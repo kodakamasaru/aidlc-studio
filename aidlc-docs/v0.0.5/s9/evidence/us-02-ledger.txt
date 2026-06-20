@@ -1,0 +1,3 @@
+=== US-02 ledger:check ===
+$ bun run scripts/migrate-root-ledger.ts --check
+[migrate-root-ledger] root ledger up to date.

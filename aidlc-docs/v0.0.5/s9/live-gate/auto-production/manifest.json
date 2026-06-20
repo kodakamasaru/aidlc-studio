@@ -1,0 +1,15 @@
+{
+  "step": "S1",
+  "forms": [
+    {
+      "kind": "log",
+      "path": "_evidence/S1/run.log",
+      "capturedAt": "2026-06-20T13:01:49.047Z"
+    },
+    {
+      "kind": "screenshot",
+      "path": "_evidence/S1/shot.png",
+      "capturedAt": "2026-06-20T13:01:49.047Z"
+    }
+  ]
+}

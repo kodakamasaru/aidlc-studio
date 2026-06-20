@@ -1,0 +1,214 @@
+# v0.0.5 引き継ぎ台帳(ledger / 正本 = file)。schema = kit/rules/ledger.md。
+# 規約: D/確定項目に state: carried|done|dropped。carried は into: 必須、dropped は reason:、done は closed_in: 必須。
+# 次サイクル(v0.0.6)S1 は本 ledger の未 reconcile(carried で into が当該サイクル)をゼロにするまで進めない。
+#
+# ── このサイクルの位置づけ ──
+# v0.0.4 ledger は carried 9 件を into: v0.0.5 で渡してきた。v0.0.5 S1(2026-06-20)で 19 US を
+# 検証/台帳土台(v0.0.5)/ 自走core(v0.0.6)/ 監視SDK・worktree並行・F3・IMP5(v0.0.7)に分割した(index D-04)。
+# 単一ホップ ledger では次サイクルは直前版の ledger だけを読むため、後続へ送る 4 件は v0.0.4 でなく
+# 本 v0.0.5 ledger に carry forward する(v0.0.4 ledger は closed のため改変しない / 履歴を残す)。
+# この単一ホップの脆さ自体が US-02(ルート単一 append-only ledger)で根治される。
+
+# ── サイクル分割の確定(D-04)──
+
+- id: SPLIT-v005-scope
+  origin: v0.0.5/s1/index.md   # D-04(2026-06-20)
+  decision: >
+    当初 19 US(放置可能な自走基盤フル + IMP1 + 周辺 carried 全件)で起こしたが過大とユーザーが判断し
+    3 サイクルに分割。v0.0.5 = 検証/台帳の土台 9 US(IMP1 / seeded+安価live / binding probe / housekeeping)。
+    v0.0.6 = 自走エンジン core + O3。v0.0.7 = 監視 Agent SDK 移行 + worktree 真の並行 + F3 + IMP5。
+    IMP1 は 2 サイクル連続 carried の escalation のため v0.0.5 据置(後続へ送ると 3 度目 defer 禁止に抵触)。
+  state: done
+  closed_in: v0.0.5/s1/index.md
+
+# ── v0.0.4 から carried されたが v0.0.5 S1 分割で後続へ送る 4 件(carry forward)──
+
+- id: AUTO-ORCH-core
+  origin: v0.0.4/ledger.yml (AUTO-ORCH-durable-self-healing / into v0.0.5) → v0.0.5 S1 分割
+  decision: >
+    放置可能な自走基盤の core: 自走スケジューラ(N並列+依存DAG+human-gate parking)/ 独立検証→自動 retry /
+    上限 backoff 自動再開 / retry 上限→inbox+後続継続 / 起動毎 reconcile を resume 優先+孤児自動 retry /
+    stall 検知+late-emit 冪等化。設計正本 = aidlc-docs/v0.0.5/autonomous-self-healing-orchestration.md(§1-§12)。
+  state: carried
+  into: v0.0.6
+  reason: >
+    v0.0.5 を検証/台帳の土台に絞ったため(信頼層を自走エンジン本体より先に固める / 未検証成果の自動前進を防ぐ)。
+    v0.0.6 S1 で US 化する(当初ドラフト US-01〜05,07 相当)。
+
+- id: AUTO-ORCH-monitoring-parallel
+  origin: v0.0.4/ledger.yml (AUTO-ORCH-durable-self-healing / into v0.0.5) → v0.0.5 S1 分割
+  decision: >
+    監視 / 並行の重インフラ: CLI spawn → Agent SDK query() 全面移行 + live-run 永続台帳(runId↔pid↔
+    session_id↔last-activity)/ stream 逐次監視 / worktree 複数による真の並行サイクル(N>1)+ 書込競合分離・
+    マージ戦略。設計正本 = autonomous-self-healing-orchestration.md §10/§13。
+  state: carried
+  into: v0.0.7
+  reason: >
+    監視 SDK 全面移行と worktree 真の並行は移行コスト大の重インフラ。core(v0.0.6)が乗ってから着手する。
+    v0.0.7 S1 で US 化する(当初ドラフト US-06,08 相当)。
+
+- id: O3-live-resume-continuation-unproven
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: >
+    US-04 resume 継続が live 未実証(揮発しない実 session を用いた --resume 継続の実機実証)。
+    AUTO-ORCH の reconcile/resume 経路(v0.0.6 = AUTO-ORCH-core)に内包して実証する。
+  state: carried
+  into: v0.0.6
+  reason: >
+    内包先の reconcile-resume(AUTO-ORCH-core)が v0.0.6 のため、本項も v0.0.6。独立 US にせず resume 経路の
+    実機シナリオで兼ねる(v0.0.4 AUTO-ORCH エントリの内包方針を継承)。
+
+- id: F3-project-management-ui
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: >
+    web にプロジェクト作成/リセット/切替の UI が無い(project-context が projects[0] 固定)。legacy プロジェクト
+    (step-model-v2 前 / S2.5 入り)の安全な正規化マイグレーションを含む。一時 cleanup script(scripts/
+    cleanup-legacy-project.ts)+ backup の整理も本項に同送(v0.0.5 US-09 は純 dead-code 削除のみ)。
+  state: carried
+  into: v0.0.7
+  reason: >
+    baseline UI 機能で IMP1 の信頼層には不要。v0.0.7 で US 化する(当初ドラフト US-13 相当)。
+
+- id: S11-IMP5-retro-metrics-autocollect
+  origin: v0.0.4/ledger.yml (into v0.0.5) → v0.0.5 S1 分割
+  decision: >
+    run/HumanTask store から検出ゲート別バグ・Step 別所要・Q&A 件数を自動集計するレポートを作り S11 入力に供給。
+  state: carried
+  into: v0.0.7
+  reason: >
+    S11 入力の自動化で、本サイクルの信頼層には不要。v0.0.7 で US 化する(当初ドラフト US-14 相当)。
+
+# ── v0.0.4 から carried され v0.0.5 本サイクルで処理する 5 件(in-flight)──
+# これらは v0.0.4 ledger で into: v0.0.5。本サイクル US-01〜09 として実装し、各 step 完了/サイクル CLOSE 時に
+# done(closed_in)へ更新する。S1 時点では US 化済(reconcile 反映済)= v0.0.5 を指す carried 放置ゼロ。
+#   - S11-IMP1-live-evidence-hard-gate  → US-01・US-02・US-03
+#   - TEST-ENV-seeded-cycle-states      → US-04
+#   - S11-IMP2-binding-rule-delivery-checklist → US-05
+#   - S9-housekeeping-O4-O7             → US-06(O4)・US-07(O7)
+#   - F12-thread-badge-consistency      → US-08
+#   - (dead code / S9-housekeeping 付随) → US-09
+
+# ── v0.0.5 S9 で判明: 証拠の「自動生成」がプラットフォームに未実装だった(US-04 debt)──
+# ★descope 撤回: 当初これを v0.0.6 へ carried したが、ユーザー指摘どおり US-04 AC
+# 「視覚/動作証拠の自動生成を毎 step 自動実行する」= プラットフォーム自身が毎 step
+# ちゃんとした live 証拠を残す は v0.0.5 スコープそのもの。手動スクリプト + carried で
+# 逃がしたのは descope。v0.0.5 で実装する(下記 done エントリ参照)。
+- id: PLATFORM-auto-evidence-production
+  origin: v0.0.5/us-04 AC + ユーザー指摘「ちゃんとした live 証拠を残すのが v0.0.5 スコープでは?」
+  decision: >
+    プラットフォームの live 実行が、技術 step 完了時に実 backend を縦に通したログ + 実 verify-ui
+    screenshot を自動で _evidence/<version>/<step>/manifest.json に書き出す(US-04「毎 step 自動」)。
+    これまでは generate-evidence.ts という手動スクリプトしかなく、自走では証拠が残らず gate が
+    永久ブロック or 手動 manifest 頼みだった = 「ちゃんとした live 証拠」になっていなかった。
+  state: done
+  closed_in: >
+    v0.0.5/s9/live-gate/auto-production/(実 claude live 検証済)。live orchestrator(src/infra/
+    orchestrator/live.ts writeStepEvidence)が技術 step 完了時に実 stdout(run.log)+ 実 verify-ui
+    screenshot(shot.png)から _evidence/<version>/<step>/manifest.json を自動書き出し。実 claude で
+    S1 を走らせ、プラットフォームが手動スクリプト無しで manifest を生成 → ゲート通過 → review 起票を確認
+    (証拠なし時は stalled = 別途実証済)。新規 src/infra/orchestrator/auto-evidence.test.ts(3)+ 750 pass。
+
+# ── 独立 auditor "エージェント" のプラットフォーム組み込みは多エージェント基盤ゆえ v0.0.6 ──
+- id: PLATFORM-evidence-separation-and-stance
+  origin: v0.0.5/s9-validation.md (ユーザー指摘「記録者とレビュアーの分離 / どういうスタンスで証拠を作るべきかがプラットフォームに組み込まれてる?」)
+  decision: >
+    本サイクルで確立した 2 点を「プラットフォーム本体(src)が強制する」レベルまで組み込む:
+    (1) 証拠の記録者(producer)≠レビュアー(checker)を別 run/agent として自走に組み込み、S9/S10 の証拠を
+        独立に監査してから人間ゲートに出す(現状は私が手で subagent を起動しただけ=コード未実装)。
+    (2) 証拠を作るスタンス(user-facing / 内部語禁止 / 自己 descope 禁止 / 非コード人を説得)を
+        テキスト注入頼みでなく構造で効かせる(現状は kit テキストを prompt 注入するだけ=AI 遵守頼み、
+        v0.0.5 S9 で私自身が破った=テキストだけでは不十分の実証)。
+    例: 評価者 run を「証拠監査ロール」に拡張し、user-facing 性の自己点検を出力契約に課す等。
+  state: done
+  closed_in: >
+    v0.0.5/s12-improvement.md (D-02) — S12 監査にて done 確定。
+    【実装済(コード + 決定論検証)】cycle-service.generatorRoleFor を verification OR
+    requiresLiveEvidence で generator 化 → 技術 step は「作る run(generator)≠ 監査する run
+    (evaluator)」が別 run として spawn される。S7/S8/S9 既定に verification(LIVE_EVIDENCE_
+    OBSERVATIONS = user-facing スタンス)付与。prompt-composer の evaluator に EVALUATOR_AUDITOR_
+    STANCE(独立レビュア / 非コード人を説得 / Rule C-3)注入。決定論テスト
+    (gen-gate-eval.test「requiresLiveEvidence WITHOUT verification → SEPARATE evaluator run」)で
+    generator.id≠evaluator.id を実証。751 pass。
+    【live 端到達 確認済】US-01 PASS 経路 live 実証(runId 2906b197… / dossier s9/live-pass/)にて
+    engine-service が generatorRoleFor → generator run を spawn し evaluator run を別 runId で
+    起動して S9 が done まで通ったことを確認(S9-run.log 132KB / S9-manifest.json に連鎖記録)。
+    S12 タスク仕様「US-01 PASS 経路 live 実証で gen→eval が実走したので evaluator 分離の live 端
+    到達は確認済として扱ってよい」に基づき done とする。into:v0.0.5 の dangling carried を解消。
+
+# ── BT-04: US-04 を S1 まで backtrack(seed の本質が「状態」でなく「即確認データ」)──
+- id: BT-04-seed-for-immediate-verification
+  origin: v0.0.5/s9 review (ユーザー指摘「ステップ戻って実装し直すべき / 最初から いろいろなステップを即確認するためのデータ作り と言っていた」)
+  decision: >
+    却下理由: US-04 を「phase 状態だけ seed + 検証は実 claude を走らせる(遅い hearing)」で実装したが、
+    原意「いろいろなステップを即確認するためのデータ作り」から外れていた(S9 live で generator が
+    hearing-first になり別 run 監査まで到達せず=即確認になっていない)。対応: US-04 を S1 まで backtrack
+    し「seed = 任意 step を走らせずに即検証できるデータ(前段成果物+産物+証拠+状態)を生成」へ再定義、
+    S5→S6→S7/S8→S9 を作り直す。制約として「seed は状態だけでなくデータまで作る / 即確認できる」を守る。
+  state: done
+  closed_in: >
+    S1 再ヒアリング Q-01「軽い base + いろんな要件のサイクル群 / 各々別 step 停止 / 全サイクル実 run 相当の
+    適切なデータ(プレースホルダ不可)」を確定し S5→S6→US-04 を再 flow。スイート 5 サイクルを
+    fixtures/seed-cycles にコミット(todo-app@S2 / inventory@S4 / booking@S6 / expense@S8 / chat@S9 =
+    別アプリ・別 step 停止・実 skill 出力形のもっともらしい本文 + 純粋 .ts コード + 実 run 相当ログ)。
+    seedCycleCore に fixtureDir 複製モード + seedSuiteCore(project ごと seed)を追加。証拠 screenshot は
+    seed-suite-capture で実 studio ボードを実キャプチャ(約 90KB/1440×900、1×1 placeholder を廃止)。
+    seed:suite CLI 実機確認(5 サイクル / chat 3・expense 2 manifest)。
+    tests/integration/seed-immediate-verify.test.ts(9 pass)で「seed → live AI 無しで chat@S9・expense@S8 が
+    即 eligible / 実 screenshot >2KB / 産物は実コード・実本文」を実証。full suite 760 pass。
+    限界(明記 / 非 descope): seed は対象アプリ画面そのものは撮らない(実 live run の captureVerifyUi の領域)=
+    即確認の「機構」をもっともらしいデータ上で証明するもの(S5 unit-04 D-04)。
+
+# ── reconcile: 旧 id で carried されていた同一系譜の消し込み(Unit-03 が検出)──
+# v0.0.5 S8 で reconcile-check を実装した際、v0.0.3 ledger の S11-P04 が into:v0.0.5 で未消し込みと
+# 機械検出された。S11-P04(確定前 evaluator を hook/CI で機械強制)は P37 の系譜どおり S11-IMP1
+# (= US-01 live 証拠ハードゲート)と同一の打ち手であり、v0.0.5 US-01 / Unit-01(evidence gate)で
+# 実装済。3 サイクル(v0.0.3→4→5)跨ぎの id 不一致で link が切れていたのを明示的に消し込む。
+- id: S11-P04-evaluator-mechanical-gate
+  origin: v0.0.3/ledger.yml (into v0.0.5) → P37 系譜 = S11-IMP1
+  decision: >
+    確定前 evaluator の hook/CI 機械強制。v0.0.5 US-01 / Unit-01(evidence gate)= evaluator allow-done を
+    live 証拠の存在で機械検証するハードゲートとして実装し、本項を消し込む(S11-IMP1 と同一系譜)。
+  state: done
+  closed_in: v0.0.5/s8-integration.md (Unit-01 / src/app/services/engine-service.ts allowDone)
+
+# ── IMP: S10 判定の標準粒度を self-contained 4-フィールドパケットに固定(ユーザー要望)──
+- id: IMP-s10-self-contained-review-packet
+  origin: v0.0.5/s10 review (ユーザー要望「今後/プラットフォーム側も その粒度で s10 判定を出すように」)
+  decision: >
+    S10(及び S8/S9)の人間レビュー提示を US/カード単位の self-contained 4-フィールドパケット
+    (①何を作ったか ②どう確認できるか ③証拠 ④判断ポイント / ファイル・ID を開かせず screenshot は実物同梱)
+    に固定し binding 化する。chat 限りのアドホックでなく headless platform も同粒度で判定を出すようにする。
+  state: done
+  closed_in: >
+    kit/skills/aidlc-s10-human-acceptance/SKILL.md(進め方1・md テンプレ・完了条件4・やってはいけないこと)と
+    kit/rules/aidlc-operating-model.md Rule C-3 に焼き込み。probe:rules で operating-model の headless 到達確認。
+    platform は S10 をこのスキルで headless 実行するため同粒度の判定を出す(カードは ReviewBlock[] で
+    任意内容を載せられ構造的制約なし=コード変更不要)。
+
+# ── S10 確定: 本サイクルの成果 + 次サイクル carried(2026-06-21 / 全 9 US 承認)──
+- id: P-S9-03-gate-hardcoded-paths
+  origin: v0.0.5/s11 (US-01 PASS 経路 live 実証中に発見)
+  decision: >
+    deterministic gate が studio 固有の成果物ファイル名(S3 画面/S5 Unit/S6 集約)を hardcode し、
+    非 studio プロジェクトの gated step が前段ゲートで stall していた(P-ARCH-02 のコア版)。
+  state: done
+  closed_in: >
+    resolveGatePaths(context-resolver)で前段 index.md のみを存在要求に変更(project-agnostic)。
+    engine-service.onGeneratorResult を切替。760 pass。US-01 PASS 経路 live 実証で確認(s9/live-pass/)。
+
+- id: P-ARCH-01-methodology-platform-link
+  origin: v0.0.5/s11 + s10 review (ユーザー指摘 2026-06-21)
+  decision: >
+    方法論(kit 散文)とプラットフォーム(機械ゲート/UI)が 3 重符号化で単一正本なし。(3a)新規不変条件は
+    step-contracts 単一正本へ宣言する規律 +(2)ルール↔ゲート↔テスト連結の drift 検出 +(1)S12 規範。
+    precision-first(存在=ゲート / 質=evaluator / 狙い=平易 intent)。詳細 BACKLOG §K。
+  state: carried
+  into: v0.0.6
+
+- id: P-ARCH-02-cross-cycle-project-param
+  origin: v0.0.5/s11 + s10 review (ユーザー指摘 2026-06-21)
+  decision: >
+    reconcile/ledger CLI が studio リポ固定で project 非パラメータ = 任意 PJ で動くプラットフォーム機能に
+    なっていない。repoPath パラメータ化 + seed 跨サイクル fixture。US-03 のゲート BLOCK 画面化の前提。詳細 BACKLOG §K。
+  state: carried
+  into: v0.0.6

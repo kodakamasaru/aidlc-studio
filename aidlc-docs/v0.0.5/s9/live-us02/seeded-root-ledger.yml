@@ -1,0 +1,9 @@
+# ルート台帳(aidlc-docs/ledger.yml)— 全サイクル横断・append-only
+- id: CARRY-csv-export
+  origin: v0.0.0/s10 (前サイクルで見送り)
+  decision: >
+    家計簿の「CSV エクスポート」機能を前サイクル(v0.0.0)では見送った(後回し)。
+    次サイクルで必ず US 化して実装する、というのが前サイクルの確定事項。
+  state: carried
+  into: v0.0.1
+  reconciled_in: v0.0.1/s1#US-07  # S1 で US 化済(reconcile 完了)。実装完了は S10 受け入れで done に更新する。

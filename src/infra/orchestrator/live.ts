@@ -33,10 +33,11 @@ import { extractCompleteness } from "./completeness-parse";
 import { buildRunContext } from "./shared";
 import { join, resolve } from "node:path";
 import { logError, logInfo } from "../log";
-import { existsSync, readFileSync, copyFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, copyFileSync, realpathSync, mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parseQuestionBlock, parseReconstructionBlock, type AidlcQuestion } from "../../wire/aidlc-wire";
 import { parseAidlcResultBlock, type AidlcResult } from "../../wire/aidlc-result";
+import { writeEvidenceManifest, toUtcInstant, type EvidenceFormInput } from "../evidence/evidence-manifest";
 
 /**
  * Unit-04: cap on resume turns per hearing. Exceeding this emits `stalled`
@@ -455,6 +456,11 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
   // project directory: resuming from a different cwd fails with "No conversation
   // found with session ID". RunContext carries no repoPath, so it is stored here.
   private readonly repoPaths = new Map<string, string>();
+  // US-04: each run's cycle version, kept parallel to repoPaths so writeStepEvidence
+  // can resolve <repoPath>/aidlc-docs/<version>/_evidence/<step>/ after the run drains.
+  // Stored at startAttempt from the launch cmd's version; absent → no auto evidence
+  // (scripted / version-less launches stay backward compatible).
+  private readonly versions = new Map<string, string>();
   // Unit-04: count resume turns per runId (turns in one hearing). When this
   // exceeds MAX_HEARING_TURNS the run is stalled so the human decides next steps.
   private readonly resumeCounts = new Map<string, number>();
@@ -505,6 +511,65 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     return screenshotBlockFrom(result, this.shotUrlBase, file);
   }
 
+  /**
+   * US-04 (AC「視覚/動作証拠の自動生成を毎 step 自動実行」): when a run produces a
+   * REVIEWABLE result, the platform itself writes the step's live-evidence manifest
+   * from REAL run artifacts — so the Unit-01 gate validates platform-produced
+   * evidence instead of a hand-faked file. Two forms are written:
+   *   - log        = the run's actual stdout (the live 縦経路 trace) → run.log
+   *   - screenshot = the real verify-ui png this orchestrator captures → shot.png
+   * The manifest's capturedAt = now (UTC), which is AFTER the run started, so the
+   * gate's freshness check passes. When a capture isn't available the manifest is
+   * written log-only and the gate honestly blocks (no visual evidence = not done).
+   *
+   * No-op (returns) when version or repoPath is unknown (scripted / version-less
+   * launches) — backward compatible. Wrapped in try/catch: a failure here NEVER
+   * breaks the run (原則④ — log it, keep going; the gate then blocks visibly).
+   */
+  private async writeStepEvidence(ctx: RunContext, stdout: string): Promise<void> {
+    const repoPath = this.repoPaths.get(ctx.runId as string);
+    const version = this.versions.get(ctx.runId as string);
+    if (repoPath === undefined || version === undefined) return; // no-op, backward compatible.
+
+    try {
+      const step = ctx.step as string;
+      const evidenceDir = join(repoPath, "aidlc-docs", version, "_evidence", step);
+      mkdirSync(evidenceDir, { recursive: true });
+
+      // log form: the run's real stdout, written to <evidenceDir>/run.log.
+      const logPath = join(evidenceDir, "run.log");
+      writeFileSync(logPath, stdout, "utf8");
+      const forms: EvidenceFormInput[] = [
+        { kind: "log", path: `_evidence/${step}/run.log` },
+      ];
+
+      // screenshot form: capture the verify-ui png, then copy it into the _evidence
+      // dir as shot.png so the manifest path is self-contained (a human can follow it).
+      // Include the form ONLY if the png actually exists — otherwise the manifest is
+      // log-only and the gate honestly blocks (no faked visual evidence).
+      await this.captureVerifyUi(ctx.runId as string);
+      const capturedPng = join(this.shotsDir, `${ctx.runId as string}.png`);
+      if (existsSync(capturedPng)) {
+        const shotPath = join(evidenceDir, "shot.png");
+        copyFileSync(capturedPng, shotPath);
+        forms.push({ kind: "screenshot", path: `_evidence/${step}/shot.png` });
+      }
+
+      writeEvidenceManifest(repoPath, version, step, forms, toUtcInstant(new Date()));
+      logInfo("LiveClaude auto-evidence written", {
+        runId: ctx.runId as string,
+        step,
+        forms: forms.map((f) => f.kind).join(","),
+      });
+    } catch (err) {
+      logError("LiveClaudeOrchestrator: writeStepEvidence failed (run continues; gate may block)", {
+        runId: ctx.runId as string,
+        step: ctx.step as string,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   /** Generator prompt: real composition when a composer is wired, else the stub. */
   private generatorPrompt(cmd: RunLaunch): string {
     if (!this.composer) return this.buildPrompt(cmd);
@@ -550,6 +615,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       buildRunContext(cmd, cmd.runId),
       this.generatorPrompt(cmd),
       cmd.repoPath,
+      { ...(cmd.version !== undefined ? { version: cmd.version } : {}) },
     );
   }
 
@@ -577,6 +643,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     // on the real model's output.
     this.startAttempt(buildRunContext(cmd, cmd.runId), prompt, cmd.repoPath, {
       completeness: true,
+      ...(cmd.version !== undefined ? { version: cmd.version } : {}),
     });
   }
 
@@ -589,12 +656,14 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
       phaseId: cmd.phaseId,
       step: cmd.step,
       repoPath: cmd.repoPath,
+      ...(cmd.version !== undefined ? { version: cmd.version } : {}),
       ...(cmd.worktreeRef !== undefined ? { worktreeRef: cmd.worktreeRef } : {}),
     };
     this.startAttempt(
       buildRunContext(cmd, cmd.newRunId),
       this.generatorPrompt(launchLike),
       cmd.repoPath,
+      { ...(cmd.version !== undefined ? { version: cmd.version } : {}) },
     );
   }
 
@@ -780,7 +849,7 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     ctx: RunContext,
     prompt: string,
     repoPath: string,
-    opts: { readonly completeness?: boolean } = {},
+    opts: { readonly completeness?: boolean; readonly version?: string } = {},
   ): void {
     // Defense in depth: refuse to spawn against a non-absolute / missing cwd.
     // Bun.spawn with a bad cwd can throw or behave oddly per-platform; failing
@@ -819,6 +888,9 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
     // Remember the cwd this run used so a later resume turn resumes in the same
     // project directory (Claude sessions are cwd-scoped — see repoPaths above).
     this.repoPaths.set(ctx.runId, repoPath);
+    // US-04: remember the cycle version so writeStepEvidence can locate the step's
+    // _evidence dir after the run drains. Absent (scripted/version-less) → skip.
+    if (opts.version !== undefined) this.versions.set(ctx.runId, opts.version);
 
     // Diagnostics (F-8/実機 slow-run 調査): record what was actually launched so a
     // slow/failed run is explainable — prompt size, model, and the wall-clock cap.
@@ -1018,6 +1090,12 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
           ...contentBlocks,
           ...designBlocks,
         ]);
+        // US-04: when this envelope yields a REVIEWABLE result, write the step's auto
+        // evidence manifest BEFORE emitting so the manifest exists when the app-layer
+        // gate runs on the emission (gate reads _evidence/<step>/manifest.json).
+        if (producesReview) {
+          await this.writeStepEvidence(ctx, stdout);
+        }
         for (const event of events) {
           await this.emit(ctx, event);
         }
@@ -1079,6 +1157,10 @@ export class LiveClaudeOrchestrator implements OrchestratorPort {
         ...(shotBlock ? [shotBlock] : []),
         ...mdImageBlocks,
       ];
+      // US-04: this legacy path always produces a reviewable ResultEmitted — write
+      // the step's auto evidence manifest BEFORE emitting so the manifest is on disk
+      // when the app-layer gate runs on the emission.
+      await this.writeStepEvidence(ctx, stdout);
       // SUCCESS: emit ONLY the review. Do NOT emit `done` — the run stays
       // `running` until the human approves the review (resume → done). This keeps
       // the live flow consistent with the scripted model's review→approve gate.
