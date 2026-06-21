@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tokens — S3 視覚カタログ / v0.0.6</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <section data-state="catalog" class="cat">
+      <h1>視覚トークン — v0.0.6 S3</h1>
+      <div class="sub">
+        web/src/styles/tokens.css と一致。dark-first / border-led 階層 / indigo+violet
+        アクセント / 状態色は意味で割り当て。v0.0.6 で自走状態バッジ(5 種)+ 要対応例外カードを追加。
+      </div>
+
+      <h2>サーフェス(4 段の深さ)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#09090b"></div><div class="nm">bg</div><div class="hx">#09090b</div></div>
+        <div class="sw"><div class="chip" style="background:#131316"></div><div class="nm">surface</div><div class="hx">#131316</div></div>
+        <div class="sw"><div class="chip" style="background:#1a1a20"></div><div class="nm">surface-2</div><div class="hx">#1a1a20</div></div>
+        <div class="sw"><div class="chip" style="background:#212129"></div><div class="nm">surface-3</div><div class="hx">#212129</div></div>
+        <div class="sw"><div class="chip" style="background:#26262d"></div><div class="nm">line</div><div class="hx">#26262d</div></div>
+        <div class="sw"><div class="chip" style="background:#34343d"></div><div class="nm">line-strong</div><div class="hx">#34343d</div></div>
+      </div>
+
+      <h2>テキスト(3 段)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#ededf0"></div><div class="nm">text-hi</div><div class="hx">#ededf0</div></div>
+        <div class="sw"><div class="chip" style="background:#9a9aa4"></div><div class="nm">text-mid</div><div class="hx">#9a9aa4</div></div>
+        <div class="sw"><div class="chip" style="background:#8b8b96"></div><div class="nm">text-low</div><div class="hx">#8b8b96</div></div>
+      </div>
+
+      <h2>アクセント(indigo + violet)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#6366f1"></div><div class="nm">primary</div><div class="hx">#6366f1</div></div>
+        <div class="sw"><div class="chip" style="background:#7c7ff5"></div><div class="nm">primary-hover</div><div class="hx">#7c7ff5</div></div>
+        <div class="sw"><div class="chip" style="background:#a78bfa"></div><div class="nm">violet</div><div class="hx">#a78bfa</div></div>
+      </div>
+
+      <h2>既存状態色(run / inbox 種別)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#2dd4bf"></div><div class="nm">running (teal)</div><div class="hx">#2dd4bf</div></div>
+        <div class="sw"><div class="chip" style="background:#f59e0b"></div><div class="nm">stalled (amber)</div><div class="hx">#f59e0b</div></div>
+        <div class="sw"><div class="chip" style="background:#22c55e"></div><div class="nm">done (green)</div><div class="hx">#22c55e</div></div>
+        <div class="sw"><div class="chip" style="background:#ef4444"></div><div class="nm">failed (red)</div><div class="hx">#ef4444</div></div>
+        <div class="sw"><div class="chip" style="background:#818cf8"></div><div class="nm">q (indigo)</div><div class="hx">#818cf8</div></div>
+        <div class="sw"><div class="chip" style="background:#c084fc"></div><div class="nm">review (violet)</div><div class="hx">#c084fc</div></div>
+      </div>
+
+      <h2>v0.0.6 新規 — 自走状態バッジ色(3 色追加)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#60a5fa"></div><div class="nm">backoff (blue)</div><div class="hx">#60a5fa</div></div>
+        <div class="sw"><div class="chip" style="background:#5eead4"></div><div class="nm">resume (lt-cyan)</div><div class="hx">#5eead4</div></div>
+        <div class="sw"><div class="chip" style="background:#818cf8; opacity:0.5"></div><div class="nm">parking = q</div><div class="hx">#818cf8</div></div>
+      </div>
+      <div class="sub" style="margin-bottom:16px">
+        parkingはQファミリのindigo(#818cf8)を流用。stall→retryはstalledのamber(#f59e0b)を流用。
+        実行中はrunningのteal(#2dd4bf)を流用。新色はbackoff青とresume薄シアンの2色のみ。
+      </div>
+
+      <h2>自走状態バッジ(5 種 — pill としてレンダリング)</h2>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+        <span class="pill running"><span class="dot"></span>● 実行中</span>
+        <span class="pill backoff"><span class="dot"></span>⟳ backoff待ち</span>
+        <span class="pill parking"><span class="dot"></span>⏸ parking</span>
+        <span class="pill stalled"><span class="dot"></span>⚠ stall→retry</span>
+        <span class="pill resume"><span class="dot"></span>◐ resume復帰</span>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+        <span class="badge running">● 実行中</span>
+        <span class="badge backoff">⟳ backoff待ち</span>
+        <span class="badge parking">⏸ parking</span>
+        <span class="badge stall">⚠ stall→retry</span>
+        <span class="badge resume">◐ resume復帰</span>
+      </div>
+
+      <h2>要対応例外カード(retry 上限到達 — 既存 Inbox と区別)</h2>
+      <div class="card card--attention" style="margin-bottom:0">
+        <div class="kind-icon attention">⚠</div>
+        <div class="body">
+          <div class="kind-label attention">要対応(自動復旧できず)</div>
+          <div class="card-title">v0.0.6 / S6 ドメインモデル — 3 回作り直しましたが完了条件を満たせませんでした</div>
+          <div class="card-sub" style="color:var(--color-text-mid)">他のタスクは止まらず進行中</div>
+        </div>
+        <div class="action">詳細 →</div>
+      </div>
+
+      <h2>既存 Inbox カード比較(routine Q / review)</h2>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="card">
+          <div class="kind-icon q">?</div>
+          <div class="body">
+            <div class="kind-label q">質問</div>
+            <div class="card-title">v0.0.6 / S1 — 要件の方針を 1 つ選んでください</div>
+            <div class="card-sub">回答 → AIが自動再開</div>
+          </div>
+          <div class="action">回答する →</div>
+        </div>
+        <div class="card">
+          <div class="kind-icon review">◎</div>
+          <div class="body">
+            <div class="kind-label review">視覚レビュー</div>
+            <div class="card-title">v0.0.6 / S3 — 画面デザインの承認</div>
+            <div class="card-sub">承認 → 次のステップへ自動進行</div>
+          </div>
+          <div class="action">見る →</div>
+        </div>
+      </div>
+
+      <h2>タイポグラフィ</h2>
+      <div class="type-row"><span class="lab">display 28/700</span><span style="font-size:1.75rem;font-weight:700;letter-spacing:-0.02em">自走ボード</span></div>
+      <div class="type-row"><span class="lab">h1 20/600</span><span style="font-size:1.25rem;font-weight:600;letter-spacing:-0.01em">稼働中タスク一覧</span></div>
+      <div class="type-row"><span class="lab">h2 16/600</span><span style="font-size:1rem;font-weight:600">振り返りメトリクス</span></div>
+      <div class="type-row"><span class="lab">body 14</span><span style="font-size:0.875rem">3 回作り直しましたが、完了条件を満たせませんでした</span></div>
+      <div class="type-row"><span class="lab">caption 12.5</span><span style="font-size:0.78rem;color:#9a9aa4">v0.0.6 / S7 ドメインコード — last activity 12 秒前</span></div>
+      <div class="type-row"><span class="lab">micro 11 (badge)</span><span style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.04em;color:#8b8b96">stall→retry</span></div>
+      <div class="type-row"><span class="lab">mono</span><span style="font-family:var(--font-mono);font-size:0.78rem;color:#a78bfa">BACKOFF 3/3</span></div>
+
+      <h2>余白(4px ベース)</h2>
+      <div class="space-row"><span class="lab">sp-1 4</span><span class="bar" style="width:4px"></span></div>
+      <div class="space-row"><span class="lab">sp-2 8</span><span class="bar" style="width:8px"></span></div>
+      <div class="space-row"><span class="lab">sp-3 12</span><span class="bar" style="width:12px"></span></div>
+      <div class="space-row"><span class="lab">sp-4 16</span><span class="bar" style="width:16px"></span></div>
+      <div class="space-row"><span class="lab">sp-5 20</span><span class="bar" style="width:20px"></span></div>
+      <div class="space-row"><span class="lab">sp-6 24</span><span class="bar" style="width:24px"></span></div>
+      <div class="space-row"><span class="lab">sp-7 32</span><span class="bar" style="width:32px"></span></div>
+
+      <h2>radius / shadow / motion</h2>
+      <div class="shadow-demo">
+        <div class="b" style="border-radius:6px">radius-sm 6</div>
+        <div class="b" style="border-radius:8px">radius-md 8</div>
+        <div class="b" style="border-radius:12px">radius-lg 12</div>
+        <div class="b" style="box-shadow:0 1px 2px rgba(0,0,0,0.4)">shadow-card</div>
+        <div class="b" style="box-shadow:0 12px 32px rgba(0,0,0,0.55)">shadow-popover</div>
+      </div>
+      <div class="sub" style="margin-top:16px">
+        motion: fast 150ms / panel 200ms / ease-out / ease-out-expo
+        cubic-bezier(0.16,1,0.3,1)。アニメーションは transform / opacity のみ。
+      </div>
+
+      <h2>ボタン</h2>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <button class="btn primary">+ 新規作成</button>
+        <button class="btn primary">この内容で S11 を回す</button>
+        <button class="btn">手動で再実行</button>
+        <button class="btn">スキップ</button>
+        <button class="btn ghost">詳細を見る →</button>
+      </div>
+    </section>
+  </body>
+</html>

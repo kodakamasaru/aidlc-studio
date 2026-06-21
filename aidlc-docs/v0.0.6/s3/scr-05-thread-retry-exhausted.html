@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-05: 会話スレッド(retry 上限到達 詳細) — v0.0.6 S3</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ── default: SCR-02「詳細を見る」から遷移。retry 上限到達の詳細ビュー ── -->
+    <section data-state="default" data-screen="scr-05-thread-retry-exhausted" class="frame-narrow">
+      <div class="scr-head">
+        <a class="back" href="#">‹ Inbox</a>
+        <span class="title">ドメインモデル</span>
+        <span class="crumb">v0.0.6 / S6</span>
+        <span class="spacer"></span>
+        <span class="pill attention-pill">
+          <span class="dot attention-dot"></span>
+          要対応(自動復旧できず)
+        </span>
+      </div>
+      <div class="scr-body">
+        <div class="thread">
+
+          <!-- スレッド要約行 -->
+          <div class="thread-summary">
+            集約・境界・用語の定義ドキュメントを 3 回作り直しましたが、完了条件を満たせませんでした。
+          </div>
+
+          <!-- 試行履歴パネル -->
+          <div class="attempt-panel">
+            <div class="attempt-panel-head">試行履歴</div>
+            <ol class="attempt-list" aria-label="自動試行の履歴">
+              <li class="attempt-row attempt-row--auto">
+                <span class="attempt-label">試行 1</span>
+                <span class="attempt-badge attempt-badge--auto">自動</span>
+                <span class="attempt-reason">集約境界が 1 つ未定義のまま生成された</span>
+              </li>
+              <li class="attempt-row attempt-row--auto">
+                <span class="attempt-label">試行 2</span>
+                <span class="attempt-badge attempt-badge--auto">自動</span>
+                <span class="attempt-reason">状態遷移の検証が不足していた</span>
+              </li>
+              <li class="attempt-row attempt-row--auto">
+                <span class="attempt-label">試行 3</span>
+                <span class="attempt-badge attempt-badge--auto">自動</span>
+                <span class="attempt-reason">完了条件のうち「全集約の不変条件が明記されていること」を満たせなかった</span>
+              </li>
+            </ol>
+          </div>
+
+          <!-- 最終結果ボックス(stall-box 適応 / attention カラー) -->
+          <div class="exhausted-box" role="status" aria-live="polite">
+            <div class="msg">
+              <div class="t">3 回作り直しましたが、完了条件を満たせませんでした。</div>
+              <div class="d">他のタスクは止まらず進行中です。このカードを対処するまで S6 は保留になります。</div>
+            </div>
+          </div>
+
+          <!-- アクションバー -->
+          <div class="exhausted-actions" role="group" aria-label="対処アクション">
+            <button class="btn primary" tabindex="1">手動で再実行</button>
+            <button class="btn" tabindex="2">戻って直す</button>
+            <button class="btn ghost" tabindex="3">保留</button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

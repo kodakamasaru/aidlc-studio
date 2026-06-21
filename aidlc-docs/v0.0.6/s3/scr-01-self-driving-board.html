@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-01: 自走ボード</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ─── state: default (充実状態 — 複数バッジが見える) ─── -->
+    <section data-state="default" data-screen="scr-01-self-driving-board">
+      <div class="scr-head">
+        <span class="title">自走ボード</span>
+        <span class="crumb">›</span>
+        <button class="proj-switcher">self-management-app <span class="chev">▾</span></button>
+        <span class="spacer"></span>
+        <div class="parallel-bar">
+          <span style="font-size:var(--text-caption);color:var(--color-text-low)">並列</span>
+          <div class="fill">
+            <div class="seg"></div>
+            <div class="seg"></div>
+            <div class="seg"></div>
+            <div class="seg empty"></div>
+          </div>
+          <span style="font-size:var(--text-caption);color:var(--color-text-mid)">3 / 4</span>
+        </div>
+      </div>
+      <div class="scr-body">
+
+        <!-- 稼働中(今動いているタスク) -->
+        <div class="section-head">
+          <span class="sh-label">稼働中(今動いているタスク)</span>
+          <span class="sh-line"></span>
+          <span class="sh-count">3 件</span>
+        </div>
+        <div class="task-list">
+          <!-- 実行中 -->
+          <div class="task-row">
+            <span class="badge running">● 実行中</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.6 / S7</span>ドメインコード
+              </span>
+            </div>
+            <span class="task-meta">last activity 12 秒前</span>
+          </div>
+          <!-- 実行中 -->
+          <div class="task-row">
+            <span class="badge running">● 実行中</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.6 / S9</span>シナリオ検証
+              </span>
+            </div>
+            <span class="task-meta">last activity 4 秒前</span>
+          </div>
+          <!-- resume復帰 -->
+          <div class="task-row">
+            <span class="badge resume">◐ resume復帰</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.6 / S8</span>統合(再起動後の継続)
+              </span>
+            </div>
+            <span class="task-meta">last activity 31 秒前</span>
+          </div>
+        </div>
+
+        <!-- 待ち / 復帰中 -->
+        <div class="section-head">
+          <span class="sh-label">待ち / 復帰中</span>
+          <span class="sh-line"></span>
+          <span class="sh-count">3 件</span>
+        </div>
+        <div class="task-list">
+          <!-- parking -->
+          <div class="task-row">
+            <span class="badge parking">⏸ parking</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.6 / S2</span>画面レビュー
+              </span>
+              <div class="task-note">Inbox で回答待ち</div>
+            </div>
+            <span class="task-meta">
+              <button class="btn ghost" style="font-size:var(--text-caption);padding:4px 10px;">Inbox で回答 →</button>
+            </span>
+          </div>
+          <!-- backoff待ち -->
+          <div class="task-row">
+            <span class="badge backoff">⟳ backoff待ち</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.7 / S5</span>並行作業単位
+              </span>
+              <div class="task-note">利用上限 — 約 4 分後に自動再開</div>
+            </div>
+            <span class="task-meta">3 分 52 秒後</span>
+          </div>
+          <!-- stall→retry -->
+          <div class="task-row">
+            <span class="badge stall">⚠ stall→retry</span>
+            <div>
+              <span class="task-label">
+                <span class="task-cycle">v0.0.6 / S6</span>ドメインモデル
+              </span>
+              <div class="task-note">無音 90 秒 — 自動作り直し (2/3)</div>
+            </div>
+            <span class="task-meta">自動復旧中…</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── state: empty (稼働なし) ─── -->
+    <section data-state="empty" data-screen="scr-01-self-driving-board">
+      <div class="scr-head">
+        <span class="title">自走ボード</span>
+        <span class="crumb">›</span>
+        <button class="proj-switcher">self-management-app <span class="chev">▾</span></button>
+        <span class="spacer"></span>
+        <div class="parallel-bar">
+          <span style="font-size:var(--text-caption);color:var(--color-text-low)">並列</span>
+          <div class="fill">
+            <div class="seg empty"></div>
+            <div class="seg empty"></div>
+            <div class="seg empty"></div>
+            <div class="seg empty"></div>
+          </div>
+          <span style="font-size:var(--text-caption);color:var(--color-text-mid)">0 / 4</span>
+        </div>
+      </div>
+      <div class="scr-body">
+        <div class="section-head">
+          <span class="sh-label">稼働中(今動いているタスク)</span>
+          <span class="sh-line"></span>
+          <span class="sh-count">0 件</span>
+        </div>
+        <div class="empty">
+          <div class="glyph">⬛</div>
+          <div class="t">現在稼働中のタスクはありません</div>
+          <div class="d">スケジューラが次の実行可能なタスクを待機中です。<br>Human Inbox に未対応の項目があると自走が止まります。</div>
+          <button class="btn" style="margin-top:8px;">Inbox を確認する →</button>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

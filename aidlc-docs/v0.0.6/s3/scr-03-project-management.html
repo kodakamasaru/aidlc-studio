@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-03: プロジェクト 作成/切替/リセット</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ─── state: default (プロジェクト一覧) ─── -->
+    <section data-state="default" data-screen="scr-03-project-management">
+      <div class="scr-head">
+        <span class="title">プロジェクト</span>
+        <span class="spacer"></span>
+        <button class="btn primary">+ 新規作成</button>
+      </div>
+      <div class="scr-body">
+
+        <!-- legacy 移行バナー -->
+        <div class="legacy-banner" style="margin-bottom:var(--sp-5);">
+          <span style="font-size:1rem;">⚠</span>
+          <div class="lm">
+            <div class="lt">旧形式のプロジェクトを検出しました</div>
+            <div class="ld">booking-system は旧形式です。ワンクリックで安全に移行できます(バックアップを自動取得します)。</div>
+          </div>
+          <button class="btn" style="font-size:var(--text-caption);padding:6px 14px;white-space:nowrap;">安全に移行する →</button>
+        </div>
+
+        <!-- プロジェクト一覧 -->
+        <div class="proj-list">
+
+          <!-- アクティブ -->
+          <div class="proj-row active">
+            <div class="proj-dot active"></div>
+            <div class="proj-body">
+              <div class="proj-name">self-management-app</div>
+              <div class="proj-cycle">現在: v0.0.6 / S6 進行中</div>
+            </div>
+            <div class="actions">
+              <span class="badge running" style="font-size:var(--text-micro);">● 現在のプロジェクト</span>
+              <button class="btn ghost" style="font-size:var(--text-caption);padding:4px 8px;">⋯</button>
+            </div>
+          </div>
+
+          <!-- 非アクティブ -->
+          <div class="proj-row">
+            <div class="proj-dot"></div>
+            <div class="proj-body">
+              <div class="proj-name">inventory-tool</div>
+              <div class="proj-cycle">v0.0.2 / 完了</div>
+            </div>
+            <div class="actions">
+              <button class="btn" style="font-size:var(--text-caption);padding:6px 14px;">切替</button>
+              <button class="btn ghost" style="font-size:var(--text-caption);padding:4px 8px;">⋯</button>
+            </div>
+          </div>
+
+          <!-- 旧形式 -->
+          <div class="proj-row" style="border-color:var(--color-stalled-border);background:var(--color-stalled-soft);">
+            <div class="proj-dot" style="border-color:var(--color-stalled-border);"></div>
+            <div class="proj-body">
+              <div class="proj-name" style="color:var(--color-text-mid);">booking-system</div>
+              <div class="proj-cycle" style="color:var(--color-stalled);">⚠ 旧形式 — 移行が必要です</div>
+            </div>
+            <div class="actions">
+              <button class="btn" style="font-size:var(--text-caption);padding:6px 14px;color:var(--color-stalled);border-color:var(--color-stalled-border);">安全に移行</button>
+              <button class="btn ghost" style="font-size:var(--text-caption);padding:4px 8px;">⋯</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- リセットメニューの注記 -->
+        <div style="font-size:var(--text-caption);color:var(--color-text-low);margin-top:var(--sp-4);">
+          ⋯ メニュー: リセット(確認 + バックアップ付き) / 表示名の変更
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── state: dialog (新規作成ダイアログ) ─── -->
+    <section data-state="dialog" data-screen="scr-03-project-management" style="position:relative;min-height:520px;">
+      <div class="scr-head">
+        <span class="title">プロジェクト</span>
+        <span class="spacer"></span>
+        <button class="btn primary" style="opacity:0.4;">+ 新規作成</button>
+      </div>
+      <!-- ボード本体(背景として薄く) -->
+      <div class="scr-body" style="opacity:0.3;user-select:none;">
+        <div class="proj-list">
+          <div class="proj-row active">
+            <div class="proj-dot active"></div>
+            <div class="proj-body">
+              <div class="proj-name">self-management-app</div>
+              <div class="proj-cycle">現在: v0.0.6 / S6 進行中</div>
+            </div>
+          </div>
+          <div class="proj-row">
+            <div class="proj-dot"></div>
+            <div class="proj-body">
+              <div class="proj-name">inventory-tool</div>
+              <div class="proj-cycle">v0.0.2 / 完了</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ダイアログ オーバーレイ -->
+      <div style="position:absolute;inset:0;background:rgba(9,9,11,0.65);display:flex;align-items:center;justify-content:center;z-index:10;">
+        <div class="dialog">
+          <div class="dialog-head">
+            <span class="title">新規プロジェクト</span>
+            <span class="close">✕</span>
+          </div>
+          <div class="dialog-body">
+            <div class="field">
+              <div class="label">表示名</div>
+              <input type="text" placeholder="例: shopping-app" />
+            </div>
+            <div class="field">
+              <div class="label">対象リポ</div>
+              <div class="pick-btn">
+                <span>📁</span>
+                <span>ローカルのリポを選択…</span>
+              </div>
+            </div>
+          </div>
+          <div class="dialog-foot">
+            <button class="btn ghost">取消</button>
+            <button class="btn primary">作成</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

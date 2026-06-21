@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-02: Inbox「要対応」例外カード</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ─── state: default (routine Q/レビューカード + 要対応カードが混在) ─── -->
+    <section data-state="default" data-screen="scr-02-inbox-retry-exhausted">
+      <div class="scr-head">
+        <span class="title">Human Inbox</span>
+        <span class="spacer"></span>
+        <span class="state-tag">未対応 4 件</span>
+      </div>
+      <div class="scr-body">
+
+        <div class="inbox-meta">
+          <span class="count">すべて表示中(4 件)</span>
+          <button class="btn ghost" style="font-size:var(--text-caption);padding:4px 10px;">既読をまとめる</button>
+        </div>
+
+        <!-- routine Q カード -->
+        <div class="card">
+          <div class="kind-icon q">?</div>
+          <div class="body">
+            <div class="kind-label q">質問</div>
+            <div class="card-title">v0.0.6 / S1 — 要件の方針を 1 つ選んでください</div>
+            <div class="card-sub">スケジューラが回答を待っています。回答後、自動で次のステップへ進みます。</div>
+          </div>
+          <div class="action">回答する →</div>
+        </div>
+
+        <!-- routine レビューカード -->
+        <div class="card">
+          <div class="kind-icon review">◎</div>
+          <div class="body">
+            <div class="kind-label review">視覚レビュー</div>
+            <div class="card-title">v0.0.6 / S3 — 画面デザインの承認</div>
+            <div class="card-sub">5 画面のデザイン案が揃いました。承認後、実装フェーズへ自動進行します。</div>
+          </div>
+          <div class="action">見る →</div>
+        </div>
+
+        <!-- 区切り(要対応ゾーン) -->
+        <div style="display:flex;align-items:center;gap:var(--sp-3);margin:var(--sp-4) 0 var(--sp-3);">
+          <span style="font-size:var(--text-micro);font-weight:700;color:var(--color-attention);text-transform:uppercase;letter-spacing:0.05em;">要対応</span>
+          <div style="flex:1;height:1px;background:var(--color-attention-border);"></div>
+          <span style="font-size:var(--text-micro);color:var(--color-text-low);">自動復旧できなかった項目</span>
+        </div>
+
+        <!-- 要対応 例外カード — retry 上限到達 -->
+        <div class="card card--attention">
+          <div class="kind-icon attention" style="width:34px;height:34px;display:grid;place-items:center;border-radius:var(--radius-md);font-size:1rem;font-weight:700;color:var(--color-attention);background:var(--color-attention-soft);border:1px solid var(--color-attention-border);">⚠</div>
+          <div class="body">
+            <div class="kind-label attention" style="font-size:var(--text-caption);font-weight:600;color:var(--color-attention);">要対応(自動復旧できず)</div>
+            <div class="card-title">v0.0.6 / S6 ドメインモデル</div>
+            <div class="card-sub" style="color:var(--color-text-mid);">
+              3 回作り直しましたが、完了条件を満たせませんでした。
+            </div>
+            <div class="card-sub" style="color:var(--color-text-low);margin-top:4px;">
+              他のタスクは止まらず進行中
+            </div>
+            <div style="display:flex;gap:var(--sp-2);margin-top:var(--sp-3);">
+              <button class="btn primary" style="font-size:var(--text-caption);padding:6px 14px;">手動で再実行</button>
+              <button class="btn" style="font-size:var(--text-caption);padding:6px 14px;">戻って直す</button>
+              <button class="btn" style="font-size:var(--text-caption);padding:6px 14px;">保留</button>
+              <button class="btn ghost" style="font-size:var(--text-caption);padding:6px 14px;">詳細を見る →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- routine 実機確認カード -->
+        <div class="card">
+          <div class="kind-icon" style="width:34px;height:34px;display:grid;place-items:center;border-radius:var(--radius-md);font-size:0.85rem;font-weight:700;color:var(--color-info);background:rgba(56,189,248,0.13);border:1px solid rgba(56,189,248,0.3);">実機</div>
+          <div class="body">
+            <div class="kind-label" style="font-size:var(--text-caption);font-weight:600;color:var(--color-info);">実機確認</div>
+            <div class="card-title">v0.0.6 / S10 — ログイン〜予約完了の動作確認</div>
+            <div class="card-sub">ブラウザでアプリを開き、シナリオを確認してください。</div>
+          </div>
+          <div class="action">確認する →</div>
+        </div>
+
+      </div>
+    </section>
+  </body>
+</html>

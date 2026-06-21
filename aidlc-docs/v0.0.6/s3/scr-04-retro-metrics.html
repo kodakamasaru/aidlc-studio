@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCR-04: 振り返りメトリクス レポート</title>
+    <link rel="stylesheet" href="./s3-base.css" />
+  </head>
+  <body>
+    <!-- ─── state: default ─── -->
+    <section data-state="default" data-screen="scr-04-retro-metrics">
+      <div class="scr-head">
+        <span class="title">振り返りメトリクス</span>
+        <span class="crumb">—</span>
+        <span style="font-size:var(--text-body);color:var(--color-text-mid);">v0.0.6</span>
+        <span class="spacer"></span>
+        <button class="btn primary">この内容で振り返りを回す</button>
+      </div>
+      <div class="scr-body">
+
+        <!-- 上段: 2カラムグリッド -->
+        <div class="metrics-grid">
+
+          <!-- 検出ゲート別バグ数 -->
+          <div class="metrics-panel">
+            <div class="mp-head">検出ゲート別バグ数</div>
+            <div class="mp-body">
+              <div class="bar-row">
+                <span class="br-label">証拠ゲート</span>
+                <div class="br-track"><div class="br-fill" style="width:70%"></div></div>
+                <span class="br-count">7</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">完了条件チェック</span>
+                <div class="br-track"><div class="br-fill warn" style="width:40%"></div></div>
+                <span class="br-count">4</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">成果物突合</span>
+                <div class="br-track"><div class="br-fill" style="width:20%"></div></div>
+                <span class="br-count">2</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">人間レビュー</span>
+                <div class="br-track"><div class="br-fill" style="width:10%"></div></div>
+                <span class="br-count">1</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ステップ別所要時間 -->
+          <div class="metrics-panel">
+            <div class="mp-head">ステップ別所要(分)</div>
+            <div class="mp-body">
+              <div class="bar-row">
+                <span class="br-label">S1 要件定義</span>
+                <div class="br-track"><div class="br-fill" style="width:30%"></div></div>
+                <span class="br-count">18</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">S6 ドメインモデル</span>
+                <div class="br-track"><div class="br-fill warn" style="width:70%"></div></div>
+                <span class="br-count">42</span>
+                <span class="br-note">retry 2</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">S7 ドメインコード</span>
+                <div class="br-track"><div class="br-fill" style="width:42%"></div></div>
+                <span class="br-count">25</span>
+              </div>
+              <div class="bar-row">
+                <span class="br-label">S9 シナリオ検証</span>
+                <div class="br-track"><div class="br-fill warn" style="width:52%"></div></div>
+                <span class="br-count">31</span>
+                <span class="br-note">retry 1</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自動復旧ステータス -->
+        <div class="recover-box">
+          <div class="rb-item">
+            <div class="num ok">2</div>
+            <div class="lbl">backoff 自動再開</div>
+          </div>
+          <div class="rb-sep"></div>
+          <div class="rb-item">
+            <div class="num warn">3</div>
+            <div class="lbl">stall→自動作り直し</div>
+          </div>
+          <div class="rb-sep"></div>
+          <div class="rb-item">
+            <div class="num warn">1</div>
+            <div class="lbl">要対応(Inbox 落ち)</div>
+          </div>
+          <div class="rb-sep"></div>
+          <div class="rb-item" style="flex:1;align-items:flex-start;padding-left:var(--sp-4);">
+            <div style="font-size:var(--text-caption);color:var(--color-text-low);margin-bottom:4px;">自動復旧率</div>
+            <div style="font-size:var(--text-h1);font-weight:700;color:var(--color-done);">83%</div>
+            <div style="font-size:var(--text-micro);color:var(--color-text-low);">5 / 6 件を自動復旧</div>
+          </div>
+        </div>
+
+        <!-- 人間介在 Q&A サマリ -->
+        <div class="metrics-panel" style="margin-bottom:var(--sp-5);">
+          <div class="mp-head">人間介在(Q&amp;A) — 介在点の内訳</div>
+          <div class="mp-body">
+            <div style="display:flex;gap:var(--sp-7);margin-bottom:var(--sp-4);">
+              <div>
+                <div style="font-size:var(--text-display);font-weight:700;color:var(--color-text-hi);">6</div>
+                <div style="font-size:var(--text-caption);color:var(--color-text-low);">Q 件数</div>
+              </div>
+              <div>
+                <div style="font-size:var(--text-display);font-weight:700;color:var(--color-done);">6</div>
+                <div style="font-size:var(--text-caption);color:var(--color-text-low);">回答済み</div>
+              </div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;">
+                <span class="badge done" style="font-size:var(--text-caption);padding:4px 12px;">● 全件対応済み</span>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--color-line);padding-top:var(--sp-3);">
+              <div style="font-size:var(--text-caption);font-weight:600;color:var(--color-text-low);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:var(--sp-3);">介在点の内訳</div>
+              <div class="summary-row">
+                <span class="sk">要件・方針選択</span>
+                <span><span class="sv">3</span>&nbsp;<span class="sn">件</span></span>
+              </div>
+              <div class="summary-row">
+                <span class="sk">画面デザイン承認</span>
+                <span><span class="sv">2</span>&nbsp;<span class="sn">件</span></span>
+              </div>
+              <div class="summary-row">
+                <span class="sk">振り返り・改善選択</span>
+                <span><span class="sv">1</span>&nbsp;<span class="sn">件</span></span>
+              </div>
+              <div class="summary-row" style="margin-top:var(--sp-2);">
+                <span class="sk" style="color:var(--color-done);font-weight:600;">設計外の介在点</span>
+                <span><span class="sv" style="color:var(--color-done);">0</span>&nbsp;<span class="sn">件 ✓</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- アクション -->
+        <div style="display:flex;justify-content:flex-end;gap:var(--sp-3);">
+          <button class="btn ghost">CSV 出力</button>
+          <button class="btn primary">この内容で振り返りを回す</button>
+        </div>
+
+      </div>
+    </section>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+# v0.0.6 引き継ぎ台帳(ledger / 正本 = file)。schema = kit/rules/ledger.md。
+# 規約: D/確定項目に state: carried|done|dropped。carried は into: 必須、dropped は reason:、done は closed_in: 必須。
+# 次サイクル(v0.0.7)S1 は本 ledger の未 reconcile(carried で into が当該サイクル)をゼロにするまで進めない。
+#
+# ── このサイクルの位置づけ ──
+# v0.0.6 = 放置可能な自走エンジン core(durable / self-healing)を載せる。13 US。
+# 前サイクル(v0.0.5)から into: v0.0.6 の carried 5 件(AUTO-ORCH-core / O3-live-resume-continuation-unproven /
+# P-ARCH-01-methodology-platform-link / P-ARCH-02-cross-cycle-project-param / S8-Q02)は S1 US 群(US-01〜06,09,10,11)
+# として US 化済(reconcile 反映済 / 各 step 完了・サイクル CLOSE 時に done へ更新)。
+# あわせて v0.0.7 予定だった 3 件を前倒し(下記)。
+
+# ── サイクル scope の確定(Q-01/Q-02/Q-03 / D-02〜D-06)──
+
+- id: SCOPE-v006
+  origin: v0.0.6/s1/index.md (Q-01/Q-02/Q-03 / D-02〜D-06)
+  decision: >
+    v0.0.6 = 放置可能な自走エンジン core。13 US。AUTO-ORCH-core(§1-§12)を US-01〜06、監視層
+    (Agent SDK query() 移行 + 逐次 stream 監視 + live-run 稼働台帳)を US-07/08(Q-02 前倒し)、
+    P-ARCH を US-09(drift 検出)/US-10(project パラメータ化)、legacy silent 再生成を US-11、
+    escalation 前倒しの F3/IMP5 を US-12/13(Q-03)。v0.0.7 に残すのは worktree 真の並行(N>1)+
+    競合分離・マージのみ。
+  state: done
+  closed_in: v0.0.6/s1/index.md
+
+# ── 監視/並行: 監視部分を v0.0.6 へ前倒し、worktree 並行のみ v0.0.7 へ narrowing(Q-02 / D-05 訂正)──
+
+- id: AUTO-ORCH-monitoring-parallel
+  origin: v0.0.5/ledger.yml (into v0.0.7) → v0.0.6 S1 で監視部分を前倒し(Q-02)
+  decision: >
+    worktree 複数による真の並行サイクル(N>1)+ 書込競合分離・マージ戦略 のみ。監視部分
+    (CLI spawn → Agent SDK query() 全面移行 + 逐次 stream 監視 + live-run 稼働台帳 pid↔session_id↔last-activity)は
+    v0.0.6 US-07/US-08 で実装する(idle stall 検知に load-bearing なため前倒し / 塊読みでは idle timeout を作れない)。
+  state: carried
+  into: v0.0.7
+  reason: >
+    worktree 真の並行は書込競合・マージ戦略を伴う重インフラで、自走 core(監視層含む)が乗ってから着手する。
+
+# ── escalation 前倒し: 2 連続 carried = 3 度目 defer 禁止(Q-03 / D-06)──
+# F3 / IMP5 は v0.0.4 → v0.0.5 と 2 サイクル連続 carried(into v0.0.7)。reconcile ゲートが escalation 発火し
+# 3 度目の v0.0.7 送りを BLOCK。本サイクルで first-class US 化(US-12 / US-13)= into を v0.0.6 へ再ターゲット。
+
+- id: F3-project-management-ui
+  origin: v0.0.4/ledger.yml → v0.0.5(into v0.0.7)→ v0.0.6 S1 で escalation 前倒し(Q-03)
+  decision: >
+    web からプロジェクト作成/リセット/切替の UI + legacy(step-model-v2 前 / S2.5 入り)の安全な正規化
+    マイグレーション + 一時 cleanup script・backup の整理。US-12 として実装。
+  state: carried
+  into: v0.0.6
+  reason: >
+    2 サイクル連続 carried で escalation 則発火(3 度目 defer 禁止)。本サイクルで US 化(US-12)。
+    各 step 完了・サイクル CLOSE 時に done(closed_in)へ更新する。
+
+- id: S11-IMP5-retro-metrics-autocollect
+  origin: v0.0.4/ledger.yml → v0.0.5(into v0.0.7)→ v0.0.6 S1 で escalation 前倒し(Q-03)
+  decision: >
+    run/HumanTask store から検出ゲート別バグ・Step 別所要・Q&A 件数を自動集計するレポートを作り S11 入力に供給。US-13 として実装。
+  state: carried
+  into: v0.0.6
+  reason: >
+    2 サイクル連続 carried で escalation 則発火(S11 改善提案の deferral 逆選択 = ルールが最も嫌う型)。
+    本サイクルで US 化(US-13)。サイクル CLOSE 時に done(closed_in)へ更新する。
